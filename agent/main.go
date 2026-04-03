@@ -23,9 +23,9 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/pion/webrtc/v3"
 	"github.com/pion/webrtc/v3/pkg/media"
-	"github.com/remotectl/agent/input"
-	"github.com/remotectl/agent/pipeline"
-	"github.com/remotectl/agent/session"
+	"github.com/bsh888/remotectl/agent/input"
+	"github.com/bsh888/remotectl/agent/pipeline"
+	"github.com/bsh888/remotectl/agent/session"
 	"gopkg.in/yaml.v3"
 )
 

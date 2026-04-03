@@ -1,4 +1,4 @@
-module github.com/remotectl/server
+module github.com/bsh888/remotectl/server
 
 go 1.26
 

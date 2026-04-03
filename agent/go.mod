@@ -1,4 +1,4 @@
-module github.com/remotectl/agent
+module github.com/bsh888/remotectl/agent
 
 go 1.26
 
