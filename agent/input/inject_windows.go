@@ -40,26 +40,40 @@ const (
 
 // INPUT structure for SendInput
 // https://docs.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-input
+//
+// 64-bit Windows memory layout of INPUT:
+//   offset 0:  type    (DWORD, 4 bytes)
+//   offset 4:  <4-byte alignment padding — the anonymous union is 8-byte aligned>
+//   offset 8:  union   (32 bytes, size of the largest member MOUSEINPUT)
+//   total: 40 bytes
+//
+// Both structs below must be exactly 40 bytes with fields at the correct offsets.
+// unsafe.Sizeof is passed as cbSize to SendInput; if it ≠ 40 the call fails silently.
+
 type mouseInput struct {
-	inputType uint32
-	dx        int32
-	dy        int32
-	mouseData int32
-	flags     uint32
-	time      uint32
-	extraInfo uintptr
-	// padding for 64-bit alignment (INPUT union is 40 bytes on 64-bit)
-	_ [4]byte
+	inputType uint32   // offset  0
+	_         uint32   // offset  4 — alignment gap before union
+	dx        int32    // offset  8
+	dy        int32    // offset 12
+	mouseData int32    // offset 16
+	flags     uint32   // offset 20
+	time      uint32   // offset 24
+	_         uint32   // offset 28 — alignment gap before ULONG_PTR
+	extraInfo uintptr  // offset 32
+	// total: 40 bytes ✓
 }
 
 type keyboardInput struct {
-	inputType uint32
-	vk        uint16
-	scan      uint16
-	flags     uint32
-	time      uint32
-	extraInfo uintptr
-	_ [8]byte
+	inputType uint32   // offset  0
+	_         uint32   // offset  4 — alignment gap before union
+	vk        uint16   // offset  8
+	scan      uint16   // offset 10
+	flags     uint32   // offset 12
+	time      uint32   // offset 16
+	_         uint32   // offset 20 — alignment gap before ULONG_PTR
+	extraInfo uintptr  // offset 24
+	_         [8]byte  // offset 32 — pad union to 32 bytes (same as MOUSEINPUT)
+	// total: 40 bytes ✓
 }
 
 func inject(e Event) {

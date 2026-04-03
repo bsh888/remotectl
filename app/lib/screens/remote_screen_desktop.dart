@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -28,10 +27,13 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
   // ── state ──────────────────────────────────────────────────────────────────
   late bool _swapCtrlCmd;
   bool _cursorInVideo = false;
+  Offset? _localCursorPos; // cursor position in widget coords for software cursor
 
-  // Toolbar auto-hide
-  bool _toolbarVisible = true;
-  Timer? _hideTimer;
+  // Keyboard focus
+  final FocusNode _focusNode = FocusNode();
+
+  // Panel toggle (click the icon to open/close)
+  bool _panelOpen = false;
 
   // Mouse throttle
   int _lastMouseMs = 0;
@@ -41,6 +43,11 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
     super.initState();
     WakelockPlus.enable();
     _swapCtrlCmd = _defaultSwap();
+    // Request keyboard focus after the first frame — autofocus alone is not
+    // reliable on macOS desktop when the route is pushed via Navigator.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
+    });
   }
 
   bool _defaultSwap() {
@@ -56,18 +63,8 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
   @override
   void dispose() {
     WakelockPlus.disable();
-    _hideTimer?.cancel();
+    _focusNode.dispose();
     super.dispose();
-  }
-
-  // ── toolbar auto-hide ──────────────────────────────────────────────────────
-
-  void _showToolbar() {
-    if (!_toolbarVisible) setState(() => _toolbarVisible = true);
-    _hideTimer?.cancel();
-    _hideTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted) setState(() => _toolbarVisible = false);
-    });
   }
 
   // ── coordinate mapping ─────────────────────────────────────────────────────
@@ -157,8 +154,20 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
 
   // ── mouse ──────────────────────────────────────────────────────────────────
 
+  void _onPointerHover(PointerHoverEvent e, Size widgetSize) {
+    setState(() => _localCursorPos = e.localPosition);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastMouseMs < 8) return; // ~120 Hz throttle
+    _lastMouseMs = now;
+    final renderer = widget.session.renderer;
+    if (renderer == null) return;
+    final (x, y) = _toVideoCoords(e.localPosition, widgetSize, renderer);
+    widget.session.sendInput({'event': 'mousemove', 'x': x, 'y': y});
+  }
+
   void _onPointerMove(PointerMoveEvent e, Size widgetSize) {
-    _showToolbar();
+    // Fires during click-drag (button held). Update cursor position and send move.
+    setState(() => _localCursorPos = e.localPosition);
     final now = DateTime.now().millisecondsSinceEpoch;
     if (now - _lastMouseMs < 8) return; // ~120 Hz throttle
     _lastMouseMs = now;
@@ -170,6 +179,8 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
   }
 
   void _onPointerDown(PointerDownEvent e, Size widgetSize) {
+    // Re-grab keyboard focus on every click so typing always works.
+    _focusNode.requestFocus();
     final renderer = widget.session.renderer;
     if (renderer == null) return;
     final (x, y) = _toVideoCoords(e.localPosition, widgetSize, renderer);
@@ -272,11 +283,21 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
 
   Widget _buildConnected(BuildContext context) {
     return Focus(
+      focusNode: _focusNode,
       autofocus: true,
       onKeyEvent: _onKey,
       child: Stack(
         children: [
-          // ── Video + mouse layer ──
+          // ── Video layer ──
+          Positioned.fill(
+            child: RTCVideoView(
+              widget.session.renderer!,
+              objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+              mirror: false,
+            ),
+          ),
+
+          // ── Event capture overlay (ABOVE the platform view so it gets events) ──
           Positioned.fill(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -287,113 +308,146 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
                       ? SystemMouseCursors.none
                       : SystemMouseCursors.basic,
                   onEnter: (_) => setState(() => _cursorInVideo = true),
-                  onExit: (_) => setState(() => _cursorInVideo = false),
+                  onExit: (_) => setState(() {
+                    _cursorInVideo = false;
+                    _localCursorPos = null;
+                  }),
                   child: Listener(
                     behavior: HitTestBehavior.opaque,
+                    onPointerHover: (e) => _onPointerHover(e, widgetSize),
                     onPointerMove: (e) => _onPointerMove(e, widgetSize),
                     onPointerDown: (e) => _onPointerDown(e, widgetSize),
                     onPointerUp: (e) => _onPointerUp(e, widgetSize),
                     onPointerSignal: _onPointerSignal,
-                    child: RTCVideoView(
-                      widget.session.renderer!,
-                      objectFit:
-                          RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
-                      mirror: false,
-                    ),
+                    child: const SizedBox.expand(),
                   ),
                 );
               },
             ),
           ),
 
-          // ── Toolbar (auto-hide) ──
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 200),
-            top: _toolbarVisible ? 0 : -56,
-            left: 0,
-            right: 0,
-            child: _buildToolbar(context),
+          // ── Software cursor (replaces hidden system cursor inside video) ──
+          if (_cursorInVideo && _localCursorPos != null)
+            Positioned(
+              left: _localCursorPos!.dx,
+              top: _localCursorPos!.dy,
+              child: const IgnorePointer(
+                child: CustomPaint(
+                  size: Size(20, 20),
+                  painter: _CursorPainter(),
+                ),
+              ),
+            ),
+
+          // ── Floating control icon (top-right) ──
+          Positioned(
+            top: 8,
+            right: 8,
+            child: _buildToggleButton(context),
           ),
 
-          // ── Mouse-move trigger for toolbar reveal ──
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 4,
-            child: MouseRegion(
-              onEnter: (_) => _showToolbar(),
-              child: const SizedBox.expand(),
+          // ── Control panel (expands below icon when open) ──
+          if (_panelOpen)
+            Positioned(
+              top: 38,
+              right: 8,
+              child: _buildPanel(context),
             ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildToolbar(BuildContext context) {
+  Widget _buildToggleButton(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        setState(() => _panelOpen = !_panelOpen);
+        // Re-grab focus after toggling so keyboard still works.
+        _focusNode.requestFocus();
+      },
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Container(
+          width: 26,
+          height: 26,
+          decoration: BoxDecoration(
+            color: _panelOpen
+                ? Colors.white.withOpacity(0.18)
+                : Colors.black.withOpacity(0.45),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(
+            _platformIcon(widget.remotePlatform),
+            size: 15,
+            color: Colors.white70,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPanel(BuildContext context) {
+    final name = widget.deviceName.isNotEmpty ? widget.deviceName : '远程桌面';
     return Container(
-      height: 48,
-      color: Colors.black.withOpacity(0.80),
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Row(
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.82),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white12),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Device icon + name
-          Icon(_platformIcon(widget.remotePlatform),
-              size: 16, color: Colors.white54),
-          const SizedBox(width: 6),
-          Text(
-            widget.deviceName.isNotEmpty ? widget.deviceName : '远程桌面',
-            style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 13,
-                fontWeight: FontWeight.w500),
-          ),
-
-          const Spacer(),
-
-          // Ctrl ⇄ Cmd toggle
-          _ToolbarToggle(
-            label: Platform.isMacOS ? 'Ctrl ⇄ ⌘' : '⌘ ⇄ Ctrl',
-            value: _swapCtrlCmd,
-            tooltip: Platform.isMacOS
-                ? 'Cmd+C/V/Z 自动转换为远程的 Ctrl+C/V/Z'
-                : 'Ctrl+C/V/Z 自动转换为远程 Mac 的 Cmd+C/V/Z',
-            onChanged: (v) => setState(() => _swapCtrlCmd = v),
-          ),
-          const SizedBox(width: 4),
-
-          // Paste clipboard
-          _ToolbarButton(
-            icon: Icons.content_paste,
-            label: '粘贴',
-            tooltip: '将本地剪贴板内容发送到远程（或直接 Ctrl+V）',
-            onTap: _pasteClipboard,
-          ),
-          const SizedBox(width: 4),
-
-          // Ctrl+Alt+Del (Windows)
-          if (widget.remotePlatform == 'windows' || widget.remotePlatform == '')
-            _ToolbarButton(
-              icon: Icons.power_settings_new,
-              label: 'CAD',
-              tooltip: 'Ctrl+Alt+Del',
-              onTap: _sendCtrlAltDel,
-            ),
-          if (widget.remotePlatform == 'windows' || widget.remotePlatform == '')
-            const SizedBox(width: 4),
-
-          // Disconnect
-          TextButton(
-            onPressed: () {
-              widget.session.disconnect();
-              Navigator.of(context).pop();
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.red.shade300,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            ),
-            child: const Text('断开', style: TextStyle(fontSize: 12)),
+          // Device name
+          Text(name,
+              style: const TextStyle(
+                  color: Colors.white54, fontSize: 11)),
+          const SizedBox(height: 8),
+          // Action row
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Ctrl ⇄ Cmd toggle
+              _PanelBtn(
+                label: Platform.isMacOS ? '⌘⇄Ctrl' : 'Ctrl⇄⌘',
+                active: _swapCtrlCmd,
+                onTap: () => setState(() => _swapCtrlCmd = !_swapCtrlCmd),
+              ),
+              const SizedBox(width: 6),
+              // Paste
+              _PanelBtn(
+                icon: Icons.content_paste,
+                tooltip: '粘贴',
+                onTap: () { _pasteClipboard(); setState(() => _panelOpen = false); },
+              ),
+              // Win key (Windows only)
+              if (widget.remotePlatform == 'windows') ...[
+                const SizedBox(width: 6),
+                _PanelBtn(
+                  label: '⊞',
+                  tooltip: 'Win',
+                  onTap: () { _sendWinKey(); setState(() => _panelOpen = false); },
+                ),
+                const SizedBox(width: 6),
+                _PanelBtn(
+                  label: 'CAD',
+                  tooltip: 'Ctrl+Alt+Del',
+                  onTap: () { _sendCtrlAltDel(); setState(() => _panelOpen = false); },
+                ),
+              ],
+              const SizedBox(width: 6),
+              // Disconnect
+              _PanelBtn(
+                icon: Icons.logout,
+                danger: true,
+                tooltip: '断开',
+                onTap: () {
+                  widget.session.disconnect();
+                  Navigator.of(context).pop();
+                },
+              ),
+            ],
           ),
         ],
       ),
@@ -420,6 +474,13 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
     }
   }
 
+  void _sendWinKey() {
+    widget.session.sendInput(
+        {'event': 'keydown', 'key': 'Meta', 'code': 'MetaLeft', 'mods': []});
+    widget.session.sendInput(
+        {'event': 'keyup', 'key': 'Meta', 'code': 'MetaLeft', 'mods': []});
+  }
+
   static IconData _platformIcon(String platform) {
     switch (platform) {
       case 'darwin':
@@ -432,117 +493,94 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
   }
 }
 
-// ── Toolbar widgets ───────────────────────────────────────────────────────────
+// ── Software cursor painter ───────────────────────────────────────────────────
+// Draws a classic arrow cursor at (0, 0) — place via Positioned so the tip
+// lands exactly on the pointer position.
 
-class _ToolbarButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String tooltip;
+class _CursorPainter extends CustomPainter {
+  const _CursorPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final fill = Paint()..color = const Color(0xFFFFFFFF)..style = PaintingStyle.fill;
+    final stroke = Paint()
+      ..color = const Color(0xFF000000)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+
+    // Arrow cursor path (tip at origin)
+    final path = Path()
+      ..moveTo(0, 0)
+      ..lineTo(0, 14)
+      ..lineTo(3.5, 10.5)
+      ..lineTo(6, 16)
+      ..lineTo(8, 15)
+      ..lineTo(5.5, 9.5)
+      ..lineTo(10, 9.5)
+      ..close();
+
+    canvas.drawPath(path, fill);
+    canvas.drawPath(path, stroke);
+  }
+
+  @override
+  bool shouldRepaint(_CursorPainter old) => false;
+}
+
+// ── Panel button ──────────────────────────────────────────────────────────────
+
+class _PanelBtn extends StatelessWidget {
+  final String? label;
+  final IconData? icon;
+  final String? tooltip;
+  final bool active;
+  final bool danger;
   final VoidCallback onTap;
 
-  const _ToolbarButton({
-    required this.icon,
-    required this.label,
-    required this.tooltip,
+  const _PanelBtn({
+    this.label,
+    this.icon,
+    this.tooltip,
+    this.active = false,
+    this.danger = false,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
+    Widget content = icon != null
+        ? Icon(icon, size: 14,
+            color: danger ? Colors.redAccent : Colors.white70)
+        : Text(label ?? '',
+            style: TextStyle(
+              fontSize: 11,
+              color: danger
+                  ? Colors.redAccent
+                  : active
+                      ? Colors.white
+                      : Colors.white70,
+            ));
+
+    Widget btn = MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(4),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 14, color: Colors.white60),
-              const SizedBox(width: 4),
-              Text(label,
-                  style: const TextStyle(fontSize: 12, color: Colors.white60)),
-            ],
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          decoration: BoxDecoration(
+            color: active
+                ? const Color(0xFF2563EB).withOpacity(0.7)
+                : Colors.white10,
+            borderRadius: BorderRadius.circular(5),
           ),
+          child: content,
         ),
       ),
     );
-  }
-}
 
-class _ToolbarToggle extends StatelessWidget {
-  final String label;
-  final String tooltip;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  const _ToolbarToggle({
-    required this.label,
-    required this.tooltip,
-    required this.value,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: () => onChanged(!value),
-        borderRadius: BorderRadius.circular(4),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 28,
-                height: 16,
-                child: _MiniSwitch(value: value),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: value ? const Color(0xFF86EFAC) : Colors.white54,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MiniSwitch extends StatelessWidget {
-  final bool value;
-  const _MiniSwitch({required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 150),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8),
-        color: value ? const Color(0xFF2563EB) : Colors.white24,
-      ),
-      child: Align(
-        alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-        child: Padding(
-          padding: const EdgeInsets.all(2),
-          child: Container(
-            width: 12,
-            height: 12,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white,
-            ),
-          ),
-        ),
-      ),
-    );
+    if (tooltip != null) {
+      return Tooltip(message: tooltip!, child: btn);
+    }
+    return btn;
   }
 }

@@ -75,8 +75,69 @@ remotectl/
 
 | 依赖 | 说明 |
 |------|------|
-| x264 静态库 | 放在 `agent/pipeline/x264/` 下（`libx264.a` + 头文件） |
+| Go | 官方安装包（`.msi`），从 [go.dev/dl](https://go.dev/dl/) 下载，**不要手动解压源码** |
+| x264 静态库 | 放在 `agent/pipeline/x264/` 下（`libx264.a` + `x264.h`） |
+| MSYS2 + MinGW-w64（Windows 本机编译） | 见下方说明 |
 | mingw-w64（macOS 交叉编译） | `brew install mingw-w64` |
+
+#### 在 Windows 本机编译 agent
+
+**1. 安装 Go**
+
+从 [go.dev/dl](https://go.dev/dl/) 下载 Windows `.msi` 安装包，按向导安装。
+安装完成后打开新终端，验证：
+
+```powershell
+go version   # 应输出版本号，如 go1.22.x windows/amd64
+go env GOROOT  # 应指向安装目录，如 C:\Program Files\Go
+```
+
+> **常见错误**：若出现 `package context is not in std (D:\go\src\context)` 等报错，
+> 说明 `GOROOT` 环境变量被手动设置成了错误路径。
+> 删除系统环境变量 `GOROOT`，重新安装 Go，或将其修正为 Go 的实际安装目录。
+
+**2. 安装 MSYS2 + MinGW-w64 及 x264**
+
+从 [msys2.org](https://www.msys2.org/) 安装 MSYS2，然后在 **MSYS2 MINGW64** 终端执行：
+
+```bash
+pacman -S mingw-w64-x86_64-gcc mingw-w64-x86_64-x264
+```
+
+将 x264 文件复制到项目：
+
+```powershell
+mkdir agent\pipeline\x264
+copy C:\msys64\mingw64\include\x264.h    agent\pipeline\x264\
+copy C:\msys64\mingw64\lib\libx264.a     agent\pipeline\x264\
+```
+
+**3. 将 MinGW bin 目录加入 PATH**
+
+永久生效（管理员 PowerShell）：
+
+```powershell
+[System.Environment]::SetEnvironmentVariable(
+  "PATH",
+  "C:\msys64\mingw64\bin;" + [System.Environment]::GetEnvironmentVariable("PATH","Machine"),
+  "Machine"
+)
+```
+
+重开终端后验证：`gcc --version`
+
+**4. 编译**
+
+在项目 `agent/` 目录下（PowerShell）：
+
+```powershell
+$env:CGO_ENABLED = "1"
+$env:CC          = "C:\msys64\mingw64\bin\gcc.exe"
+go build -ldflags="-s -w -H windowsgui" -o remotectl-agent-windows-amd64.exe
+```
+
+> **注意**：Windows CMD 不支持 `VAR=val cmd` 的 Unix 语法，必须用 `set VAR=val`
+> 或 PowerShell 的 `$env:VAR = "val"` 分行设置。
 
 ### 被控端 — Linux
 

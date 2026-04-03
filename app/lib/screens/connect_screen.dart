@@ -64,7 +64,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                   deviceName: deviceInfo.name,
                   remotePlatform: deviceInfo.platform,
                 )
-              : RemoteScreen(session: _session, deviceName: deviceInfo.name),
+              : RemoteScreen(session: _session, deviceName: deviceInfo.name, remotePlatform: deviceInfo.platform),
         ),
       );
     }

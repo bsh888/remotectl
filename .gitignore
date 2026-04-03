@@ -32,6 +32,7 @@ app/android/local.properties
 app/android/key.properties
 app/*.jks
 app/ios/Pods/
+app/ios/Podfile.lock
 app/ios/.symlinks/
 app/ios/Flutter/App.framework
 app/ios/Flutter/Flutter.framework
@@ -39,9 +40,17 @@ app/ios/Flutter/Generated.xcconfig
 app/ios/Flutter/flutter_export_environment.sh
 app/ios/Runner.xcworkspace/xcuserdata/
 app/macos/Pods/
+app/macos/Podfile.lock
 app/macos/.symlinks/
 app/macos/Flutter/GeneratedPluginRegistrant.swift
 app/macos/Flutter/ephemeral/
+app/macos/Runner.xcworkspace/xcuserdata/
+app/windows/flutter/generated_plugin_registrant.cc
+app/windows/flutter/generated_plugin_registrant.h
+app/windows/flutter/generated_plugins.cmake
+app/linux/flutter/generated_plugin_registrant.cc
+app/linux/flutter/generated_plugin_registrant.h
+app/linux/flutter/generated_plugins.cmake
 
 # ── IDE ──────────────────────────────────────────────────────
 .idea/
@@ -52,3 +61,7 @@ app/macos/Flutter/ephemeral/
 
 # ── Claude Code 内部状态 ─────────────────────────────────────
 .claude/
+
+# ── 压缩包 ────────────────────────────────────────────────────
+*.gz
+*.zip

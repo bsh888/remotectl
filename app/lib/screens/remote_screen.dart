@@ -8,11 +8,13 @@ import '../services/remote_session.dart';
 class RemoteScreen extends StatefulWidget {
   final RemoteSession session;
   final String deviceName;
+  final String remotePlatform; // 'darwin' | 'windows' | 'linux' | ''
 
   const RemoteScreen({
     super.key,
     required this.session,
     this.deviceName = '',
+    this.remotePlatform = '',
   });
 
   @override
@@ -544,6 +546,11 @@ class _RemoteScreenState extends State<RemoteScreen> {
           // ── function keys ──
           for (int i = 1; i <= 12; i++)
             _ModKey(label: 'F$i', onTap: () => _sendSpecialKey('F$i', 'F$i')),
+          // ── Win key (Windows only) ──
+          if (widget.remotePlatform == 'windows') ...[
+            sep(),
+            _ModKey(label: '⊞', onTap: () => _sendSpecialKey('Meta', 'MetaLeft')),
+          ],
         ]),
       ),
     );

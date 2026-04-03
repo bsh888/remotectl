@@ -46,6 +46,8 @@ class RemoteSession extends ChangeNotifier {
   RTCPeerConnection? _pc;
   RTCDataChannel? _inputDC;      // reliable+ordered: clicks, keys, scroll, paste
   RTCDataChannel? _inputMoveDC;  // unreliable+unordered: mousemove only
+  bool _inputDCOpen = false;
+  bool _inputMoveDCOpen = false;
   final _crypto = CryptoService();
   List<Map<String, dynamic>> _iceServers = [
     {'urls': 'stun:stun.l.google.com:19302'},
@@ -97,8 +99,10 @@ class RemoteSession extends ChangeNotifier {
   Future<void> disconnect() async {
     _inputDC?.close();
     _inputDC = null;
+    _inputDCOpen = false;
     _inputMoveDC?.close();
     _inputMoveDC = null;
+    _inputMoveDCOpen = false;
     await _pc?.close();
     _pc = null;
     _ws?.sink.close();
@@ -120,11 +124,22 @@ class RemoteSession extends ChangeNotifier {
     // mousemove goes through the unreliable channel — stale positions are
     // worthless and retransmitting them only adds latency.
     final isMove = event == 'mousemove';
-    final dc = isMove ? (_inputMoveDC ?? _inputDC) : _inputDC;
-    if (dc != null && dc.state == RTCDataChannelState.RTCDataChannelOpen) {
-      dc.send(RTCDataChannelMessage(jsonEncode(ev)));
-      return;
+
+    // Prefer DataChannel (P2P, low latency). Use the tracked _open flags instead
+    // of dc.state — flutter_webrtc updates state asynchronously via method
+    // channels, so dc.state may still read "connecting" even when the native
+    // channel is already open.
+    if (isMove) {
+      final dc = _inputMoveDCOpen ? _inputMoveDC : (_inputDCOpen ? _inputDC : null);
+      if (dc != null) {
+        try { dc.send(RTCDataChannelMessage(jsonEncode(ev))); return; } catch (_) {}
+      }
+    } else {
+      if (_inputDCOpen && _inputDC != null) {
+        try { _inputDC!.send(RTCDataChannelMessage(jsonEncode(ev))); return; } catch (_) {}
+      }
     }
+
     // Fallback: E2EE over WebSocket
     final ws = _ws;
     if (ws == null || !_crypto.hasSessionKey) return;
@@ -197,7 +212,15 @@ class RemoteSession extends ChangeNotifier {
         'payload': {'public_key': myPubKey},
       }));
     } catch (e) {
-      _setError('Key exchange failed: $e');
+      // Key exchange only protects the WebSocket input fallback path.
+      // WebRTC DataChannel (primary path) works without it — don't fail
+      // the whole session, just disable the fallback and send an empty answer
+      // so the server can continue to the rtc_offer step.
+      debugPrint('[remotectl] key exchange failed (WS fallback disabled): $e');
+      _ws?.sink.add(jsonEncode({
+        'type': 'key_answer',
+        'payload': {'public_key': ''},
+      }));
     }
   }
 
@@ -225,8 +248,18 @@ class RemoteSession extends ChangeNotifier {
       pc.onDataChannel = (channel) {
         if (channel.label == 'input') {
           _inputDC = channel;
+          // flutter_webrtc updates channel.state asynchronously — track open
+          // state explicitly via the state callback instead of reading .state.
+          _inputDCOpen = channel.state == RTCDataChannelState.RTCDataChannelOpen;
+          channel.onDataChannelState = (state) {
+            _inputDCOpen = state == RTCDataChannelState.RTCDataChannelOpen;
+          };
         } else if (channel.label == 'input-move') {
           _inputMoveDC = channel;
+          _inputMoveDCOpen = channel.state == RTCDataChannelState.RTCDataChannelOpen;
+          channel.onDataChannelState = (state) {
+            _inputMoveDCOpen = state == RTCDataChannelState.RTCDataChannelOpen;
+          };
         }
       };
 
