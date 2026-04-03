@@ -1,0 +1,15 @@
+# remotectl agent configuration
+# Copy to agent.yaml and edit before starting.
+
+server:   "https://your-server:8443"
+id:       "my-mac"
+token:    "replace-with-a-strong-secret"  # must match server tokens.my-mac
+name:     "My Mac"
+
+fps:      30
+bitrate:  3000000   # 3 Mbps
+scale:    0.5       # 0.5 = capture at 50% of screen resolution
+retry:    "5s"      # reconnect interval
+
+insecure: false     # set true to skip TLS cert check (dev only)
+# ca_cert: "certs/ca.crt"   # custom CA for self-signed certs

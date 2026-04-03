@@ -1,0 +1,24 @@
+name: remotectl
+description: RemoteCtl — cross-platform remote desktop client for Android & iOS
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_webrtc: ^0.11.7
+  web_socket_channel: ^3.0.2
+  cryptography: ^2.7.0
+  shared_preferences: ^2.3.3
+  wakelock_plus: ^1.2.10
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true

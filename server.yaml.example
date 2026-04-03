@@ -1,0 +1,23 @@
+# remotectl server configuration
+# Copy to server.yaml and edit before starting.
+
+addr: ":8443"
+password: "your-viewer-password"
+
+tls_cert: "/certs/server.crt"
+tls_key:  "/certs/server.key"
+static:   "/app/static"
+
+# Device tokens: map of device_id → secret
+# Agents authenticate with HMAC-SHA256(nonce, token).
+# Leave empty to run in dev mode (accepts all agents, not for production).
+tokens:
+  my-mac: "replace-with-a-strong-secret"
+  # work-pc: "another-secret"
+
+# TURN relay server (required for clients behind symmetric NAT, e.g. mobile 4G/5G).
+# Leave url empty to disable TURN (P2P + STUN only).
+turn:
+  url:      ""          # e.g. turn:1.2.3.4:3478
+  user:     "remotectl"
+  password: "changeme"

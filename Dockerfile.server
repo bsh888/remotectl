@@ -1,0 +1,24 @@
+## Stage 1: build client
+FROM node:20-alpine AS client-builder
+WORKDIR /app/client
+COPY client/package*.json ./
+RUN npm ci
+COPY client/ ./
+RUN npm run build
+
+## Stage 2: build server
+FROM golang:1.24-alpine AS server-builder
+WORKDIR /app/server
+COPY server/go.mod server/go.sum ./
+RUN go mod download
+COPY server/ ./
+RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /remotectl-server .
+
+## Stage 3: runtime
+FROM alpine:3.20
+RUN apk add --no-cache ca-certificates
+WORKDIR /app
+COPY --from=server-builder /remotectl-server .
+COPY --from=client-builder /app/server/static ./static
+EXPOSE 8080
+ENTRYPOINT ["/app/remotectl-server"]

@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    ports:
+      - "8443:8443"
+      - "8080:8080"   # dev only, remove in prod
+    command: --config /app/server.yaml
+    volumes:
+      - ./certs:/certs:ro
+      - ./server.yaml:/app/server.yaml:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "--no-check-certificate", "https://localhost:8443/api/devices"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  coturn:
+    image: coturn/coturn:latest
+    network_mode: host   # required: TURN needs to bind directly to the public IP
+    command: >
+      -n
+      --listening-port=3478
+      --tls-listening-port=5349
+      --fingerprint
+      --lt-cred-mech
+      --user=${TURN_USER:-remotectl}:${TURN_PASSWORD:-changeme}
+      --realm=remotectl
+      --log-file=stdout
+      --no-cli
+      --no-software-attribute
+    restart: unless-stopped
