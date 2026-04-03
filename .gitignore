@@ -12,6 +12,8 @@ certs/
 # ── 编译产物 ─────────────────────────────────────────────────
 bin/
 server/static/
+server/server
+server/remotectl-server*
 
 # ── Go ───────────────────────────────────────────────────────
 vendor/
