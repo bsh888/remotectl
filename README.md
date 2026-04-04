@@ -327,9 +327,12 @@ make app-linux   # → app/build/linux/x64/release/bundle/
 
 **Windows**（PowerShell，无需 `make`）：
 ```powershell
-.\scripts\build-app-win.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\build-app-win.ps1
 # → app\build\windows\x64\runner\Release\
 ```
+
+> Windows 默认禁止运行脚本，`-ExecutionPolicy Bypass` 绕过限制，仅对本次执行有效，不修改系统策略。
+> 也可以永久允许本地脚本：`Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`
 
 前提与 [在 Windows 本机编译 agent](#在-windows-本机编译-agent) 相同：Go（.msi）+ MSYS2 MinGW-w64 + Flutter。
 

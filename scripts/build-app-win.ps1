@@ -6,10 +6,14 @@
 #   3. Flutter SDK 已安装并在 PATH
 #
 # 用法（PowerShell）：
-#   .\scripts\build-app-win.ps1
+#   powershell -ExecutionPolicy Bypass -File .\scripts\build-app-win.ps1
 #
 # 输出：
 #   app\build\windows\x64\runner\Release\   （含 remotectl.exe + remotectl-agent.exe）
+
+# 设置控制台输出为 UTF-8，避免中文乱码
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
