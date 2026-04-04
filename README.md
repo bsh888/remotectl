@@ -315,31 +315,42 @@ flutter run              # Android / iOS（连接手机后自动选择）
 > ```
 > `AgentService` 会自动在项目 `bin/` 目录中寻找二进制作为 fallback。
 
-#### 发布打包（agent 自动注入）
+#### 发布打包（一键脚本）
 
-使用 `app-*` 目标一步完成：编译 agent + 构建 Flutter app + 将 agent 注入发布包。
+编译 agent + 构建 Flutter app + 注入 agent + 打包压缩，全部自动完成。
 
-**macOS / Linux**（需要 `make`）：
+**macOS**
+
+前提：Xcode Command Line Tools、Flutter
 ```bash
-make app-mac     # → bin/remotectl-macos.zip
-make app-linux   # → bin/remotectl-linux-amd64.tar.gz
+./scripts/build-app-mac.sh
+# 输出：bin/remotectl-macos.zip
+# 发布：将 zip 拷贝到目标 Mac，解压后双击 remotectl.app 即可运行
 ```
 
-**Windows**（PowerShell，无需 `make`）：
+**Windows**
+
+前提：Go（.msi）、MSYS2 MinGW-w64（`C:\msys64\mingw64\bin` 在 PATH）、Flutter、开发者模式已开启
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\build-app-win.ps1
-# → bin\remotectl-windows-amd64.zip
+# 输出：bin\remotectl-windows-amd64.zip
+# 发布：将 zip 拷贝到目标 Windows，解压后运行 remotectl.exe 即可
 ```
 
-> Windows 默认禁止运行脚本，`-ExecutionPolicy Bypass` 绕过限制，仅对本次执行有效，不修改系统策略。
-> 也可以永久允许本地脚本：`Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`
+> `-ExecutionPolicy Bypass` 仅对本次执行有效，不修改系统策略。
+> 若提示"禁止运行脚本"，也可永久允许：`Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`
 
-前提与 [在 Windows 本机编译 agent](#在-windows-本机编译-agent) 相同：Go（.msi）+ MSYS2 MinGW-w64 + Flutter。
+**Linux**
 
-**发布说明**：Flutter 桌面应用需要携带 DLL 和 `data/` 等运行时文件，**不能只发单个 exe**。
-上述命令会自动将整个发布目录打包成压缩文件，拷贝到目标机器解压后直接运行 `remotectl.exe` / `remotectl` 即可，无需安装任何运行时。
+前提：GCC、libx264-dev、libX11-dev、Flutter
+```bash
+make app-linux
+# 输出：bin/remotectl-linux-amd64.tar.gz
+# 发布：将 tar.gz 拷贝到目标 Linux，解压后运行 bundle/remotectl 即可
+```
 
-打包后 agent 与 Flutter 可执行文件位于同一目录，App 启动后可在"被控端"标签页一键启停。
+> **注意**：Flutter 桌面应用依赖旁边的 DLL / .so 和 `data/` 目录，不能只发单个可执行文件。
+> 以上脚本已将完整运行目录打包，目标机器无需安装任何运行时，解压即用。
 
 #### 各平台被控端支持
 
