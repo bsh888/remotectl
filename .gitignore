@@ -18,6 +18,11 @@ server/remotectl-server*
 # ── Go ───────────────────────────────────────────────────────
 vendor/
 
+# ── Agent 构建产物 & 平台依赖库 ───────────────────────────────
+agent/pipeline/x264/
+agent/*.exe
+agent/remotectl-agent*
+
 # ── Node / 前端 ──────────────────────────────────────────────
 client/node_modules/
 client/dist/
