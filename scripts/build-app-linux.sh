@@ -49,10 +49,10 @@ echo ""
 
 # -- 4. Package into tar.gz ---------------------------------------------------
 echo "[4/4] Packaging into tar.gz..."
-ARCHIVE="bin/remotectl-linux-amd64.tar.gz"
+ARCHIVE="$(pwd)/bin/remotectl-linux-amd64.tar.gz"
 rm -f "$ARCHIVE"
 cd "app/build/linux/x64/release"
-tar -czf "../../../../../$ARCHIVE" bundle/
+tar -czf "$ARCHIVE" bundle/
 cd - > /dev/null
 echo "      OK: $ARCHIVE"
 echo ""

@@ -55,10 +55,10 @@ echo ""
 
 # -- 4. Package into zip -------------------------------------------------------
 echo "[4/4] Packaging into zip..."
-ZIP="bin/remotectl-macos.zip"
+ZIP="$(pwd)/bin/remotectl-macos.zip"
 rm -f "$ZIP"
 cd "app/build/macos/Build/Products/Release"
-zip -r --symlinks "../../../../../$ZIP" remotectl.app
+zip -r --symlinks "$ZIP" remotectl.app
 cd - > /dev/null
 echo "      OK: $ZIP"
 echo ""
