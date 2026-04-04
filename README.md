@@ -13,6 +13,7 @@
 - **Ctrl ⇄ Cmd 自动转换**：Windows/Linux 连接 Mac 时自动映射快捷键
 - **TLS 加密传输**：信令通道全程 TLS，支持自签名证书
 - **自动重连**：被控端 pipeline 异常中断后自动重启，无需人工干预
+- **一体化桌面 App**：macOS/Windows/Linux 原生 App 同时内置控制端和被控端，一个程序搞定；iOS/Android 作纯控制端
 - **YAML 配置文件**：服务端和 agent 均支持配置文件，无需记忆命令行参数
 - **Docker 部署**：服务器一键容器化部署
 
@@ -292,7 +293,9 @@ insecure: false
 
 ### 6. 原生客户端 App
 
-在 `app/` 目录下提供了 Flutter 客户端，支持 Android / iOS / macOS / Windows / Linux：
+Flutter 客户端支持全平台，且在桌面平台（macOS/Windows/Linux）上同时内置**控制端**和**被控端**，一个 App 两种模式无需分别安装。
+
+#### 开发运行
 
 ```bash
 cd app
@@ -304,7 +307,35 @@ flutter run -d linux     # Linux
 flutter run              # Android / iOS（连接手机后自动选择）
 ```
 
-详细说明见 [app/README.md](app/README.md)。
+> 开发模式下测试被控端功能，需先编译 agent 二进制：
+> ```bash
+> make agent-mac      # macOS
+> make agent-win      # Windows
+> make agent-linux    # Linux
+> ```
+> `AgentService` 会自动在项目 `bin/` 目录中寻找二进制作为 fallback。
+
+#### 发布打包（agent 自动注入）
+
+使用 `app-*` 目标一步完成：编译 agent + 构建 Flutter app + 将 agent 注入发布包。
+
+```bash
+make app-mac     # → app/build/macos/Build/Products/Release/remotectl.app
+make app-win     # → app/build/windows/x64/runner/Release/
+make app-linux   # → app/build/linux/x64/release/bundle/
+```
+
+打包后 agent 与 Flutter 可执行文件位于同一目录，App 启动后可在"被控端"标签页一键启停。
+
+#### 各平台被控端支持
+
+| 平台 | 控制端 | 被控端 |
+|------|--------|--------|
+| macOS | ✅ | ✅ |
+| Windows | ✅ | ✅ |
+| Linux | ✅ | ✅ |
+| iOS | ✅ | ❌（系统沙箱限制） |
+| Android | ✅ | ❌（系统沙箱限制） |
 
 ---
 
@@ -363,9 +394,14 @@ make all
 # 单独构建
 make server          # 服务器
 make client          # 前端
-make agent-mac       # macOS agent（arm64 + amd64）
+make agent-mac       # macOS agent 二进制（arm64 + amd64，输出到 bin/）
 make agent-win       # Windows agent（需要 mingw-w64）
 make agent-linux     # Linux agent（需要 musl-cross 或在 Linux 上直接构建）
+
+# Flutter App 一体化打包（agent 自动注入到发布包）
+make app-mac         # macOS：universal agent + flutter build macos
+make app-win         # Windows：agent.exe + flutter build windows
+make app-linux       # Linux：agent + flutter build linux
 
 # 整理依赖
 make tidy
