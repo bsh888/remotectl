@@ -1,41 +1,37 @@
-# build-app-win.ps1 — Windows 一键打包脚本
+# build-app-win.ps1 -- RemoteCtl Windows one-click build script
 #
-# 前提：
-#   1. Go 已通过官方 .msi 安装（go.dev/dl）
-#   2. MSYS2 + MinGW-w64 已安装，且 C:\msys64\mingw64\bin 在 PATH
-#   3. Flutter SDK 已安装并在 PATH
+# Requirements:
+#   1. Go installed via official .msi (go.dev/dl)
+#   2. MSYS2 + MinGW-w64 installed, C:\msys64\mingw64\bin in PATH
+#   3. Flutter SDK installed and in PATH
 #
-# 用法（PowerShell）：
+# Usage:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\build-app-win.ps1
 #
-# 输出：
-#   app\build\windows\x64\runner\Release\   （含 remotectl.exe + remotectl-agent.exe）
-
-# 设置控制台输出为 UTF-8，避免中文乱码
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
+# Output:
+#   app\build\windows\x64\runner\Release\  (remotectl.exe + remotectl-agent.exe)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-# 切换到仓库根目录
+# Switch to repo root
 $root = Split-Path $PSScriptRoot -Parent
 Set-Location $root
 
 Write-Host ""
-Write-Host "=== RemoteCtl Windows 一键打包 ===" -ForegroundColor Cyan
+Write-Host "=== RemoteCtl Windows Build ===" -ForegroundColor Cyan
 Write-Host ""
 
-# ── 1. 创建 bin/ 目录 ─────────────────────────────────────────
+# -- 1. Create bin/ directory -------------------------------------------------
 New-Item -ItemType Directory -Force -Path "bin" | Out-Null
 
-# ── 2. 构建 Windows agent ─────────────────────────────────────
-Write-Host "▶ 构建 agent..." -ForegroundColor Yellow
+# -- 2. Build agent -----------------------------------------------------------
+Write-Host "[1/3] Building agent..." -ForegroundColor Yellow
 
 $env:CGO_ENABLED = "1"
 $env:GOOS        = "windows"
 $env:GOARCH      = "amd64"
-$env:CC          = "gcc"   # MSYS2 MinGW-w64 提供
+$env:CC          = "gcc"   # provided by MSYS2 MinGW-w64
 
 Push-Location "agent"
 try {
@@ -45,11 +41,11 @@ try {
     Pop-Location
 }
 
-Write-Host "  ✓ bin\remotectl-agent-windows-amd64.exe" -ForegroundColor Green
+Write-Host "      OK: bin\remotectl-agent-windows-amd64.exe" -ForegroundColor Green
 Write-Host ""
 
-# ── 3. 构建 Flutter Windows app ──────────────────────────────
-Write-Host "▶ flutter build windows --release ..." -ForegroundColor Yellow
+# -- 3. Build Flutter Windows app ---------------------------------------------
+Write-Host "[2/3] Building Flutter Windows app..." -ForegroundColor Yellow
 
 Push-Location "app"
 try {
@@ -60,18 +56,20 @@ try {
 
 Write-Host ""
 
-# ── 4. 将 agent 注入 Flutter 发布目录 ────────────────────────
+# -- 4. Inject agent into Flutter release bundle ------------------------------
+Write-Host "[3/3] Injecting agent into release bundle..." -ForegroundColor Yellow
+
 $dest = "app\build\windows\x64\runner\Release"
 if (-not (Test-Path $dest)) {
-    Write-Error "Flutter 构建目录不存在：$dest"
+    Write-Error "Flutter build output not found: $dest"
 }
 
 Copy-Item "bin\remotectl-agent-windows-amd64.exe" "$dest\remotectl-agent.exe" -Force
-Write-Host "  ✓ agent 已注入 $dest" -ForegroundColor Green
+Write-Host "      OK: $dest\remotectl-agent.exe" -ForegroundColor Green
 Write-Host ""
 
-# ── 完成 ─────────────────────────────────────────────────────
-Write-Host "=== 打包完成 ===" -ForegroundColor Cyan
-Write-Host "  发布目录：$((Resolve-Path $dest).Path)" -ForegroundColor White
-Write-Host "  直接运行：$dest\remotectl.exe" -ForegroundColor White
+# -- Done ---------------------------------------------------------------------
+Write-Host "=== Build complete ===" -ForegroundColor Cyan
+Write-Host "  Output : $((Resolve-Path $dest).Path)" -ForegroundColor White
+Write-Host "  Run    : $dest\remotectl.exe" -ForegroundColor White
 Write-Host ""
