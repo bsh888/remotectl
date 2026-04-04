@@ -35,6 +35,7 @@ app/build/
 app/android/.gradle/
 app/android/local.properties
 app/android/key.properties
+app/android/app/src/main/java/io/flutter/plugins/
 app/*.jks
 app/ios/Pods/
 app/ios/Podfile.lock
