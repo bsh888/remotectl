@@ -344,7 +344,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-app-win.ps1
 
 前提：GCC、libx264-dev、libX11-dev、Flutter
 ```bash
-make app-linux
+./scripts/build-app-linux.sh
 # 输出：bin/remotectl-linux-amd64.tar.gz
 # 发布：将 tar.gz 拷贝到目标 Linux，解压后运行 bundle/remotectl 即可
 ```
