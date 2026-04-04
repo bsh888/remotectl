@@ -9,7 +9,8 @@
 #   powershell -ExecutionPolicy Bypass -File .\scripts\build-app-win.ps1
 #
 # Output:
-#   app\build\windows\x64\runner\Release\  (remotectl.exe + remotectl-agent.exe)
+#   app\build\windows\x64\runner\Release\   (run in place)
+#   bin\remotectl-windows-amd64.zip         (distribute this)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -26,7 +27,7 @@ Write-Host ""
 New-Item -ItemType Directory -Force -Path "bin" | Out-Null
 
 # -- 2. Build agent -----------------------------------------------------------
-Write-Host "[1/3] Building agent..." -ForegroundColor Yellow
+Write-Host "[1/4] Building agent..." -ForegroundColor Yellow
 
 $env:CGO_ENABLED = "1"
 $env:GOOS        = "windows"
@@ -45,7 +46,7 @@ Write-Host "      OK: bin\remotectl-agent-windows-amd64.exe" -ForegroundColor Gr
 Write-Host ""
 
 # -- 3. Build Flutter Windows app ---------------------------------------------
-Write-Host "[2/3] Building Flutter Windows app..." -ForegroundColor Yellow
+Write-Host "[2/4] Building Flutter Windows app..." -ForegroundColor Yellow
 
 Push-Location "app"
 try {
@@ -58,7 +59,7 @@ try {
 Write-Host ""
 
 # -- 4. Inject agent into Flutter release bundle ------------------------------
-Write-Host "[3/3] Injecting agent into release bundle..." -ForegroundColor Yellow
+Write-Host "[3/4] Injecting agent into release bundle..." -ForegroundColor Yellow
 
 $dest = "app\build\windows\x64\runner\Release"
 if (-not (Test-Path $dest)) {
@@ -69,8 +70,19 @@ Copy-Item "bin\remotectl-agent-windows-amd64.exe" "$dest\remotectl-agent.exe" -F
 Write-Host "      OK: $dest\remotectl-agent.exe" -ForegroundColor Green
 Write-Host ""
 
+# -- 5. Package into zip ------------------------------------------------------
+Write-Host "[4/4] Packaging into zip..." -ForegroundColor Yellow
+
+$zip = "bin\remotectl-windows-amd64.zip"
+if (Test-Path $zip) { Remove-Item $zip -Force }
+Compress-Archive -Path "$dest\*" -DestinationPath $zip
+Write-Host "      OK: $zip" -ForegroundColor Green
+Write-Host ""
+
 # -- Done ---------------------------------------------------------------------
 Write-Host "=== Build complete ===" -ForegroundColor Cyan
-Write-Host "  Output : $((Resolve-Path $dest).Path)" -ForegroundColor White
-Write-Host "  Run    : $dest\remotectl.exe" -ForegroundColor White
+Write-Host "  Run in place : $((Resolve-Path $dest).Path)\remotectl.exe" -ForegroundColor White
+Write-Host "  Distribute   : $((Resolve-Path $zip).Path)" -ForegroundColor White
+Write-Host ""
+Write-Host "  Unzip on the target machine and run remotectl.exe directly." -ForegroundColor Gray
 Write-Host ""

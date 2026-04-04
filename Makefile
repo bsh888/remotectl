@@ -99,7 +99,11 @@ app-mac: | bin
 		app/build/macos/Build/Products/Release/remotectl.app/Contents/MacOS/remotectl-agent
 	chmod +x \
 		app/build/macos/Build/Products/Release/remotectl.app/Contents/MacOS/remotectl-agent
+	# Package into zip for distribution
+	cd app/build/macos/Build/Products/Release && \
+		zip -r --symlinks ../../../../../bin/remotectl-macos.zip remotectl.app
 	@echo "✓ remotectl.app → app/build/macos/Build/Products/Release/remotectl.app"
+	@echo "✓ distribute  → bin/remotectl-macos.zip"
 
 # Windows: agent.exe 与 Flutter exe 同目录
 # 在 Windows 上运行时将 CC= 改为 gcc（MSYS2）；
@@ -125,7 +129,10 @@ app-linux: | bin
 	cp bin/remotectl-agent-linux-amd64 \
 		app/build/linux/x64/release/bundle/remotectl-agent
 	chmod +x app/build/linux/x64/release/bundle/remotectl-agent
+	cd app/build/linux/x64/release && \
+		tar -czf ../../../../../bin/remotectl-linux-amd64.tar.gz bundle/
 	@echo "✓ Linux app → app/build/linux/x64/release/bundle/"
+	@echo "✓ distribute → bin/remotectl-linux-amd64.tar.gz"
 
 # ── TLS 证书 ─────────────────────────────────
 # 用 Go 原生 crypto/x509 生成，100% 兼容 Go TLS 合规检查

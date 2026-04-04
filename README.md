@@ -321,20 +321,23 @@ flutter run              # Android / iOS（连接手机后自动选择）
 
 **macOS / Linux**（需要 `make`）：
 ```bash
-make app-mac     # → app/build/macos/Build/Products/Release/remotectl.app
-make app-linux   # → app/build/linux/x64/release/bundle/
+make app-mac     # → bin/remotectl-macos.zip
+make app-linux   # → bin/remotectl-linux-amd64.tar.gz
 ```
 
 **Windows**（PowerShell，无需 `make`）：
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\build-app-win.ps1
-# → app\build\windows\x64\runner\Release\
+# → bin\remotectl-windows-amd64.zip
 ```
 
 > Windows 默认禁止运行脚本，`-ExecutionPolicy Bypass` 绕过限制，仅对本次执行有效，不修改系统策略。
 > 也可以永久允许本地脚本：`Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`
 
 前提与 [在 Windows 本机编译 agent](#在-windows-本机编译-agent) 相同：Go（.msi）+ MSYS2 MinGW-w64 + Flutter。
+
+**发布说明**：Flutter 桌面应用需要携带 DLL 和 `data/` 等运行时文件，**不能只发单个 exe**。
+上述命令会自动将整个发布目录打包成压缩文件，拷贝到目标机器解压后直接运行 `remotectl.exe` / `remotectl` 即可，无需安装任何运行时。
 
 打包后 agent 与 Flutter 可执行文件位于同一目录，App 启动后可在"被控端"标签页一键启停。
 
