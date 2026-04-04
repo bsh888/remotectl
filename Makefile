@@ -1,5 +1,6 @@
 .PHONY: all server server-mac server-win server-linux \
         agent-mac agent-win agent-linux \
+        app-mac app-win app-linux \
         client dev-server dev-client tidy cert clean
 
 # ── 完整构建 ──────────────────────────────────
@@ -78,6 +79,53 @@ agent-linux: | bin
 
 bin:
 	mkdir -p bin
+
+# ── Flutter 桌面应用打包（agent 注入）─────────────────────────
+# 构建 agent + Flutter app，并将 agent 二进制注入到 Flutter 发布包中。
+# agent 与 Flutter 可执行文件同目录，运行时自动发现。
+
+# macOS: 生成 universal binary (arm64 + amd64)，注入 .app/Contents/MacOS/
+app-mac: | bin
+	cd agent && CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 \
+		go build -ldflags="-s -w" -o ../bin/remotectl-agent-mac-arm64 .
+	cd agent && CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 \
+		go build -ldflags="-s -w" -o ../bin/remotectl-agent-mac-amd64 .
+	lipo -create \
+		bin/remotectl-agent-mac-arm64 \
+		bin/remotectl-agent-mac-amd64 \
+		-output bin/remotectl-agent-mac
+	cd app && flutter build macos --release
+	cp bin/remotectl-agent-mac \
+		app/build/macos/Build/Products/Release/remotectl.app/Contents/MacOS/remotectl-agent
+	chmod +x \
+		app/build/macos/Build/Products/Release/remotectl.app/Contents/MacOS/remotectl-agent
+	@echo "✓ remotectl.app → app/build/macos/Build/Products/Release/remotectl.app"
+
+# Windows: agent.exe 与 Flutter exe 同目录
+# 在 Windows 上运行时将 CC= 改为 gcc（MSYS2）；
+# 在 macOS 上交叉编译时保持 mingw-w64 toolchain。
+app-win: | bin
+	cd agent && CGO_ENABLED=1 GOOS=windows GOARCH=amd64 \
+		CC=x86_64-w64-mingw32-gcc \
+		go build -ldflags="-s -w -H windowsgui" \
+		-o ../bin/remotectl-agent-windows-amd64.exe .
+	cd app && flutter build windows --release
+	cp bin/remotectl-agent-windows-amd64.exe \
+		app/build/windows/x64/runner/Release/remotectl-agent.exe
+	@echo "✓ Windows app → app/build/windows/x64/runner/Release/"
+
+# Linux: agent 与 Flutter 可执行文件同目录（bundle/）
+app-linux: | bin
+	cd agent && CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+		CC=x86_64-linux-musl-gcc \
+		CGO_LDFLAGS="-lx264 -lX11 -lXext -static" \
+		go build -ldflags="-s -w" \
+		-o ../bin/remotectl-agent-linux-amd64 .
+	cd app && flutter build linux --release
+	cp bin/remotectl-agent-linux-amd64 \
+		app/build/linux/x64/release/bundle/remotectl-agent
+	chmod +x app/build/linux/x64/release/bundle/remotectl-agent
+	@echo "✓ Linux app → app/build/linux/x64/release/bundle/"
 
 # ── TLS 证书 ─────────────────────────────────
 # 用 Go 原生 crypto/x509 生成，100% 兼容 Go TLS 合规检查
