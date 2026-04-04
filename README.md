@@ -319,11 +319,19 @@ flutter run              # Android / iOS（连接手机后自动选择）
 
 使用 `app-*` 目标一步完成：编译 agent + 构建 Flutter app + 将 agent 注入发布包。
 
+**macOS / Linux**（需要 `make`）：
 ```bash
 make app-mac     # → app/build/macos/Build/Products/Release/remotectl.app
-make app-win     # → app/build/windows/x64/runner/Release/
 make app-linux   # → app/build/linux/x64/release/bundle/
 ```
+
+**Windows**（PowerShell，无需 `make`）：
+```powershell
+.\scripts\build-app-win.ps1
+# → app\build\windows\x64\runner\Release\
+```
+
+前提与 [在 Windows 本机编译 agent](#在-windows-本机编译-agent) 相同：Go（.msi）+ MSYS2 MinGW-w64 + Flutter。
 
 打包后 agent 与 Flutter 可执行文件位于同一目录，App 启动后可在"被控端"标签页一键启停。
 
