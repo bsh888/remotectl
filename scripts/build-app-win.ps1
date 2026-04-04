@@ -50,6 +50,7 @@ Write-Host "[2/3] Building Flutter Windows app..." -ForegroundColor Yellow
 Push-Location "app"
 try {
     flutter build windows --release
+    if ($LASTEXITCODE -ne 0) { throw "flutter build failed (exit $LASTEXITCODE)" }
 } finally {
     Pop-Location
 }
