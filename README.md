@@ -13,7 +13,7 @@
 - **Ctrl ⇄ Cmd 自动转换**：Windows/Linux 连接 Mac 时自动映射快捷键
 - **TLS 加密传输**：信令通道全程 TLS，支持自签名证书
 - **自动重连**：被控端 pipeline 异常中断后自动重启，无需人工干预
-- **一体化桌面 App**：macOS/Windows/Linux 原生 App 同时内置控制端和被控端，一个程序搞定；iOS/Android 作纯控制端
+- **一体化桌面 App**：macOS/Windows/Linux 原生 App 同时内置"远程控制"和"共享本机"两种模式，一个程序搞定；iOS/Android 作纯控制端
 - **YAML 配置文件**：服务端和 agent 均支持配置文件，无需记忆命令行参数
 - **Docker 部署**：服务器一键容器化部署
 
@@ -250,8 +250,8 @@ token:    "replace-with-a-strong-secret"
 name:     "My Mac"          # 控制端显示的设备名称
 
 fps:      30
-bitrate:  3000000           # 3 Mbps
-scale:    0.5               # 采集分辨率缩放比例（0.5 = 半分辨率）
+bitrate:  6000000           # 6 Mbps
+scale:    0.75              # 采集分辨率缩放比例（0.75 = 75% 分辨率）
 retry:    "5s"              # 断线重连间隔
 
 insecure: false
@@ -282,18 +282,18 @@ insecure: false
 | `token` | `--token` | 认证 token | — |
 | `name` | `--name` | 设备显示名称 | 同 id |
 | `ca_cert` | `--ca-cert` | 自签名 CA 证书路径 | — |
-| `scale` | `--scale` | 采集分辨率缩放（0.25–1.0） | `0.5` |
+| `scale` | `--scale` | 采集分辨率缩放（0.25–1.0） | `0.75` |
 | `fps` | `--fps` | 目标帧率 | `30` |
-| `bitrate` | `--bitrate` | H.264 目标码率（bps） | `3000000` |
+| `bitrate` | `--bitrate` | H.264 目标码率（bps） | `6000000` |
 | `insecure` | `--insecure` | 跳过 TLS 验证（仅开发） | `false` |
 
 ### 5. 浏览器访问
 
-打开 `https://your-server:8443`，输入服务器地址、设备 ID、连接密码即可。
+打开 `https://your-server:8443`，输入服务器地址、设备 ID、**服务器密码**（即 `server.yaml` 中的 `password`）即可。
 
 ### 6. 原生客户端 App
 
-Flutter 客户端支持全平台，且在桌面平台（macOS/Windows/Linux）上同时内置**控制端**和**被控端**，一个 App 两种模式无需分别安装。
+Flutter 客户端支持全平台，且在桌面平台（macOS/Windows/Linux）上同时内置**远程控制**和**共享本机**两种模式，一个 App 无需分别安装。
 
 #### 开发运行
 
@@ -351,6 +351,25 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-app-win.ps1
 
 > **注意**：Flutter 桌面应用依赖旁边的 DLL / .so 和 `data/` 目录，不能只发单个可执行文件。
 > 以上脚本已将完整运行目录打包，目标机器无需安装任何运行时，解压即用。
+
+#### App 密码说明
+
+App 中有两处密码，含义不同，请勿混淆：
+
+| 字段 | 对应配置 | 说明 |
+|------|---------|------|
+| **服务器密码**（"远程控制"标签页） | `server.yaml` → `password` | 访问信令服务器的密码，控制端与服务器之间 |
+| **设备密钥**（"共享本机"标签页） | `server.yaml` → `tokens.<id>` | 被控端向服务器注册时用于身份验证的 HMAC 密钥 |
+
+#### 设备 ID 自动生成
+
+App 首次启动时会自动以本机主机名作为设备 ID（转小写、空格转 `-`），无需手动填写。
+若需修改，在"共享本机"标签页顶部的设备卡片直接编辑，点击复制图标可复制 ID。
+
+#### CA 证书配置（被控端）
+
+使用自签名证书时，在"共享本机" → **高级设置** → **CA 证书路径** 中填入 `server.crt` 的绝对路径，
+等同于命令行 `--ca-cert /path/to/server.crt`，无需打开 `--insecure`。
 
 #### 各平台被控端支持
 
@@ -493,9 +512,9 @@ WARNING: Accessibility permission not granted — mouse/keyboard injection will 
 
 | 需求 | 推荐配置 |
 |------|---------|
-| 清晰优先（局域网） | `scale: 1.0  fps: 30  bitrate: 6000000` |
-| 均衡（默认） | `scale: 0.5  fps: 30  bitrate: 3000000` |
-| 流量节省 | `scale: 0.75  fps: 24  bitrate: 1500000` |
+| 清晰优先（局域网） | `scale: 1.0   fps: 30  bitrate: 8000000` |
+| 均衡（默认） | `scale: 0.75  fps: 30  bitrate: 6000000` |
+| 流量节省 | `scale: 0.5   fps: 24  bitrate: 2000000` |
 | 极低带宽 | `scale: 0.5  fps: 15  bitrate: 800000` |
 
 ---
