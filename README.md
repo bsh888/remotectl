@@ -190,17 +190,24 @@ cp server.yaml.example server.yaml
 
 ```yaml
 addr:     ":8443"
-password: "your-viewer-password"   # 控制端连接密码
+password: "your-viewer-password"   # 控制端 App 里的"服务器密码"
 
 tls_cert: "/certs/server.crt"
 tls_key:  "/certs/server.key"
 static:   "/app/static"
 
-# 设备 token：device_id → 密钥
-# agent 通过 HMAC-SHA256 认证，留空则接受所有 agent（仅开发用）
-tokens:
-  my-mac: "replace-with-a-strong-secret"
-  my-win: "another-secret"
+# Agent 认证（三选一）：
+#
+# 推荐：全局 token — 任意设备只要持有此 token 就能注册，新增设备无需改配置。
+#   App"共享本机"→"设备密钥"填这个值。
+agent_token: "replace-with-a-strong-secret"
+
+# 可选：按设备单独配置（优先级高于 agent_token，需要细粒度控制时使用）
+# tokens:
+#   my-mac: "mac-secret"
+#   work-pc: "pc-secret"
+
+# 两者均留空 → dev 模式，接受所有 agent（仅本地开发）
 
 # TURN 中继（移动网络 / 对称型 NAT 必须配置，局域网可留空）
 turn:

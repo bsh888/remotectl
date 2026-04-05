@@ -2,21 +2,27 @@
 # Copy to server.yaml and edit before starting.
 
 addr: ":8443"
-password: "your-viewer-password"
+password: "your-viewer-password"   # 控制端 App 里的"服务器密码"
 
 tls_cert: "/certs/server.crt"
 tls_key:  "/certs/server.key"
 static:   "/app/static"
 
-# Device tokens: map of device_id → secret
-# Agents authenticate with HMAC-SHA256(nonce, token).
-# Leave empty to run in dev mode (accepts all agents, not for production).
-tokens:
-  my-mac: "replace-with-a-strong-secret"
-  # work-pc: "another-secret"
+# ── Agent 认证（三选一）────────────────────────────────────────────────────────
+#
+# 方式一（推荐）：全局 token — 任意设备均可用此 token 注册，无需预先登记设备 ID。
+#   新增设备无需改配置，App"共享本机"里的"设备密钥"填这个值即可。
+agent_token: "replace-with-a-strong-secret"
 
-# TURN relay server (required for clients behind symmetric NAT, e.g. mobile 4G/5G).
-# Leave url empty to disable TURN (P2P + STUN only).
+# 方式二：按设备单独配置 token（优先级高于 agent_token，可做精细权限控制）
+# tokens:
+#   my-mac: "mac-specific-secret"
+#   work-pc: "pc-specific-secret"
+
+# 方式三：两者均留空 → dev 模式，接受所有 agent（仅本地开发用，不要用于生产）
+
+# ── TURN 中继 ─────────────────────────────────────────────────────────────────
+# 移动网络 / 对称型 NAT 必须配置，局域网可留空。
 turn:
   url:      ""          # e.g. turn:1.2.3.4:3478
   user:     "remotectl"

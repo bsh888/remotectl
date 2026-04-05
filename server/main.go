@@ -188,13 +188,14 @@ type TURNConfig struct {
 }
 
 type ServerConfig struct {
-	Addr     string            `yaml:"addr"`
-	Password string            `yaml:"password"`
-	TLSCert  string            `yaml:"tls_cert"`
-	TLSKey   string            `yaml:"tls_key"`
-	Static   string            `yaml:"static"`
-	Tokens   map[string]string `yaml:"tokens"`
-	TURN     TURNConfig        `yaml:"turn"`
+	Addr       string            `yaml:"addr"`
+	Password   string            `yaml:"password"`
+	TLSCert    string            `yaml:"tls_cert"`
+	TLSKey     string            `yaml:"tls_key"`
+	Static     string            `yaml:"static"`
+	AgentToken string            `yaml:"agent_token"` // single shared token for all agents
+	Tokens     map[string]string `yaml:"tokens"`      // per-device tokens (optional, higher priority)
+	TURN       TURNConfig        `yaml:"turn"`
 }
 
 func defaultServerConfig() ServerConfig {
@@ -240,27 +241,34 @@ type Hub struct {
 	agents     map[string]*Agent
 	mu         sync.RWMutex
 	password   string
-	tokens     map[string]string // deviceID → pre-shared token
+	agentToken string            // single shared token accepted from any agent
+	tokens     map[string]string // per-device tokens (override agentToken if set)
 	iceServers []ICEServerConfig
 }
 
-func newHub(password string, tokens map[string]string, iceServers []ICEServerConfig) *Hub {
+func newHub(password, agentToken string, tokens map[string]string, iceServers []ICEServerConfig) *Hub {
 	return &Hub{
 		agents:     make(map[string]*Agent),
 		password:   password,
+		agentToken: agentToken,
 		tokens:     tokens,
 		iceServers: iceServers,
 	}
 }
 
 func (h *Hub) verifyHMAC(deviceID, nonceHex, receivedHMAC string) bool {
+	// Priority: per-device token > global agent_token > dev mode
 	token, ok := h.tokens[deviceID]
 	if !ok {
-		if len(h.tokens) > 0 {
-			return false // tokens configured but this device unknown
+		if h.agentToken != "" {
+			// Global token: any device with the right token is accepted.
+			token = h.agentToken
+		} else if len(h.tokens) > 0 {
+			return false // per-device tokens configured but this device is unknown
+		} else {
+			// Dev mode: no tokens configured at all, accept everyone.
+			return true
 		}
-		// dev mode: no tokens configured, accept all
-		return true
 	}
 	nonce, err := hex.DecodeString(nonceHex)
 	if err != nil {
@@ -269,7 +277,6 @@ func (h *Hub) verifyHMAC(deviceID, nonceHex, receivedHMAC string) bool {
 	mac := hmac.New(sha256.New, []byte(token))
 	mac.Write(nonce)
 	expected := hex.EncodeToString(mac.Sum(nil))
-	// constant-time compare
 	return hmac.Equal([]byte(expected), []byte(receivedHMAC))
 }
 
@@ -782,9 +789,15 @@ func main() {
 		}
 	}
 
+	agentToken := cfg.AgentToken
 	tokens := cfg.Tokens
-	if len(tokens) == 0 {
-		log.Println("WARNING: no tokens configured — running in dev mode (all agents accepted)")
+	switch {
+	case len(tokens) > 0:
+		log.Printf("agent auth: per-device tokens (%d devices)", len(tokens))
+	case agentToken != "":
+		log.Println("agent auth: global agent_token (any device with correct token accepted)")
+	default:
+		log.Println("WARNING: no agent token configured — dev mode, all agents accepted")
 	}
 
 	iceServers := []ICEServerConfig{
@@ -799,7 +812,7 @@ func main() {
 		log.Printf("TURN enabled: %s (user=%s)", *turnURL, *turnUser)
 	}
 
-	hub := newHub(*password, tokens, iceServers)
+	hub := newHub(*password, agentToken, tokens, iceServers)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws/agent", hub.handleAgent)
