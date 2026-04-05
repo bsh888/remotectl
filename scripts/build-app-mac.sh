@@ -41,16 +41,23 @@ echo ""
 
 # -- 2. Build Flutter macOS app -----------------------------------------------
 echo "[2/4] Building Flutter macOS app..."
+APP="app/build/macos/Build/Products/Release/remotectl.app"
+# Remove previously injected agent so Xcode code-signing doesn't choke on an
+# unsigned binary left over from a prior build run.
+rm -f "$APP/Contents/MacOS/remotectl-agent"
 cd app && flutter build macos --release
 cd ..
 echo ""
 
-# -- 3. Inject agent into .app bundle -----------------------------------------
+# -- 3. Inject agent into .app bundle + re-sign --------------------------------
 echo "[3/4] Injecting agent into .app bundle..."
-APP="app/build/macos/Build/Products/Release/remotectl.app"
 cp bin/remotectl-agent-mac "$APP/Contents/MacOS/remotectl-agent"
 chmod +x "$APP/Contents/MacOS/remotectl-agent"
-echo "      OK: $APP/Contents/MacOS/remotectl-agent"
+# Ad-hoc sign the agent binary, then re-sign the whole bundle so macOS
+# accepts the modified app without Gatekeeper errors.
+codesign --force --sign - "$APP/Contents/MacOS/remotectl-agent"
+codesign --force --deep --sign - "$APP"
+echo "      OK: $APP/Contents/MacOS/remotectl-agent (ad-hoc signed)"
 echo ""
 
 # -- 4. Package into zip -------------------------------------------------------
