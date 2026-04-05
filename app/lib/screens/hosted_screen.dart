@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -120,6 +121,17 @@ class _HostedScreenState extends State<HostedScreen> {
     } else {
       await widget.agentService.saveConfig(_buildConfig());
       await widget.agentService.start();
+    }
+  }
+
+  Future<void> _pickCaCert() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['crt', 'pem', 'cer'],
+      dialogTitle: '选择 CA 证书文件',
+    );
+    if (result != null && result.files.single.path != null) {
+      setState(() => _caCertCtrl.text = result.files.single.path!);
     }
   }
 
@@ -298,12 +310,35 @@ class _HostedScreenState extends State<HostedScreen> {
                             ],
                           ),
                           const SizedBox(height: 4),
-                          _Field(
-                            controller: _caCertCtrl,
-                            label: 'CA 证书路径',
-                            hint: '/path/to/server.crt（可选）',
-                            icon: Icons.verified_outlined,
-                            enabled: !running,
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: _Field(
+                                  controller: _caCertCtrl,
+                                  label: 'CA 证书路径',
+                                  hint: '/path/to/server.crt（可选）',
+                                  icon: Icons.verified_outlined,
+                                  enabled: !running,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                height: 56,
+                                child: OutlinedButton(
+                                  onPressed: running ? null : _pickCaCert,
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.white54,
+                                    side: BorderSide(
+                                        color: Colors.white.withOpacity(
+                                            running ? 0.07 : 0.15)),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 12),
+                                  ),
+                                  child: const Text('浏览'),
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 12),
                           Row(children: [
