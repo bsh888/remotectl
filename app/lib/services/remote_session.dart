@@ -48,6 +48,7 @@ class RemoteSession extends ChangeNotifier {
   RTCDataChannel? _inputMoveDC;  // unreliable+unordered: mousemove only
   bool _inputDCOpen = false;
   bool _inputMoveDCOpen = false;
+  Timer? _connectTimer;
   final _crypto = CryptoService();
   List<Map<String, dynamic>> _iceServers = [
     {'urls': 'stun:stun.l.google.com:19302'},
@@ -64,6 +65,14 @@ class RemoteSession extends ChangeNotifier {
     await disconnect();
     _setState(SessionState.connecting);
     _error = '';
+
+    // Guard: if no response within 15 s, treat as timeout.
+    _connectTimer = Timer(const Duration(seconds: 15), () {
+      if (_state == SessionState.connecting) {
+        _setError('连接超时，请检查服务器地址是否正确');
+        disconnect();
+      }
+    });
 
     try {
       final uri = _wsUri(serverURL);
@@ -97,6 +106,8 @@ class RemoteSession extends ChangeNotifier {
   }
 
   Future<void> disconnect() async {
+    _connectTimer?.cancel();
+    _connectTimer = null;
     _inputDC?.close();
     _inputDC = null;
     _inputDCOpen = false;
@@ -155,13 +166,15 @@ class RemoteSession extends ChangeNotifier {
   Future<void> fetchDevices(String serverURL, {bool allowSelfSigned = false}) async {
     try {
       final uri = Uri.parse(serverURL).replace(path: '/api/devices');
-      final client = HttpClient();
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 10);
       if (allowSelfSigned) {
         client.badCertificateCallback = (cert, host, port) => true;
       }
-      final req = await client.getUrl(uri);
-      final res = await req.close();
-      final body = await res.transform(utf8.decoder).join();
+      final body = await client.getUrl(uri)
+          .then((req) => req.close())
+          .then((res) => res.transform(utf8.decoder).join())
+          .timeout(const Duration(seconds: 10));
       client.close();
       final list = jsonDecode(body) as List<dynamic>;
       _devices = list
@@ -305,11 +318,17 @@ class RemoteSession extends ChangeNotifier {
   // ── helpers ──────────────────────────────────────────────────────────────────
 
   void _setState(SessionState s) {
+    if (s != SessionState.connecting) {
+      _connectTimer?.cancel();
+      _connectTimer = null;
+    }
     _state = s;
     notifyListeners();
   }
 
   void _setError(String msg) {
+    _connectTimer?.cancel();
+    _connectTimer = null;
     _error = msg;
     _state = SessionState.error;
     notifyListeners();
