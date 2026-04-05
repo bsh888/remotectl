@@ -74,12 +74,12 @@ class _HomeScreenState extends State<HomeScreen> {
           NavigationDestination(
             icon: Icon(Icons.monitor_outlined),
             selectedIcon: Icon(Icons.monitor),
-            label: '控制端',
+            label: '远程控制',
           ),
           NavigationDestination(
             icon: Icon(Icons.screen_share_outlined),
             selectedIcon: Icon(Icons.screen_share),
-            label: '被控端',
+            label: '共享本机',
           ),
         ],
       ),

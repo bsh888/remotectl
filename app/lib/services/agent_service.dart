@@ -13,6 +13,7 @@ class AgentConfig {
   int bitrate; // bits/sec
   double scale;
   bool insecure;
+  String caCert; // path to custom CA certificate (.crt)
 
   AgentConfig({
     this.server = 'http://localhost:8080',
@@ -20,9 +21,10 @@ class AgentConfig {
     this.token = '',
     this.name = '',
     this.fps = 30,
-    this.bitrate = 3000000,
-    this.scale = 0.5,
+    this.bitrate = 6000000,
+    this.scale = 0.75,
     this.insecure = false,
+    this.caCert = '',
   });
 
   factory AgentConfig.fromJson(Map<String, dynamic> j) => AgentConfig(
@@ -31,9 +33,10 @@ class AgentConfig {
         token: (j['token'] as String?) ?? '',
         name: (j['name'] as String?) ?? '',
         fps: (j['fps'] as int?) ?? 30,
-        bitrate: (j['bitrate'] as int?) ?? 3000000,
-        scale: ((j['scale'] as num?) ?? 0.5).toDouble(),
+        bitrate: (j['bitrate'] as int?) ?? 6000000,
+        scale: ((j['scale'] as num?) ?? 0.75).toDouble(),
         insecure: (j['insecure'] as bool?) ?? false,
+        caCert: (j['ca_cert'] as String?) ?? '',
       );
 
   Map<String, dynamic> toJson() => {
@@ -45,6 +48,7 @@ class AgentConfig {
         'bitrate': bitrate,
         'scale': scale,
         'insecure': insecure,
+        'ca_cert': caCert,
       };
 }
 
@@ -191,6 +195,7 @@ class AgentService extends ChangeNotifier {
         '--bitrate', _config.bitrate.toString(),
         '--scale', _config.scale.toStringAsFixed(2),
         if (_config.insecure) '--insecure',
+        if (_config.caCert.isNotEmpty) ...['--ca-cert', _config.caCert],
       ];
 
   @override

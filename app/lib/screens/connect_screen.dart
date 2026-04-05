@@ -199,8 +199,8 @@ class _ConnectScreenState extends State<ConnectScreen> {
                   const SizedBox(height: 16),
                   _field(
                     controller: _passCtrl,
-                    label: '连接密码',
-                    hint: '（可选）',
+                    label: '服务器密码',
+                    hint: '信令服务器访问密码（可选）',
                     icon: Icons.lock_outline,
                     obscure: true,
                   ),

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../services/agent_service.dart';
 
 class HostedScreen extends StatefulWidget {
@@ -18,7 +19,8 @@ class _HostedScreenState extends State<HostedScreen> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _fpsCtrl;
   late final TextEditingController _bitrateCtrl;
-  double _scale = 0.5;
+  late final TextEditingController _caCertCtrl;
+  double _scale = 0.75;
   bool _insecure = false;
   bool _showAdvanced = false;
 
@@ -35,6 +37,7 @@ class _HostedScreenState extends State<HostedScreen> {
     _fpsCtrl = TextEditingController(text: cfg.fps.toString());
     _bitrateCtrl =
         TextEditingController(text: (cfg.bitrate ~/ 1000).toString());
+    _caCertCtrl = TextEditingController(text: cfg.caCert);
     _scale = cfg.scale;
     _insecure = cfg.insecure;
 
@@ -49,14 +52,24 @@ class _HostedScreenState extends State<HostedScreen> {
     final cfg = widget.agentService.config;
     setState(() {
       _serverCtrl.text = cfg.server;
-      _idCtrl.text = cfg.id;
+      // Auto-fill device ID from hostname if not set
+      _idCtrl.text = cfg.id.isNotEmpty ? cfg.id : _defaultDeviceId();
       _tokenCtrl.text = cfg.token;
       _nameCtrl.text = cfg.name;
       _fpsCtrl.text = cfg.fps.toString();
       _bitrateCtrl.text = (cfg.bitrate ~/ 1000).toString();
+      _caCertCtrl.text = cfg.caCert;
       _scale = cfg.scale;
       _insecure = cfg.insecure;
     });
+  }
+
+  String _defaultDeviceId() {
+    try {
+      return Platform.localHostname.toLowerCase().replaceAll(' ', '-');
+    } catch (_) {
+      return '';
+    }
   }
 
   void _onAgentChanged() {
@@ -84,6 +97,7 @@ class _HostedScreenState extends State<HostedScreen> {
     _nameCtrl.dispose();
     _fpsCtrl.dispose();
     _bitrateCtrl.dispose();
+    _caCertCtrl.dispose();
     _logScroll.dispose();
     super.dispose();
   }
@@ -94,9 +108,10 @@ class _HostedScreenState extends State<HostedScreen> {
         token: _tokenCtrl.text.trim(),
         name: _nameCtrl.text.trim(),
         fps: int.tryParse(_fpsCtrl.text) ?? 30,
-        bitrate: (int.tryParse(_bitrateCtrl.text) ?? 3000) * 1000,
+        bitrate: (int.tryParse(_bitrateCtrl.text) ?? 6000) * 1000,
         scale: _scale,
         insecure: _insecure,
+        caCert: _caCertCtrl.text.trim(),
       );
 
   Future<void> _startStop() async {
@@ -106,6 +121,19 @@ class _HostedScreenState extends State<HostedScreen> {
       await widget.agentService.saveConfig(_buildConfig());
       await widget.agentService.start();
     }
+  }
+
+  void _copyDeviceId() {
+    final id = _idCtrl.text.trim();
+    if (id.isEmpty) return;
+    Clipboard.setData(ClipboardData(text: id));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('设备 ID 已复制'),
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -130,7 +158,7 @@ class _HostedScreenState extends State<HostedScreen> {
               const Icon(Icons.desktop_access_disabled_outlined,
                   size: 64, color: Colors.white24),
               const SizedBox(height: 16),
-              const Text('被控模式仅支持桌面平台',
+              const Text('共享本机仅支持桌面平台',
                   style: TextStyle(color: Colors.white54, fontSize: 18)),
               const SizedBox(height: 8),
               const Text('macOS · Windows · Linux',
@@ -152,6 +180,7 @@ class _HostedScreenState extends State<HostedScreen> {
   Widget _buildContent(BuildContext context) {
     final svc = widget.agentService;
     final running = svc.isRunning;
+    final theme = Theme.of(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F172A),
@@ -161,18 +190,24 @@ class _HostedScreenState extends State<HostedScreen> {
             // ── Config + controls (scrollable) ──
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(20),
                 child: Center(
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 440),
+                    constraints: const BoxConstraints(maxWidth: 460),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // Status card
-                        _StatusCard(status: svc.status, error: svc.error),
+                        // ── Device ID card (prominent, Sunflower-style) ──
+                        _DeviceIdCard(
+                          idController: _idCtrl,
+                          status: svc.status,
+                          error: svc.error,
+                          onCopy: _copyDeviceId,
+                          enabled: !running,
+                        ),
                         const SizedBox(height: 20),
 
-                        // Form fields
+                        // ── Server + token ──
                         _Field(
                           controller: _serverCtrl,
                           label: '服务器地址',
@@ -182,18 +217,10 @@ class _HostedScreenState extends State<HostedScreen> {
                         ),
                         const SizedBox(height: 12),
                         _Field(
-                          controller: _idCtrl,
-                          label: '设备 ID',
-                          hint: 'my-mac',
-                          icon: Icons.computer_outlined,
-                          enabled: !running,
-                        ),
-                        const SizedBox(height: 12),
-                        _Field(
                           controller: _tokenCtrl,
-                          label: '连接密码',
-                          hint: '（可选）',
-                          icon: Icons.lock_outline,
+                          label: '设备密钥',
+                          hint: '用于验证身份的密钥（可选）',
+                          icon: Icons.vpn_key_outlined,
                           obscure: true,
                           enabled: !running,
                         ),
@@ -217,8 +244,7 @@ class _HostedScreenState extends State<HostedScreen> {
                                 : Icons.expand_more,
                             size: 18,
                           ),
-                          label:
-                              Text(_showAdvanced ? '收起高级设置' : '高级设置'),
+                          label: Text(_showAdvanced ? '收起高级设置' : '高级设置'),
                           style: TextButton.styleFrom(
                             foregroundColor: Colors.white38,
                             alignment: Alignment.centerLeft,
@@ -243,7 +269,7 @@ class _HostedScreenState extends State<HostedScreen> {
                               child: _Field(
                                 controller: _bitrateCtrl,
                                 label: '码率 (kbps)',
-                                hint: '3000',
+                                hint: '6000',
                                 icon: Icons.settings_input_antenna,
                                 keyboardType: TextInputType.number,
                                 enabled: !running,
@@ -271,6 +297,15 @@ class _HostedScreenState extends State<HostedScreen> {
                               ),
                             ],
                           ),
+                          const SizedBox(height: 4),
+                          _Field(
+                            controller: _caCertCtrl,
+                            label: 'CA 证书路径',
+                            hint: '/path/to/server.crt（可选）',
+                            icon: Icons.verified_outlined,
+                            enabled: !running,
+                          ),
+                          const SizedBox(height: 12),
                           Row(children: [
                             Switch(
                               value: _insecure,
@@ -280,7 +315,7 @@ class _HostedScreenState extends State<HostedScreen> {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              '允许自签名证书',
+                              '跳过证书验证（不安全）',
                               style: TextStyle(
                                   color: running
                                       ? Colors.white24
@@ -293,25 +328,29 @@ class _HostedScreenState extends State<HostedScreen> {
                         const SizedBox(height: 20),
 
                         // Start / Stop
-                        FilledButton.icon(
-                          onPressed: _startStop,
-                          icon: running
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white),
-                                )
-                              : const Icon(Icons.play_arrow),
-                          label: Text(running ? '停止被控' : '启动被控'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: running
-                                ? Colors.red.shade700
-                                : Theme.of(context).colorScheme.primary,
-                            padding:
-                                const EdgeInsets.symmetric(vertical: 14),
-                            textStyle: const TextStyle(fontSize: 16),
+                        SizedBox(
+                          height: 52,
+                          child: FilledButton.icon(
+                            onPressed: _startStop,
+                            icon: running
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white),
+                                  )
+                                : const Icon(Icons.play_circle_outlined),
+                            label: Text(
+                              running ? '停止共享' : '开始共享',
+                              style: const TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.w600),
+                            ),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: running
+                                  ? Colors.red.shade700
+                                  : theme.colorScheme.primary,
+                            ),
                           ),
                         ),
                       ],
@@ -332,7 +371,6 @@ class _HostedScreenState extends State<HostedScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Log header
                     Padding(
                       padding: const EdgeInsets.fromLTRB(12, 4, 4, 0),
                       child: Row(children: [
@@ -353,7 +391,6 @@ class _HostedScreenState extends State<HostedScreen> {
                         ),
                       ]),
                     ),
-                    // Log lines
                     Expanded(
                       child: ListView.builder(
                         controller: _logScroll,
@@ -379,46 +416,129 @@ class _HostedScreenState extends State<HostedScreen> {
   }
 }
 
-// ── Status card ───────────────────────────────────────────────────────────────
+// ── Device ID card ─────────────────────────────────────────────────────────────
+// Sunflower-style: shows the device ID prominently with status and copy button.
 
-class _StatusCard extends StatelessWidget {
+class _DeviceIdCard extends StatelessWidget {
+  final TextEditingController idController;
   final AgentStatus status;
   final String error;
-  const _StatusCard({required this.status, required this.error});
+  final VoidCallback onCopy;
+  final bool enabled;
+
+  const _DeviceIdCard({
+    required this.idController,
+    required this.status,
+    required this.error,
+    required this.onCopy,
+    required this.enabled,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final (icon, label, color) = switch (status) {
-      AgentStatus.stopped  => (Icons.circle_outlined, '未运行', Colors.white38),
-      AgentStatus.starting => (Icons.pending_outlined, '启动中…', Colors.orange),
-      AgentStatus.running  => (Icons.circle, '运行中', Colors.green),
-      AgentStatus.error    => (Icons.error_outline, '错误', Colors.red),
+    final (statusIcon, statusLabel, statusColor) = switch (status) {
+      AgentStatus.stopped  => (Icons.circle_outlined,  '未共享', Colors.white38),
+      AgentStatus.starting => (Icons.pending_outlined,  '启动中…', Colors.orange),
+      AgentStatus.running  => (Icons.circle,            '共享中', Colors.greenAccent),
+      AgentStatus.error    => (Icons.error_outline,     '错误', Colors.redAccent),
     };
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        gradient: LinearGradient(
+          colors: [
+            const Color(0xFF1E3A8A).withOpacity(0.6),
+            const Color(0xFF1E40AF).withOpacity(0.3),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: statusColor.withOpacity(0.3),
+          width: 1.5,
+        ),
       ),
-      child: Row(children: [
-        Icon(icon, color: color, size: 18),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Status row
+          Row(children: [
+            Icon(statusIcon, size: 14, color: statusColor),
+            const SizedBox(width: 6),
+            Text(
+              statusLabel,
+              style: TextStyle(
+                  color: statusColor,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500),
+            ),
+            if (status == AgentStatus.error && error.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  error,
+                  style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ]),
+          const SizedBox(height: 14),
+
+          // Label
+          const Text(
+            '本机设备 ID',
+            style: TextStyle(
+                color: Colors.white54, fontSize: 12, letterSpacing: 0.5),
+          ),
+          const SizedBox(height: 6),
+
+          // ID + copy button
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text('被控状态: $label',
-                  style: TextStyle(
-                      color: color, fontWeight: FontWeight.w600)),
-              if (status == AgentStatus.error && error.isNotEmpty)
-                Text(error,
-                    style: const TextStyle(
-                        color: Colors.red, fontSize: 12)),
+              Expanded(
+                child: TextField(
+                  controller: idController,
+                  enabled: enabled,
+                  autocorrect: false,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1,
+                  ),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                    border: InputBorder.none,
+                    hintText: '设备标识',
+                    hintStyle: TextStyle(
+                        color: Colors.white.withOpacity(0.2),
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: onCopy,
+                tooltip: '复制设备 ID',
+                icon: const Icon(Icons.copy_outlined, size: 20),
+                color: Colors.white54,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              ),
             ],
           ),
-        ),
-      ]),
+          const SizedBox(height: 4),
+          const Text(
+            '控制端输入此 ID 即可连接到本机',
+            style: TextStyle(color: Colors.white30, fontSize: 11),
+          ),
+        ],
+      ),
     );
   }
 }
