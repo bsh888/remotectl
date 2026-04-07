@@ -555,6 +555,16 @@ func (a *Agent) readPump() {
 			if err := json.Unmarshal(msg.Payload, &p); err != nil {
 				continue
 			}
+			// Empty public key means the viewer could not complete key exchange
+			// (e.g. platform crypto not available). Drop the session silently —
+			// input will still work via WebRTC DataChannel (DTLS-encrypted).
+			if p.PublicKey == "" {
+				log.Printf("key exchange skipped for %s (viewer sent empty key, WS fallback disabled)", p.ViewerID)
+				a.sessionsMu.Lock()
+				delete(a.sessions, p.ViewerID)
+				a.sessionsMu.Unlock()
+				continue
+			}
 			a.sessionsMu.Lock()
 			s, ok := a.sessions[p.ViewerID]
 			a.sessionsMu.Unlock()
