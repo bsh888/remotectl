@@ -427,16 +427,18 @@ class _HostedScreenState extends State<HostedScreen> {
                       ]),
                     ),
                     Expanded(
-                      child: ListView.builder(
-                        controller: _logScroll,
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                        itemCount: svc.logs.length,
-                        itemBuilder: (_, i) => Text(
-                          svc.logs[i],
-                          style: const TextStyle(
-                            color: Colors.white54,
-                            fontSize: 11,
-                            fontFamily: 'monospace',
+                      child: SelectionArea(
+                        child: ListView.builder(
+                          controller: _logScroll,
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                          itemCount: svc.logs.length,
+                          itemBuilder: (_, i) => Text(
+                            svc.logs[i],
+                            style: const TextStyle(
+                              color: Colors.white54,
+                              fontSize: 11,
+                              fontFamily: 'monospace',
+                            ),
                           ),
                         ),
                       ),
