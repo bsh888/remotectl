@@ -704,6 +704,7 @@ func (h *Hub) handleViewer(w http.ResponseWriter, r *http.Request) {
 		validPwd = true // dev mode: no password set anywhere
 	}
 	if !validPwd {
+		log.Printf("[viewer] password rejected for device %s (remote %s)", cp.DeviceID, conn.RemoteAddr())
 		replyErr(conn, "invalid password")
 		conn.Close()
 		return
@@ -770,6 +771,13 @@ func sendJSON(ch chan []byte, msgType string, payload any) {
 func replyErr(conn *websocket.Conn, msg string) {
 	conn.SetWriteDeadline(time.Now().Add(writeWait))
 	conn.WriteMessage(websocket.TextMessage, marshalMsg(TypeError, ErrorPayload{Message: msg}))
+	// Send a proper WebSocket close frame so the client receives the error
+	// message before the connection is torn down (avoids race with TCP close).
+	conn.WriteControl(
+		websocket.CloseMessage,
+		websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""),
+		time.Now().Add(writeWait),
+	)
 }
 
 func randomHex(n int) string {

@@ -94,9 +94,10 @@ class RemoteSession extends ChangeNotifier {
         onError: (e) => _setError('WebSocket error: $e'),
         onDone: () {
           // WebSocket closing is normal once WebRTC negotiation has started (_pc != null).
-          // Only treat it as an error if no peer connection was ever created.
+          // Only treat it as an error if no peer connection was ever created,
+          // and only if a better error hasn't already been set (e.g. 'invalid password').
           if (_state == SessionState.connecting && _pc == null) {
-            _setError('WebSocket closed unexpectedly');
+            _setError('连接被服务器关闭，请检查服务器地址和设备 ID');
           }
         },
       );
@@ -211,7 +212,7 @@ class RemoteSession extends ChangeNotifier {
       case 'agent_offline':
         _setError('Agent disconnected');
       case 'error':
-        _setError((payload?['message'] as String?) ?? 'Unknown server error');
+        _setError(_friendlyServerError((payload?['message'] as String?) ?? ''));
     }
   }
 
@@ -344,6 +345,19 @@ class RemoteSession extends ChangeNotifier {
     }
     _state = s;
     notifyListeners();
+  }
+
+  static String _friendlyServerError(String raw) {
+    switch (raw) {
+      case 'invalid password':
+        return '会话密码错误，请重新输入';
+      case 'device not found or offline':
+        return '设备不在线，请确认设备 ID';
+      case 'authentication failed':
+        return '认证失败，请检查设备密钥';
+      default:
+        return raw.isEmpty ? '服务器返回未知错误' : raw;
+    }
   }
 
   void _setError(String msg) {
