@@ -303,9 +303,9 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                 // Password
                                 _labeledField(
                                   context: context,
-                                  label: '服务器密码',
+                                  label: '会话密码',
                                   controller: _passCtrl,
-                                  hint: '信令服务器访问密码（可选）',
+                                  hint: '被控端显示的6位数字',
                                   icon: Icons.lock_outline,
                                   obscure: true,
                                 ),

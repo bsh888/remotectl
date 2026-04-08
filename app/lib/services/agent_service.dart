@@ -60,11 +60,13 @@ class AgentService extends ChangeNotifier {
   final List<String> _logs = [];
   Process? _process;
   AgentConfig _config = AgentConfig();
+  String _sessionPwd = '';
 
   AgentStatus get status => _status;
   String get error => _error;
   List<String> get logs => List.unmodifiable(_logs);
   AgentConfig get config => _config;
+  String get sessionPassword => _sessionPwd;
   bool get isRunning =>
       _status == AgentStatus.running || _status == AgentStatus.starting;
 
@@ -105,6 +107,7 @@ class AgentService extends ChangeNotifier {
     _status = AgentStatus.starting;
     _error = '';
     _logs.clear();
+    _sessionPwd = '';
     notifyListeners();
 
     try {
@@ -144,6 +147,7 @@ class AgentService extends ChangeNotifier {
     final prev = _status;
     _status = AgentStatus.stopped;
     _error = '';
+    _sessionPwd = '';
     _process?.kill(ProcessSignal.sigterm);
     _process = null;
     if (prev != AgentStatus.stopped) notifyListeners();
@@ -156,6 +160,12 @@ class AgentService extends ChangeNotifier {
 
   void _appendLog(String line) {
     if (line.isEmpty) return;
+    // Machine-readable marker emitted by agent — parse silently, don't log
+    if (line.startsWith('SESSION_PWD:')) {
+      _sessionPwd = line.substring('SESSION_PWD:'.length).trim();
+      notifyListeners();
+      return;
+    }
     _logs.add(line);
     if (_logs.length > 500) _logs.removeRange(0, _logs.length - 500);
     notifyListeners();

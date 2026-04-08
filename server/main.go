@@ -103,10 +103,11 @@ type ChallengePayload struct {
 }
 
 type AuthPayload struct {
-	DeviceID string `json:"device_id"`
-	HMAC     string `json:"hmac"` // hex HMAC-SHA256(nonce_bytes, token)
-	Platform string `json:"platform"`
-	Name     string `json:"name"`
+	DeviceID   string `json:"device_id"`
+	HMAC       string `json:"hmac"` // hex HMAC-SHA256(nonce_bytes, token)
+	Platform   string `json:"platform"`
+	Name       string `json:"name"`
+	SessionPwd string `json:"session_pwd"` // ephemeral per-session password from agent
 }
 
 type ConnectPayload struct {
@@ -283,15 +284,16 @@ func (h *Hub) verifyHMAC(deviceID, nonceHex, receivedHMAC string) bool {
 // ── Agent ─────────────────────────────────────────────────────────────────────
 
 type Agent struct {
-	id       string
-	name     string
-	platform string
-	conn     *websocket.Conn
-	send     chan []byte
-	viewers  map[string]*Viewer
-	mu       sync.RWMutex
-	hub      *Hub
-	closed   atomic.Bool
+	id         string
+	name       string
+	platform   string
+	sessionPwd string // ephemeral password set by agent at registration
+	conn       *websocket.Conn
+	send       chan []byte
+	viewers    map[string]*Viewer
+	mu         sync.RWMutex
+	hub        *Hub
+	closed     atomic.Bool
 }
 
 func (a *Agent) close() {
@@ -625,13 +627,14 @@ func (h *Hub) handleAgent(w http.ResponseWriter, r *http.Request) {
 	conn.SetReadDeadline(time.Time{})
 
 	agent := &Agent{
-		id:       auth.DeviceID,
-		name:     auth.Name,
-		platform: auth.Platform,
-		conn:     conn,
-		send:     make(chan []byte, 256),
-		viewers:  make(map[string]*Viewer),
-		hub:      h,
+		id:         auth.DeviceID,
+		name:       auth.Name,
+		platform:   auth.Platform,
+		sessionPwd: auth.SessionPwd,
+		conn:       conn,
+		send:       make(chan []byte, 256),
+		viewers:    make(map[string]*Viewer),
+		hub:        h,
 	}
 
 	h.mu.Lock()
@@ -677,17 +680,31 @@ func (h *Hub) handleViewer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if cp.Password != h.password {
-		replyErr(conn, "invalid password")
-		conn.Close()
-		return
-	}
-
+	// Look up the agent first so we can validate against its session password.
 	h.mu.RLock()
 	agent, ok := h.agents[cp.DeviceID]
 	h.mu.RUnlock()
 	if !ok {
 		replyErr(conn, "device not found or offline")
+		conn.Close()
+		return
+	}
+
+	// Password priority:
+	//  1. Agent session_pwd (ephemeral, generated per run) — preferred
+	//  2. Global server password from config — backward-compat fallback
+	//  3. Neither configured (dev mode) — accept all
+	var validPwd bool
+	switch {
+	case agent.sessionPwd != "":
+		validPwd = cp.Password == agent.sessionPwd
+	case h.password != "":
+		validPwd = cp.Password == h.password
+	default:
+		validPwd = true // dev mode: no password set anywhere
+	}
+	if !validPwd {
+		replyErr(conn, "invalid password")
 		conn.Close()
 		return
 	}

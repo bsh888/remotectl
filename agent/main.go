@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
@@ -11,6 +12,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math/big"
 	"net/url"
 	"os"
 	"os/signal"
@@ -61,10 +63,11 @@ type ChallengePayload struct {
 }
 
 type AuthPayload struct {
-	DeviceID string `json:"device_id"`
-	HMAC     string `json:"hmac"`
-	Platform string `json:"platform"`
-	Name     string `json:"name"`
+	DeviceID   string `json:"device_id"`
+	HMAC       string `json:"hmac"`
+	Platform   string `json:"platform"`
+	Name       string `json:"name"`
+	SessionPwd string `json:"session_pwd"` // ephemeral per-session numeric password
 }
 
 type ViewerEventPayload struct {
@@ -183,6 +186,8 @@ type Agent struct {
 	insecure    bool
 	caCert      string
 
+	sessionPwd  string // random 6-digit numeric password, generated once per run
+
 	conn        *websocket.Conn
 	send        chan []byte
 	viewerCount atomic.Int32
@@ -200,6 +205,16 @@ type Agent struct {
 	videoTrack *webrtc.TrackLocalStaticSample
 	rtcPeers   map[string]*webrtc.PeerConnection
 	rtcMu      sync.RWMutex
+}
+
+// generateSessionPwd returns a random 6-digit numeric string used as the
+// ephemeral session password viewers must provide to connect.
+func generateSessionPwd() string {
+	n, err := rand.Int(rand.Reader, big.NewInt(1_000_000))
+	if err != nil {
+		return "000000"
+	}
+	return fmt.Sprintf("%06d", n)
 }
 
 // ── WebRTC helpers ─────────────────────────────────────────────────────────────
@@ -452,6 +467,7 @@ func (a *Agent) authenticate() error {
 	macHex := hex.EncodeToString(mac.Sum(nil))
 	payload, _ := json.Marshal(AuthPayload{
 		DeviceID: a.deviceID, HMAC: macHex, Platform: a.platform, Name: a.name,
+		SessionPwd: a.sessionPwd,
 	})
 	authMsg, _ := json.Marshal(Message{Type: TypeAuth, Payload: payload})
 	a.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
@@ -834,6 +850,7 @@ func main() {
 		log.Fatalf("NewTrackLocalStaticSample: %v", err)
 	}
 
+	sessionPwd := generateSessionPwd()
 	agent := &Agent{
 		serverURL:  *serverURL,
 		deviceID:   *deviceID,
@@ -845,11 +862,19 @@ func main() {
 		scale:      *scale,
 		insecure:   *insecure,
 		caCert:     *caCert,
+		sessionPwd: sessionPwd,
 		sessions:   make(map[string]*session.Session),
 		webrtcAPI:  api,
 		videoTrack: videoTrack,
 		rtcPeers:   make(map[string]*webrtc.PeerConnection),
 	}
+
+	// Machine-readable marker for the Flutter app to parse (do not change format)
+	fmt.Printf("SESSION_PWD:%s\n", sessionPwd)
+	log.Printf("┌─────────────────────────────────")
+	log.Printf("│ 设备 ID:  %s", *deviceID)
+	log.Printf("│ 会话密码: %s", sessionPwd)
+	log.Printf("└─────────────────────────────────")
 
 	// ── macOS permission checks (run once at startup) ─────────────────────────
 	appName := "remotectl"

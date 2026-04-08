@@ -152,6 +152,19 @@ class _HostedScreenState extends State<HostedScreen> {
     );
   }
 
+  void _copySessionPwd() {
+    final pwd = widget.agentService.sessionPassword;
+    if (pwd.isEmpty) return;
+    Clipboard.setData(ClipboardData(text: pwd));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('会话密码已复制'),
+        duration: Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (kIsWeb ||
@@ -285,7 +298,9 @@ class _HostedScreenState extends State<HostedScreen> {
                               idController: _idCtrl,
                               status: svc.status,
                               error: svc.error,
+                              sessionPwd: svc.sessionPassword,
                               onCopy: _copyDeviceId,
+                              onCopyPwd: _copySessionPwd,
                               enabled: !running,
                             ),
                             const SizedBox(height: 20),
@@ -851,14 +866,18 @@ class _DeviceIdCard extends StatelessWidget {
   final TextEditingController idController;
   final AgentStatus status;
   final String error;
+  final String sessionPwd;
   final VoidCallback onCopy;
+  final VoidCallback onCopyPwd;
   final bool enabled;
 
   const _DeviceIdCard({
     required this.idController,
     required this.status,
     required this.error,
+    required this.sessionPwd,
     required this.onCopy,
+    required this.onCopyPwd,
     required this.enabled,
   });
 
@@ -1018,6 +1037,67 @@ class _DeviceIdCard extends StatelessWidget {
               fontSize: 11,
             ),
           ),
+
+          // ── Session password (shown only when agent is running) ──
+          if (sessionPwd.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Divider(color: Colors.white.withValues(alpha: 0.10), height: 1),
+            const SizedBox(height: 14),
+            Text(
+              '会话密码',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.54),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Text(
+                    sessionPwd,
+                    style: const TextStyle(
+                      color: Color(0xFF4ADE80),
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 6,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.12),
+                    ),
+                  ),
+                  child: IconButton(
+                    onPressed: onCopyPwd,
+                    tooltip: '复制会话密码',
+                    icon: const Icon(Icons.copy_outlined, size: 16),
+                    color: Colors.white.withValues(alpha: 0.60),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '每次启动随机生成，控制端连接时输入此密码',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.30),
+                fontSize: 11,
+              ),
+            ),
+          ],
         ],
       ),
     );
