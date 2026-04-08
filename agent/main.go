@@ -372,7 +372,7 @@ func (a *Agent) startRTC(viewerID string) {
 		log.Printf("CreateDataChannel(chat) for %s: %v", viewerID, err)
 	} else {
 		chatDC.OnOpen(func() {
-			log.Printf("[chat] channel open with viewer %s", viewerID[:8])
+			log.Printf("[chat] channel open with viewer %s", viewerID[:min(8, len(viewerID))])
 		})
 		chatDC.OnMessage(func(msg webrtc.DataChannelMessage) {
 			a.handleChatDCMessage(viewerID, chatDC, msg)
@@ -429,7 +429,7 @@ func (a *Agent) handleChatDCMessage(viewerID string, _ *webrtc.DataChannel, msg 
 		if text == "" {
 			return
 		}
-		log.Printf("[chat] message from %s: %s", viewerID[:8], text)
+		log.Printf("[chat] message from %s: %s", viewerID[:min(8, len(viewerID))], text)
 		showNotification("RemoteCtl 新消息", text)
 
 	case "file_start":
@@ -443,7 +443,7 @@ func (a *Agent) handleChatDCMessage(viewerID string, _ *webrtc.DataChannel, msg 
 		a.fileRxMu.Lock()
 		a.fileRx[id] = &chatFileReceiver{name: name, size: int64(size), mime: mime}
 		a.fileRxMu.Unlock()
-		log.Printf("[chat] incoming file from %s: %s (%.0f bytes, %s)", viewerID[:8], name, size, mime)
+		log.Printf("[chat] incoming file from %s: %s (%.0f bytes, %s)", viewerID[:min(8, len(viewerID))], name, size, mime)
 
 	case "file_chunk":
 		id, _ := ev["id"].(string)

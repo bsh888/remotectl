@@ -354,6 +354,7 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
               right: 8,
               bottom: 8,
               child: ChatPanel(
+                width: 300,
                 chat: widget.session.chat,
                 onClose: () {
                   setState(() => _chatOpen = false);

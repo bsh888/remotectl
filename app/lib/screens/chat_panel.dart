@@ -16,8 +16,11 @@ import '../services/chat_service.dart';
 class ChatPanel extends StatefulWidget {
   final ChatService chat;
   final VoidCallback onClose;
+  /// Fixed width for the panel. If null, the panel fills available width
+  /// (used when embedded in a bottom sheet on mobile).
+  final double? width;
 
-  const ChatPanel({super.key, required this.chat, required this.onClose});
+  const ChatPanel({super.key, required this.chat, required this.onClose, this.width});
 
   @override
   State<ChatPanel> createState() => _ChatPanelState();
@@ -170,22 +173,28 @@ class _ChatPanelState extends State<ChatPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final isSheet = widget.width == null;
+    final radius = isSheet
+        ? const BorderRadius.vertical(top: Radius.circular(16))
+        : BorderRadius.circular(12);
     return Container(
-      width: 300,
+      width: widget.width,
       decoration: BoxDecoration(
-        color: const Color(0xFF0A1628).withOpacity(0.96),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.5),
-            blurRadius: 24,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: const Color(0xFF0A1628).withOpacity(0.97),
+        borderRadius: radius,
+        border: isSheet ? null : Border.all(color: Colors.white.withOpacity(0.08)),
+        boxShadow: isSheet
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.5),
+                  blurRadius: 24,
+                  offset: const Offset(0, 4),
+                ),
+              ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: radius,
         child: Column(
           children: [
             _buildHeader(),

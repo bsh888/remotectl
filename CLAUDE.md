@@ -42,11 +42,20 @@ make all            # 全量构建
 - 设置了 `ExpectedFrameRate`、`DataRateLimits`（2× 目标码率/秒，防止关键帧突发）
 - `AllowFrameReordering = false`，保证低延迟
 
+### agent — 会话密码与认证
+
+- `generateSessionPwd()` 启动时生成 6 位随机数字密码
+- 打印 `SESSION_PWD:XXXXXX` 到 stdout，Flutter App 解析后在共享页面显示
+- viewer 连接时必须提供会话密码（`h.password` 字段）；server 校验后才放行
+- 认证失败时 agent 打印 `AUTH_FAILED:…` 到 stdout（Flutter App 解析后显示错误）并以 exit(1) 退出
+- Windows 进程清理：`ProcessSignal.sigkill`（`WidgetsBindingObserver.didChangeAppLifecycleState(detached)`）
+
 ### agent — WebRTC SDP (main.go)
 
 - SDP profile-level-id 保持 `42e01f`（Baseline），保证与 Flutter WebRTC 协商兼容
 - VT 编码器实际输出 High Profile，iOS/浏览器解码器均能解
 - 注册了 RTX (PT 103, apt=102) 用于丢包重传
+- DataChannels：`input`（reliable+ordered）、`input-move`（unreliable+unordered）、`chat`（reliable+ordered）
 
 ### app — Flutter 移动端 (app/lib/screens/remote_screen.dart)
 
@@ -55,6 +64,37 @@ make all            # 全量构建
 - 修饰键行包含数字键 1-9/0，避免切换数字键盘导致 TextField 失焦
 - 双指手势：`onSecondFingerDown` 时重置 `_prevCentroid` 和 `_prevPinchDist`
 - 竖屏居中：`ListenableBuilder(listenable: renderer)` 监听 videoWidth/videoHeight 变化
+
+### app — 会话内聊天功能
+
+**DataChannel 协议**（DataChannel 名：`chat`，reliable+ordered）
+
+```
+文字消息:  {"type":"text",       "id":"<hex8>","text":"…","ts":1700000000000}
+文件开始:  {"type":"file_start", "id":"<hex8>","name":"photo.jpg","size":12345,"mime":"image/jpeg"}
+文件分块:  {"type":"file_chunk", "id":"<hex8>","seq":0,"data":"<base64>","last":false}
+最后分块:  {"type":"file_chunk", "id":"<hex8>","seq":N,"data":"<base64>","last":true}
+```
+
+**Flutter 端**
+- `ChatService`（`app/lib/services/chat_service.dart`）：ChangeNotifier，attach/detach DC，持有消息列表
+- `RemoteSession` 在 `pc.onDataChannel` 中识别 label `"chat"` → `_chat.attach(channel)`
+- `session.chat` 暴露给 UI 层
+- 桌面（`remote_screen_desktop.dart`）：控制面板新增 💬 按钮，`ChatPanel(width:300)` 固定宽右侧覆盖层
+- 移动端（`remote_screen.dart`）：工具栏聊天按钮，`ChatPanel`（无 width）作为 `DraggableScrollableSheet`
+- 文件保存：桌面 → `~/Downloads`，移动 → App Documents
+- 语音录制：`record` 包（AAC 16kHz），播放：`audioplayers` 包
+
+**Agent 端**（`agent/main.go`，`agent/notify.go`）
+- `startRTC()` 中创建 `chat` DC，`handleChatDCMessage()` 处理收到的消息/文件
+- 收到文字/文件/语音 → `showNotification()` 调用系统通知（macOS: osascript，Windows: PowerShell WinForms，Linux: notify-send）
+- 文件保存到 `~/Downloads`，重名自动加时间戳后缀
+
+**iOS/macOS 权限**
+- iOS `Info.plist`：已有 `NSMicrophoneUsageDescription`
+- macOS `Info.plist`：已加 `NSMicrophoneUsageDescription`
+- macOS entitlements：已有 `com.apple.security.device.audio-input`
+- Android：已有 `RECORD_AUDIO` 权限
 
 ### app — iOS
 

@@ -730,12 +730,27 @@ class _RemoteScreenState extends State<RemoteScreen> {
         initialChildSize: 0.6,
         minChildSize: 0.3,
         maxChildSize: 0.92,
-        builder: (ctx, scrollCtrl) => ChatPanel(
-          chat: widget.session.chat,
-          onClose: () {
-            widget.session.chat.setPanelOpen(false);
-            Navigator.of(ctx).pop();
-          },
+        builder: (ctx, scrollCtrl) => Column(
+          children: [
+            // Drag handle
+            Container(
+              width: 40, height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Expanded(
+              child: ChatPanel(
+                chat: widget.session.chat,
+                onClose: () {
+                  widget.session.chat.setPanelOpen(false);
+                  Navigator.of(ctx).pop();
+                },
+              ),
+            ),
+          ],
         ),
       ),
     ).then((_) => widget.session.chat.setPanelOpen(false));
