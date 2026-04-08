@@ -298,4 +298,5 @@ func windowsVK(code string) (int, bool) {
 	return 0, false
 }
 
-func CheckAccessibility() bool { return true }
+func CheckAccessibility() bool         { return true }
+func RequestAccessibilityPrompt() bool { return true }

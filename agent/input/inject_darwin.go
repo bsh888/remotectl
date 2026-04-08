@@ -11,6 +11,20 @@ static bool rc_accessibility_trusted(void) {
     return AXIsProcessTrustedWithOptions(NULL);
 }
 
+// Prompt the user via the system Accessibility dialog if not already trusted.
+// Returns true if already trusted (no dialog needed).
+static bool rc_accessibility_request_prompt(void) {
+    const void *keys[]   = { kAXTrustedCheckOptionPrompt };
+    const void *values[] = { kCFBooleanTrue };
+    CFDictionaryRef opts = CFDictionaryCreate(
+        NULL, keys, values, 1,
+        &kCFTypeDictionaryKeyCallBacks,
+        &kCFTypeDictionaryValueCallBacks);
+    bool trusted = AXIsProcessTrustedWithOptions(opts);
+    CFRelease(opts);
+    return trusted;
+}
+
 // Scale physical pixel coordinates to logical points for CGEventPost.
 // On a Retina display CGDisplayPixelsWide > CGDisplayBounds width (e.g. 2x or 3x).
 static CGPoint rc_to_logical(int x, int y) {
@@ -109,6 +123,12 @@ import "unsafe"
 // CGEventPost (mouse/keyboard injection) silently fails without it.
 func CheckAccessibility() bool {
 	return bool(C.rc_accessibility_trusted())
+}
+
+// RequestAccessibilityPrompt opens the macOS "Accessibility" system dialog if
+// the permission has not been granted yet. Returns true if already trusted.
+func RequestAccessibilityPrompt() bool {
+	return bool(C.rc_accessibility_request_prompt())
 }
 
 func inject(e Event) {

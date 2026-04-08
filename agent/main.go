@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -460,15 +461,6 @@ func (a *Agent) authenticate() error {
 // ── Main loop ─────────────────────────────────────────────────────────────────
 
 func (a *Agent) run(ctx context.Context) {
-	if !input.CheckAccessibility() {
-		log.Println("WARNING: Accessibility permission not granted — input injection will fail")
-		log.Println("  Fix: System Settings → Privacy & Security → Accessibility → add Terminal")
-	}
-	if !pipeline.CheckScreenRecording() {
-		log.Println("WARNING: Screen Recording permission not granted — capture will not work")
-		log.Println("  Fix: System Settings → Privacy & Security → Screen Recording → add Terminal")
-	}
-
 	if err := a.dial(); err != nil {
 		log.Printf("dial: %v", err)
 		return
@@ -857,6 +849,22 @@ func main() {
 		webrtcAPI:  api,
 		videoTrack: videoTrack,
 		rtcPeers:   make(map[string]*webrtc.PeerConnection),
+	}
+
+	// ── macOS permission checks (run once at startup) ─────────────────────────
+	appName := "remotectl"
+	if exe, err := os.Executable(); err == nil {
+		appName = filepath.Base(exe)
+	}
+	if !pipeline.CheckScreenRecording() {
+		log.Printf("WARNING: 屏幕录制权限未授权 — 截图将无法工作")
+		log.Printf("  请前往: 系统设置 → 隐私与安全性 → 屏幕录制 → 添加 %s", appName)
+	}
+	if !input.RequestAccessibilityPrompt() {
+		// RequestAccessibilityPrompt triggers the system Accessibility dialog.
+		log.Printf("WARNING: 辅助功能权限未授权 — 鼠标/键盘注入将无法工作")
+		log.Printf("  请前往: 系统设置 → 隐私与安全性 → 辅助功能 → 添加 %s", appName)
+		log.Printf("  授权后请重新启动共享")
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

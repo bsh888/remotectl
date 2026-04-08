@@ -11,4 +11,5 @@ func inject(e Event) {
 	log.Printf("[input] CGO disabled — cannot inject event: %+v", e)
 }
 
-func CheckAccessibility() bool { return false }
+func CheckAccessibility() bool         { return false }
+func RequestAccessibilityPrompt() bool { return false }

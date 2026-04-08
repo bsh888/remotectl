@@ -127,4 +127,5 @@ func xdoKey(code string, mods []string) string {
 	return prefix + key
 }
 
-func CheckAccessibility() bool { return true }
+func CheckAccessibility() bool         { return true }
+func RequestAccessibilityPrompt() bool { return true }
