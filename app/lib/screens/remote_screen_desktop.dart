@@ -29,17 +29,8 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
   bool _cursorInVideo = false;
   Offset? _localCursorPos; // cursor position in widget coords for software cursor
 
-  // Keyboard focus — onKeyEvent is set in initState so _onKey can reference `this`
-  late final FocusNode _focusNode;
-
-  // Hidden TextField for text / IME capture (Chinese, Japanese, etc.)
-  // The same FocusNode is shared so key events and text input are co-located.
-  final TextEditingController _kbController =
-      TextEditingController(text: '\u200b');
-  String _prevKbText = '\u200b';
-  // Tracks which physical keys were passed through to the TextField (printable,
-  // no modifier) so their KeyUpEvent can also be ignored.
-  final Set<PhysicalKeyboardKey> _textKeys = {};
+  // Keyboard focus
+  final FocusNode _focusNode = FocusNode();
 
   // Panel toggle (click the icon to open/close)
   bool _panelOpen = false;
@@ -52,7 +43,6 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
     super.initState();
     WakelockPlus.enable();
     _swapCtrlCmd = _defaultSwap();
-    _focusNode = FocusNode(onKeyEvent: _onKey);
     // Request keyboard focus after the first frame — autofocus alone is not
     // reliable on macOS desktop when the route is pushed via Navigator.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -74,7 +64,6 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
   void dispose() {
     WakelockPlus.disable();
     _focusNode.dispose();
-    _kbController.dispose();
     super.dispose();
   }
 
@@ -140,45 +129,11 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
 
   // ── keyboard ───────────────────────────────────────────────────────────────
 
-  // Returns true when a character is "printable text" that should flow through
-  // to the hidden TextField so the IME can process it (e.g. Chinese pinyin
-  // input).  Control characters, Backspace, Tab, Enter, Delete are excluded
-  // so we can handle them explicitly.
-  static bool _isPrintableChar(String? char) {
-    if (char == null || char.isEmpty) return false;
-    final cp = char.runes.first;
-    // Exclude control characters (< U+0020) and DEL (U+007F)
-    return cp >= 0x20 && cp != 0x7f;
-  }
-
   KeyEventResult _onKey(FocusNode _, KeyEvent event) {
     if (event is! KeyDownEvent &&
         event is! KeyUpEvent &&
         event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
-    }
-
-    final hasCtrlAltMeta = HardwareKeyboard.instance.isControlPressed ||
-        HardwareKeyboard.instance.isAltPressed ||
-        HardwareKeyboard.instance.isMetaPressed;
-
-    if (event is KeyUpEvent) {
-      // If the matching KeyDown was passed through to the TextField, ignore
-      // this KeyUp too (TextField + IME owns that key's lifecycle).
-      if (_textKeys.remove(event.physicalKey)) {
-        return KeyEventResult.ignored;
-      }
-    } else {
-      // KeyDown / KeyRepeat
-      if (!hasCtrlAltMeta && _isPrintableChar(event.character)) {
-        // Let the hidden TextField + platform IME handle this character.
-        // _onKbChanged will send it as paste_text once IME commits it.
-        _textKeys.add(event.physicalKey);
-        return KeyEventResult.ignored;
-      }
-      // Not a text key — remove from set in case a modifier was pressed after
-      // the key was already tracked (edge case).
-      _textKeys.remove(event.physicalKey);
     }
 
     final type = (event is KeyUpEvent) ? 'keyup' : 'keydown';
@@ -195,49 +150,6 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
     });
 
     return KeyEventResult.handled;
-  }
-
-  // ── IME / text field ───────────────────────────────────────────────────────
-
-  void _onKbChanged(String text) {
-    // While IME composition is in progress the preedit text changes rapidly.
-    // Only act once composition is committed (composing range becomes empty).
-    if (_kbController.value.composing.isValid) return;
-
-    final prev = _prevKbText;
-
-    if (text.isEmpty) {
-      _prevKbText = '\u200b';
-      _kbController.value = const TextEditingValue(
-        text: '\u200b',
-        selection: TextSelection.collapsed(offset: 1),
-      );
-      widget.session
-          .sendInput({'event': 'keydown', 'key': 'Backspace', 'code': 'Backspace', 'mods': []});
-      widget.session
-          .sendInput({'event': 'keyup', 'key': 'Backspace', 'code': 'Backspace', 'mods': []});
-      return;
-    }
-
-    if (text.length > prev.length) {
-      final added = text.replaceFirst('\u200b', '');
-      final prevClean = prev.replaceFirst('\u200b', '');
-      if (added.length > prevClean.length) {
-        final newChars = added.substring(prevClean.length);
-        widget.session.sendInput({'event': 'paste_text', 'text': newChars});
-      }
-    } else if (text.length < prev.length) {
-      final removed = prev.length - text.length;
-      for (var i = 0; i < removed; i++) {
-        widget.session
-            .sendInput({'event': 'keydown', 'key': 'Backspace', 'code': 'Backspace', 'mods': []});
-        widget.session
-            .sendInput({'event': 'keyup', 'key': 'Backspace', 'code': 'Backspace', 'mods': []});
-      }
-    }
-
-    _prevKbText = text;
-    _kbController.selection = TextSelection.collapsed(offset: text.length);
   }
 
   // ── mouse ──────────────────────────────────────────────────────────────────
@@ -370,100 +282,79 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
   }
 
   Widget _buildConnected(BuildContext context) {
-    return Stack(
-      children: [
-        // ── Hidden TextField for text / IME input ──────────────────────────
-        // Fills the entire area so Flutter can establish a proper text-input
-        // connection (a 1×1 box fails to do so on some platforms).
-        // IgnorePointer lets mouse events fall through to the Listener below;
-        // Opacity(0) makes it invisible without removing it from layout.
-        Positioned.fill(
-          child: IgnorePointer(
-            child: Opacity(
-              opacity: 0,
-              child: TextField(
-                focusNode: _focusNode,
-                controller: _kbController,
-                onChanged: _onKbChanged,
-                autofocus: true,
-                enableInteractiveSelection: false,
-                keyboardType: TextInputType.multiline,
-                maxLines: null,
-                style: const TextStyle(color: Colors.transparent, fontSize: 14),
-                cursorColor: Colors.transparent,
-                cursorWidth: 0,
-                decoration: const InputDecoration.collapsed(hintText: ''),
-              ),
+    return Focus(
+      focusNode: _focusNode,
+      autofocus: true,
+      onKeyEvent: _onKey,
+      child: Stack(
+        children: [
+          // ── Video layer ──
+          Positioned.fill(
+            child: RTCVideoView(
+              widget.session.renderer!,
+              objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+              mirror: false,
             ),
           ),
-        ),
 
-        // ── Video layer ──
-        Positioned.fill(
-          child: RTCVideoView(
-            widget.session.renderer!,
-            objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
-            mirror: false,
+          // ── Event capture overlay (ABOVE the platform view so it gets events) ──
+          Positioned.fill(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final widgetSize =
+                    Size(constraints.maxWidth, constraints.maxHeight);
+                return MouseRegion(
+                  cursor: _cursorInVideo
+                      ? SystemMouseCursors.none
+                      : SystemMouseCursors.basic,
+                  onEnter: (_) => setState(() => _cursorInVideo = true),
+                  onExit: (_) => setState(() {
+                    _cursorInVideo = false;
+                    _localCursorPos = null;
+                  }),
+                  child: Listener(
+                    behavior: HitTestBehavior.opaque,
+                    onPointerHover: (e) => _onPointerHover(e, widgetSize),
+                    onPointerMove: (e) => _onPointerMove(e, widgetSize),
+                    onPointerDown: (e) => _onPointerDown(e, widgetSize),
+                    onPointerUp: (e) => _onPointerUp(e, widgetSize),
+                    onPointerSignal: _onPointerSignal,
+                    child: const SizedBox.expand(),
+                  ),
+                );
+              },
+            ),
           ),
-        ),
 
-        // ── Event capture overlay (ABOVE the platform view so it gets events) ──
-        Positioned.fill(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final widgetSize =
-                  Size(constraints.maxWidth, constraints.maxHeight);
-              return MouseRegion(
-                cursor: _cursorInVideo
-                    ? SystemMouseCursors.none
-                    : SystemMouseCursors.basic,
-                onEnter: (_) => setState(() => _cursorInVideo = true),
-                onExit: (_) => setState(() {
-                  _cursorInVideo = false;
-                  _localCursorPos = null;
-                }),
-                child: Listener(
-                  behavior: HitTestBehavior.opaque,
-                  onPointerHover: (e) => _onPointerHover(e, widgetSize),
-                  onPointerMove: (e) => _onPointerMove(e, widgetSize),
-                  onPointerDown: (e) => _onPointerDown(e, widgetSize),
-                  onPointerUp: (e) => _onPointerUp(e, widgetSize),
-                  onPointerSignal: _onPointerSignal,
-                  child: const SizedBox.expand(),
+          // ── Software cursor (replaces hidden system cursor inside video) ──
+          if (_cursorInVideo && _localCursorPos != null)
+            Positioned(
+              left: _localCursorPos!.dx,
+              top: _localCursorPos!.dy,
+              child: const IgnorePointer(
+                child: CustomPaint(
+                  size: Size(20, 20),
+                  painter: _CursorPainter(),
                 ),
-              );
-            },
-          ),
-        ),
-
-        // ── Software cursor (replaces hidden system cursor inside video) ──
-        if (_cursorInVideo && _localCursorPos != null)
-          Positioned(
-            left: _localCursorPos!.dx,
-            top: _localCursorPos!.dy,
-            child: const IgnorePointer(
-              child: CustomPaint(
-                size: Size(20, 20),
-                painter: _CursorPainter(),
               ),
             ),
-          ),
 
-        // ── Floating control icon (top-right) ──
-        Positioned(
-          top: 8,
-          right: 8,
-          child: _buildToggleButton(context),
-        ),
-
-        // ── Control panel (expands below icon when open) ──
-        if (_panelOpen)
+          // ── Floating control icon (top-right) ──
           Positioned(
-            top: 38,
+            top: 8,
             right: 8,
-            child: _buildPanel(context),
+            child: _buildToggleButton(context),
           ),
-      ],
+
+          // ── Control panel (expands below icon when open) ──
+          if (_panelOpen)
+            Positioned(
+              top: 38,
+              right: 8,
+              child: _buildPanel(context),
+            ),
+        ],
+      ),
     );
   }
 
