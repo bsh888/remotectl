@@ -373,28 +373,27 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
     return Stack(
       children: [
         // ── Hidden TextField for text / IME input ──────────────────────────
-        // Shares _focusNode (which has onKeyEvent) so key events and text
-        // composition are handled in the same focus scope.  Positioned 1×1 at
-        // top-left; the IME candidate window will appear near the corner which
-        // is acceptable for a remote-desktop context.
-        Positioned(
-          left: 0,
-          top: 0,
-          child: SizedBox(
-            width: 1,
-            height: 1,
-            child: TextField(
-              focusNode: _focusNode,
-              controller: _kbController,
-              onChanged: _onKbChanged,
-              autofocus: true,
-              enableInteractiveSelection: false,
-              keyboardType: TextInputType.multiline,
-              maxLines: null,
-              style: const TextStyle(color: Colors.transparent, fontSize: 1),
-              cursorColor: Colors.transparent,
-              cursorWidth: 0,
-              decoration: const InputDecoration.collapsed(hintText: ''),
+        // Fills the entire area so Flutter can establish a proper text-input
+        // connection (a 1×1 box fails to do so on some platforms).
+        // IgnorePointer lets mouse events fall through to the Listener below;
+        // Opacity(0) makes it invisible without removing it from layout.
+        Positioned.fill(
+          child: IgnorePointer(
+            child: Opacity(
+              opacity: 0,
+              child: TextField(
+                focusNode: _focusNode,
+                controller: _kbController,
+                onChanged: _onKbChanged,
+                autofocus: true,
+                enableInteractiveSelection: false,
+                keyboardType: TextInputType.multiline,
+                maxLines: null,
+                style: const TextStyle(color: Colors.transparent, fontSize: 14),
+                cursorColor: Colors.transparent,
+                cursorWidth: 0,
+                decoration: const InputDecoration.collapsed(hintText: ''),
+              ),
             ),
           ),
         ),
