@@ -17,7 +17,7 @@ dependencies:
   wakelock_plus: ^1.2.10
   file_picker: ^8.1.7
   path_provider: ^2.1.4
-  record: ^5.2.0
+  record: ^6.0.0
   audioplayers: ^6.1.0
 
 dev_dependencies:
