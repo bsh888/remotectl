@@ -364,21 +364,83 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
               ),
             ),
 
-          // ── Floating control icon (top-right, shifts left when chat open) ──
+          // ── Floating buttons column (top-right, shifts left when chat open) ──
           Positioned(
             top: 8,
             right: _chatOpen ? 316 : 8,
-            child: _buildToggleButton(context),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Control panel toggle
+                _buildToggleButton(context),
+                const SizedBox(height: 6),
+                // Chat toggle (always visible)
+                _buildChatButton(context),
+              ],
+            ),
           ),
 
-          // ── Control panel (expands below icon when open) ──
+          // ── Control panel (expands below buttons when open) ──
           if (_panelOpen)
             Positioned(
-              top: 38,
+              top: 66, // below both buttons + spacing
               right: _chatOpen ? 316 : 8,
               child: _buildPanel(context),
             ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildChatButton(BuildContext context) {
+    final unread = widget.session.chat.unreadCount;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _chatOpen = !_chatOpen;
+          _panelOpen = false;
+        });
+        widget.session.chat.setPanelOpen(_chatOpen);
+        _focusNode.requestFocus();
+      },
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Container(
+              width: 26,
+              height: 26,
+              decoration: BoxDecoration(
+                color: _chatOpen
+                    ? const Color(0xFF2563EB).withOpacity(0.8)
+                    : Colors.black.withOpacity(0.45),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(
+                _chatOpen ? Icons.chat_bubble : Icons.chat_bubble_outline,
+                size: 14,
+                color: Colors.white70,
+              ),
+            ),
+            if (unread > 0)
+              Positioned(
+                top: -4,
+                right: -4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    unread > 9 ? '9+' : '$unread',
+                    style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -461,20 +523,6 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
                   onTap: () { _sendCtrlAltDel(); setState(() => _panelOpen = false); },
                 ),
               ],
-              const SizedBox(width: 6),
-              // Chat
-              _ChatPanelBtn(
-                active: _chatOpen,
-                unread: widget.session.chat.unreadCount,
-                onTap: () {
-                  setState(() {
-                    _chatOpen = !_chatOpen;
-                    _panelOpen = false;
-                  });
-                  widget.session.chat.setPanelOpen(_chatOpen);
-                  _focusNode.requestFocus();
-                },
-              ),
               const SizedBox(width: 6),
               // Disconnect
               _PanelBtn(
@@ -564,64 +612,6 @@ class _CursorPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_CursorPainter old) => false;
-}
-
-// ── Chat panel button (with unread badge) ─────────────────────────────────────
-
-class _ChatPanelBtn extends StatelessWidget {
-  final bool active;
-  final int unread;
-  final VoidCallback onTap;
-
-  const _ChatPanelBtn({required this.active, required this.unread, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: '聊天',
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: GestureDetector(
-          onTap: onTap,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                decoration: BoxDecoration(
-                  color: active
-                      ? const Color(0xFF2563EB).withOpacity(0.7)
-                      : Colors.white10,
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                child: Icon(
-                  active ? Icons.chat_bubble : Icons.chat_bubble_outline,
-                  size: 14,
-                  color: active ? Colors.white : Colors.white70,
-                ),
-              ),
-              if (unread > 0)
-                Positioned(
-                  top: -4,
-                  right: -4,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: Colors.redAccent,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      unread > 9 ? '9+' : '$unread',
-                      style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 // ── Panel button ──────────────────────────────────────────────────────────────
