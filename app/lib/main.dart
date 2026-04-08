@@ -63,12 +63,29 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _index = 0;
   final _agentService = AgentService();
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Ensure agent subprocess is killed when the app window is closed.
+    // This is especially important on Windows where dispose() may not be
+    // called before the process exits.
+    if (state == AppLifecycleState.detached) {
+      _agentService.stop();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _agentService.dispose();
     super.dispose();
   }

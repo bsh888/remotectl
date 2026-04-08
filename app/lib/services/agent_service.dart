@@ -148,7 +148,11 @@ class AgentService extends ChangeNotifier {
     _status = AgentStatus.stopped;
     _error = '';
     _sessionPwd = '';
-    _process?.kill(ProcessSignal.sigterm);
+    // On Windows, SIGTERM maps to a console event that may not reliably
+    // terminate the subprocess; use SIGKILL (TerminateProcess) instead.
+    final sig =
+        Platform.isWindows ? ProcessSignal.sigkill : ProcessSignal.sigterm;
+    _process?.kill(sig);
     _process = null;
     if (prev != AgentStatus.stopped) notifyListeners();
   }
@@ -160,9 +164,16 @@ class AgentService extends ChangeNotifier {
 
   void _appendLog(String line) {
     if (line.isEmpty) return;
-    // Machine-readable marker emitted by agent — parse silently, don't log
+    // Machine-readable markers emitted by agent — parse silently, don't log
     if (line.startsWith('SESSION_PWD:')) {
       _sessionPwd = line.substring('SESSION_PWD:'.length).trim();
+      notifyListeners();
+      return;
+    }
+    if (line.startsWith('AUTH_FAILED:')) {
+      _status = AgentStatus.error;
+      _error = line.substring('AUTH_FAILED:'.length).trim();
+      _sessionPwd = '';
       notifyListeners();
       return;
     }

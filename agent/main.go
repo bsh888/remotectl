@@ -444,7 +444,12 @@ func (a *Agent) buildTLSConfig() (*tls.Config, error) {
 	return &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12}, nil
 }
 
+// errAuthRejected is a sentinel returned by authenticate() when the server
+// explicitly rejects the device token. The caller should not retry.
+var errAuthRejected = fmt.Errorf("authentication rejected by server")
+
 func (a *Agent) authenticate() error {
+	// Step 1: receive challenge
 	a.conn.SetReadDeadline(time.Now().Add(15 * time.Second))
 	_, data, err := a.conn.ReadMessage()
 	if err != nil {
@@ -462,6 +467,8 @@ func (a *Agent) authenticate() error {
 	if err != nil {
 		return err
 	}
+
+	// Step 2: send auth
 	mac := hmac.New(sha256.New, []byte(a.token))
 	mac.Write(nonce)
 	macHex := hex.EncodeToString(mac.Sum(nil))
@@ -471,7 +478,28 @@ func (a *Agent) authenticate() error {
 	})
 	authMsg, _ := json.Marshal(Message{Type: TypeAuth, Payload: payload})
 	a.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
-	return a.conn.WriteMessage(websocket.TextMessage, authMsg)
+	if err := a.conn.WriteMessage(websocket.TextMessage, authMsg); err != nil {
+		return err
+	}
+
+	// Step 3: wait for registered confirmation (or error)
+	a.conn.SetReadDeadline(time.Now().Add(15 * time.Second))
+	_, data, err = a.conn.ReadMessage()
+	if err != nil {
+		return err
+	}
+	var resp Message
+	if err := json.Unmarshal(data, &resp); err != nil {
+		return fmt.Errorf("invalid response: %w", err)
+	}
+	switch resp.Type {
+	case TypeRegistered:
+		return nil
+	case TypeError:
+		return errAuthRejected
+	default:
+		return fmt.Errorf("expected registered, got %s", resp.Type)
+	}
 }
 
 // ── Main loop ─────────────────────────────────────────────────────────────────
@@ -484,6 +512,12 @@ func (a *Agent) run(ctx context.Context) {
 	defer a.conn.Close()
 
 	if err := a.authenticate(); err != nil {
+		if err == errAuthRejected {
+			// Machine-readable marker for the Flutter app (do not change format)
+			fmt.Printf("AUTH_FAILED:设备密钥不正确，请检查配置\n")
+			log.Printf("认证失败：设备密钥不正确，请检查配置后重新启动")
+			os.Exit(1)
+		}
 		log.Printf("auth: %v", err)
 		return
 	}
