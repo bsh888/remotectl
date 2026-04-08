@@ -26,6 +26,7 @@ class _HostedScreenState extends State<HostedScreen> {
   bool _showAdvanced = false;
 
   final _logScroll = ScrollController();
+  bool _logExpanded = false;
 
   @override
   void initState() {
@@ -76,17 +77,19 @@ class _HostedScreenState extends State<HostedScreen> {
   void _onAgentChanged() {
     if (!mounted) return;
     setState(() {});
-    // Auto-scroll log to bottom
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_logScroll.hasClients &&
-          _logScroll.position.maxScrollExtent > 0) {
-        _logScroll.animateTo(
-          _logScroll.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 120),
-          curve: Curves.easeOut,
-        );
-      }
-    });
+    // Auto-scroll log to bottom (only when panel is expanded)
+    if (_logExpanded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_logScroll.hasClients &&
+            _logScroll.position.maxScrollExtent > 0) {
+          _logScroll.animateTo(
+            _logScroll.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 120),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
   }
 
   @override
@@ -395,38 +398,62 @@ class _HostedScreenState extends State<HostedScreen> {
               ),
             ),
 
-            // ── Log panel ──
+            // ── Log panel (collapsible) ──
             if (svc.logs.isNotEmpty)
               Container(
-                height: 180,
                 decoration: const BoxDecoration(
                   color: Color(0xFF070C1A),
                   border: Border(top: BorderSide(color: Colors.white12)),
                 ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 4, 4, 0),
-                      child: Row(children: [
-                        const Text('日志',
-                            style: TextStyle(
-                                color: Colors.white38, fontSize: 11)),
-                        const Spacer(),
-                        TextButton(
-                          onPressed: svc.clearLogs,
-                          style: TextButton.styleFrom(
-                            foregroundColor: Colors.white24,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            minimumSize: Size.zero,
+                    // Header / toggle bar
+                    InkWell(
+                      onTap: () => setState(() => _logExpanded = !_logExpanded),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 6, 4, 6),
+                        child: Row(children: [
+                          Icon(
+                            _logExpanded ? Icons.expand_more : Icons.chevron_right,
+                            size: 15, color: Colors.white38,
                           ),
-                          child: const Text('清空',
-                              style: TextStyle(fontSize: 11)),
-                        ),
-                      ]),
+                          const SizedBox(width: 4),
+                          const Text('日志',
+                              style: TextStyle(color: Colors.white38, fontSize: 11)),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '${svc.logs.length}',
+                              style: const TextStyle(color: Colors.white38, fontSize: 10),
+                            ),
+                          ),
+                          const Spacer(),
+                          if (_logExpanded)
+                            TextButton(
+                              onPressed: svc.clearLogs,
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.white24,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                minimumSize: Size.zero,
+                              ),
+                              child: const Text('清空',
+                                  style: TextStyle(fontSize: 11)),
+                            ),
+                        ]),
+                      ),
                     ),
-                    Expanded(
+                    // Expandable content
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeInOut,
+                      height: _logExpanded ? 180 : 0,
                       child: SelectionArea(
                         child: ListView.builder(
                           controller: _logScroll,
