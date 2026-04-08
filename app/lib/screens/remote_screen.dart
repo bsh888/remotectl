@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import '../services/remote_session.dart';
+import 'chat_panel.dart';
 
 class RemoteScreen extends StatefulWidget {
   final RemoteSession session;
@@ -66,6 +67,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
     WakelockPlus.enable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     _resetHideTimer();
+    widget.session.chat.addListener(_onChatUpdate);
 
     // Desktop: capture all physical keyboard events via HardwareKeyboard.
     // This bypasses the FocusNode requirement and survives clicks on the remote screen.
@@ -76,8 +78,13 @@ class _RemoteScreenState extends State<RemoteScreen> {
     }
   }
 
+  void _onChatUpdate() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    widget.session.chat.removeListener(_onChatUpdate);
     if (_hwKeyHandler != null) {
       HardwareKeyboard.instance.removeHandler(_hwKeyHandler!);
     }
@@ -688,6 +695,11 @@ class _RemoteScreenState extends State<RemoteScreen> {
           label: '粘贴',
           onTap: _sendPaste,
         ),
+        // Chat
+        _ChatToolbarBtn(
+          unread: widget.session.chat.unreadCount,
+          onTap: _openChat,
+        ),
         // Hide toolbar
         _ToolbarBtn(
           icon: Icons.keyboard_arrow_down_rounded,
@@ -705,6 +717,72 @@ class _RemoteScreenState extends State<RemoteScreen> {
           onTap: _disconnect,
         ),
       ]),
+    );
+  }
+
+  void _openChat() {
+    widget.session.chat.setPanelOpen(true);
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        minChildSize: 0.3,
+        maxChildSize: 0.92,
+        builder: (ctx, scrollCtrl) => ChatPanel(
+          chat: widget.session.chat,
+          onClose: () {
+            widget.session.chat.setPanelOpen(false);
+            Navigator.of(ctx).pop();
+          },
+        ),
+      ),
+    ).then((_) => widget.session.chat.setPanelOpen(false));
+  }
+}
+
+// ── Chat toolbar button (with unread badge) ────────────────────────────────────
+
+class _ChatToolbarBtn extends StatelessWidget {
+  final int unread;
+  final VoidCallback onTap;
+  const _ChatToolbarBtn({required this.unread, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.chat_bubble_outline_rounded, color: Colors.white70, size: 22),
+              SizedBox(height: 2),
+              Text('聊天', style: TextStyle(color: Colors.white70, fontSize: 10)),
+            ]),
+          ),
+        ),
+        if (unread > 0)
+          Positioned(
+            top: 2,
+            right: 6,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+              decoration: BoxDecoration(
+                color: Colors.redAccent,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                unread > 9 ? '9+' : '$unread',
+                style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

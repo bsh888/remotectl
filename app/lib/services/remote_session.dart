@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/io.dart' as ws_io;
+import 'chat_service.dart';
 import 'crypto_service.dart';
 
 enum SessionState { idle, connecting, connected, error }
@@ -36,11 +37,13 @@ class RemoteSession extends ChangeNotifier {
   String _error = '';
   RTCVideoRenderer? _renderer;
   List<DeviceInfo> _devices = [];
+  final ChatService _chat = ChatService();
 
   SessionState get state => _state;
   String get error => _error;
   RTCVideoRenderer? get renderer => _renderer;
   List<DeviceInfo> get devices => _devices;
+  ChatService get chat => _chat;
 
   WebSocketChannel? _ws;
   RTCPeerConnection? _pc;
@@ -120,6 +123,7 @@ class RemoteSession extends ChangeNotifier {
     _ws?.sink.close();
     _ws = null;
     _iceServers = [{'urls': 'stun:stun.l.google.com:19302'}];
+    _chat.detach();
     final r = _renderer;
     _renderer = null;
     r?.srcObject = null;
@@ -281,6 +285,8 @@ class RemoteSession extends ChangeNotifier {
           channel.onDataChannelState = (state) {
             _inputMoveDCOpen = state == RTCDataChannelState.RTCDataChannelOpen;
           };
+        } else if (channel.label == 'chat') {
+          _chat.attach(channel);
         }
       };
 
@@ -385,6 +391,7 @@ class RemoteSession extends ChangeNotifier {
   @override
   void dispose() {
     disconnect();
+    _chat.dispose();
     super.dispose();
   }
 }

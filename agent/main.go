@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
@@ -205,6 +206,22 @@ type Agent struct {
 	videoTrack *webrtc.TrackLocalStaticSample
 	rtcPeers   map[string]*webrtc.PeerConnection
 	rtcMu      sync.RWMutex
+
+	// Chat DataChannels (one per connected viewer)
+	chatDCs  map[string]*webrtc.DataChannel
+	chatMu   sync.RWMutex
+
+	// In-flight inbound file transfers (chat)
+	fileRx   map[string]*chatFileReceiver
+	fileRxMu sync.Mutex
+}
+
+// chatFileReceiver buffers incoming file chunks until the transfer completes.
+type chatFileReceiver struct {
+	name string
+	size int64
+	mime string
+	buf  []byte
 }
 
 // generateSessionPwd returns a random 6-digit numeric string used as the
@@ -347,6 +364,24 @@ func (a *Agent) startRTC(viewerID string) {
 		dcMove.OnMessage(func(msg webrtc.DataChannelMessage) { a.handleDCMessage(msg) })
 	}
 
+	// chat: reliable+ordered DataChannel for text messages, file transfer, and
+	// voice messages. Created by the agent (offerer) so flutter_webrtc receives
+	// it via pc.onDataChannel on the viewer side.
+	chatDC, err := pc.CreateDataChannel("chat", nil)
+	if err != nil {
+		log.Printf("CreateDataChannel(chat) for %s: %v", viewerID, err)
+	} else {
+		chatDC.OnOpen(func() {
+			log.Printf("[chat] channel open with viewer %s", viewerID[:8])
+		})
+		chatDC.OnMessage(func(msg webrtc.DataChannelMessage) {
+			a.handleChatDCMessage(viewerID, chatDC, msg)
+		})
+		a.chatMu.Lock()
+		a.chatDCs[viewerID] = chatDC
+		a.chatMu.Unlock()
+	}
+
 	offer, err := pc.CreateOffer(nil)
 	if err != nil {
 		log.Printf("CreateOffer for %s: %v", viewerID, err)
@@ -380,6 +415,102 @@ func (a *Agent) handleDCMessage(msg webrtc.DataChannelMessage) {
 		ev.Y /= a.scale
 	}
 	input.Handle(ev)
+}
+
+// handleChatDCMessage processes an incoming chat DataChannel message from a viewer.
+func (a *Agent) handleChatDCMessage(viewerID string, _ *webrtc.DataChannel, msg webrtc.DataChannelMessage) {
+	var ev map[string]interface{}
+	if json.Unmarshal(msg.Data, &ev) != nil {
+		return
+	}
+	switch ev["type"] {
+	case "text":
+		text, _ := ev["text"].(string)
+		if text == "" {
+			return
+		}
+		log.Printf("[chat] message from %s: %s", viewerID[:8], text)
+		showNotification("RemoteCtl 新消息", text)
+
+	case "file_start":
+		id, _ := ev["id"].(string)
+		name, _ := ev["name"].(string)
+		size, _ := ev["size"].(float64)
+		mime, _ := ev["mime"].(string)
+		if id == "" || name == "" {
+			return
+		}
+		a.fileRxMu.Lock()
+		a.fileRx[id] = &chatFileReceiver{name: name, size: int64(size), mime: mime}
+		a.fileRxMu.Unlock()
+		log.Printf("[chat] incoming file from %s: %s (%.0f bytes, %s)", viewerID[:8], name, size, mime)
+
+	case "file_chunk":
+		id, _ := ev["id"].(string)
+		if id == "" {
+			return
+		}
+		a.fileRxMu.Lock()
+		rx := a.fileRx[id]
+		a.fileRxMu.Unlock()
+		if rx == nil {
+			return
+		}
+		dataB64, _ := ev["data"].(string)
+		decoded, err := base64.StdEncoding.DecodeString(dataB64)
+		if err != nil {
+			return
+		}
+		isLast, _ := ev["last"].(bool)
+		a.fileRxMu.Lock()
+		rx.buf = append(rx.buf, decoded...)
+		a.fileRxMu.Unlock()
+		if isLast {
+			a.saveChatFile(id, rx)
+		}
+	}
+}
+
+// saveChatFile writes a completed inbound file to the Downloads directory.
+func (a *Agent) saveChatFile(id string, rx *chatFileReceiver) {
+	a.fileRxMu.Lock()
+	data := make([]byte, len(rx.buf))
+	copy(data, rx.buf)
+	name := rx.name
+	mime := rx.mime
+	delete(a.fileRx, id)
+	a.fileRxMu.Unlock()
+
+	dir := chatDownloadsDir()
+	path := filepath.Join(dir, name)
+	// Avoid overwriting an existing file with the same name.
+	if _, err := os.Stat(path); err == nil {
+		ext := filepath.Ext(name)
+		base := strings.TrimSuffix(name, ext)
+		path = filepath.Join(dir, fmt.Sprintf("%s-%d%s", base, time.Now().UnixMilli(), ext))
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		log.Printf("[chat] failed to save %s: %v", name, err)
+		return
+	}
+	log.Printf("[chat] saved: %s", path)
+	if strings.HasPrefix(mime, "audio/") {
+		showNotification("RemoteCtl 语音消息", "已保存到: "+path)
+	} else {
+		showNotification("RemoteCtl 文件已接收", name+" 已保存到下载目录")
+	}
+}
+
+// chatDownloadsDir returns the best directory for saving received files.
+func chatDownloadsDir() string {
+	home, _ := os.UserHomeDir()
+	if home != "" {
+		dl := filepath.Join(home, "Downloads")
+		if _, err := os.Stat(dl); err == nil {
+			return dl
+		}
+	}
+	return os.TempDir()
 }
 
 // enqueue marshals and queues a message for the write pump (non-blocking).
@@ -589,6 +720,10 @@ func (a *Agent) readPump() {
 			a.sessionsMu.Lock()
 			delete(a.sessions, e.ViewerID)
 			a.sessionsMu.Unlock()
+			// Clean up chat DC
+			a.chatMu.Lock()
+			delete(a.chatDCs, e.ViewerID)
+			a.chatMu.Unlock()
 			log.Printf("viewer left (%s), total=%d", e.ViewerID, e.ViewerCount)
 
 		// E2EE key exchange: viewer replied with its public key
@@ -901,6 +1036,8 @@ func main() {
 		webrtcAPI:  api,
 		videoTrack: videoTrack,
 		rtcPeers:   make(map[string]*webrtc.PeerConnection),
+		chatDCs:    make(map[string]*webrtc.DataChannel),
+		fileRx:     make(map[string]*chatFileReceiver),
 	}
 
 	// Machine-readable marker for the Flutter app to parse (do not change format)
