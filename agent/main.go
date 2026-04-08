@@ -631,12 +631,17 @@ func (a *Agent) readPump() {
 			if err := json.Unmarshal(msg.Payload, &p); err != nil {
 				continue
 			}
+			if p.Candidate == "" {
+				// end-of-candidates marker — ignore
+				continue
+			}
 			a.rtcMu.RLock()
 			pc, ok := a.rtcPeers[p.ViewerID]
 			a.rtcMu.RUnlock()
 			if !ok {
 				continue
 			}
+			log.Printf("ICE candidate from viewer %s: %s", p.ViewerID, p.Candidate)
 			sdpMid := p.SDPMid
 			if err := pc.AddICECandidate(webrtc.ICECandidateInit{
 				Candidate: p.Candidate,

@@ -249,10 +249,12 @@ class RemoteSession extends ChangeNotifier {
       _renderer = renderer;
 
       pc.onIceCandidate = (candidate) {
+        final c = candidate.candidate;
+        if (c == null || c.isEmpty) return; // end-of-candidates marker, don't forward
         _ws?.sink.add(jsonEncode({
           'type': 'rtc_ice_viewer',
           'payload': {
-            'candidate': candidate.candidate ?? '',
+            'candidate': c,
             'sdp_mid': candidate.sdpMid ?? '',
           },
         }));

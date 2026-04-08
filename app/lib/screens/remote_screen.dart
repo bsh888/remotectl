@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
@@ -41,6 +42,11 @@ class _RemoteScreenState extends State<RemoteScreen> {
   String _prevKbText = '\u200b';
   bool _kbVisible = false;
 
+  // Desktop hardware keyboard capture (Windows/macOS/Linux viewer)
+  // HardwareKeyboard.addHandler works without focus — reliable for remote desktop.
+  bool Function(KeyEvent)? _hwKeyHandler;
+  final Set<String> _desktopMods = {}; // currently held modifier keys
+
   // Toolbar auto-hide
   bool _toolbarVisible = true;
   Timer? _hideTimer;
@@ -48,16 +54,33 @@ class _RemoteScreenState extends State<RemoteScreen> {
   // Sticky modifier keys (armed until next keystroke)
   final Set<String> _mods = {};
 
+  bool get _isDesktopViewer => !kIsWeb && (
+    defaultTargetPlatform == TargetPlatform.windows ||
+    defaultTargetPlatform == TargetPlatform.linux ||
+    defaultTargetPlatform == TargetPlatform.macOS
+  );
+
   @override
   void initState() {
     super.initState();
     WakelockPlus.enable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     _resetHideTimer();
+
+    // Desktop: capture all physical keyboard events via HardwareKeyboard.
+    // This bypasses the FocusNode requirement and survives clicks on the remote screen.
+    if (_isDesktopViewer) {
+      _kbVisible = true; // show modifier row by default on desktop
+      _hwKeyHandler = _handleHardwareKeyEvent;
+      HardwareKeyboard.instance.addHandler(_hwKeyHandler!);
+    }
   }
 
   @override
   void dispose() {
+    if (_hwKeyHandler != null) {
+      HardwareKeyboard.instance.removeHandler(_hwKeyHandler!);
+    }
     WakelockPlus.disable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _longPressTimer?.cancel();
@@ -216,14 +239,16 @@ class _RemoteScreenState extends State<RemoteScreen> {
 
   void _toggleKeyboard() {
     if (_kbVisible) {
-      _kbFocus.unfocus();
+      if (!_isDesktopViewer) _kbFocus.unfocus();
       setState(() { _kbVisible = false; _mods.clear(); });
-      _resetHideTimer();
+      if (!_isDesktopViewer) _resetHideTimer();
     } else {
       setState(() => _kbVisible = true);
-      // Must call requestFocus synchronously within the tap handler for iOS.
-      _kbFocus.requestFocus();
-      _hideTimer?.cancel(); // keep toolbar visible while keyboard is open
+      if (!_isDesktopViewer) {
+        // Must call requestFocus synchronously within the tap handler for iOS.
+        _kbFocus.requestFocus();
+        _hideTimer?.cancel();
+      }
     }
   }
 
@@ -324,6 +349,73 @@ class _RemoteScreenState extends State<RemoteScreen> {
     if (data?.text != null && data!.text!.isNotEmpty) {
       widget.session.sendInput({'event': 'paste_text', 'text': data.text!});
     }
+  }
+
+  // ── desktop hardware keyboard ────────────────────────────────────────────────
+
+  bool _handleHardwareKeyEvent(KeyEvent event) {
+    if (widget.session.state != SessionState.connected) return false;
+    final logical = event.logicalKey;
+    final physical = event.physicalKey;
+    final isDown = event is KeyDownEvent || event is KeyRepeatEvent;
+    final isUp = event is KeyUpEvent;
+    if (!isDown && !isUp) return false;
+
+    // Track modifier keys; consume them so Flutter's own shortcuts don't fire.
+    switch (logical) {
+      case LogicalKeyboardKey.controlLeft:
+      case LogicalKeyboardKey.controlRight:
+        isDown ? _desktopMods.add('ctrl') : _desktopMods.remove('ctrl');
+        return true;
+      case LogicalKeyboardKey.shiftLeft:
+      case LogicalKeyboardKey.shiftRight:
+        isDown ? _desktopMods.add('shift') : _desktopMods.remove('shift');
+        return true;
+      case LogicalKeyboardKey.altLeft:
+      case LogicalKeyboardKey.altRight:
+        isDown ? _desktopMods.add('alt') : _desktopMods.remove('alt');
+        return true;
+      case LogicalKeyboardKey.metaLeft:
+      case LogicalKeyboardKey.metaRight:
+        isDown ? _desktopMods.add('meta') : _desktopMods.remove('meta');
+        return true;
+      default:
+        break;
+    }
+
+    final code = _physicalKeyToCode(physical);
+    if (code.isEmpty) return false;
+    final mods = _desktopMods.toList();
+
+    // Printable character with no modifiers → paste_text (handles unicode/IME).
+    if (isDown && mods.isEmpty) {
+      final ch = event.character;
+      if (ch != null && ch.isNotEmpty) {
+        final cp = ch.codeUnitAt(0);
+        if (cp >= 32 && cp != 127) {
+          widget.session.sendInput({'event': 'paste_text', 'text': ch});
+          return true;
+        }
+      }
+    }
+
+    // Special keys and hotkeys → keydown / keyup with code + mods.
+    final keyLabel = logical.keyLabel;
+    final key = keyLabel.isNotEmpty ? keyLabel : code;
+    widget.session.sendInput({
+      'event': isDown ? 'keydown' : 'keyup',
+      'key': key,
+      'code': code,
+      'mods': mods,
+    });
+    return true;
+  }
+
+  // "Key A" → "KeyA",  "Arrow Left" → "ArrowLeft",  "Digit 1" → "Digit1"
+  static String _physicalKeyToCode(PhysicalKeyboardKey key) {
+    final name = key.debugName;
+    if (name == null || name.isEmpty) return '';
+    return name.split(' ').map((s) => s.isEmpty ? '' : '${s[0].toUpperCase()}${s.substring(1)}').join('');
   }
 
   Future<void> _disconnect() async {
