@@ -244,6 +244,11 @@ class RemoteSession extends ChangeNotifier {
       final pc = await createPeerConnection({'iceServers': _iceServers});
       _pc = pc;
 
+      // Signaling is done — cancel the WS connect timeout.
+      // ICE failures from here on are handled by onConnectionState.
+      _connectTimer?.cancel();
+      _connectTimer = null;
+
       final renderer = RTCVideoRenderer();
       await renderer.initialize();
       _renderer = renderer;
