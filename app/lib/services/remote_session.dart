@@ -281,6 +281,19 @@ class RemoteSession extends ChangeNotifier {
           _renderer?.srcObject = event.streams[0];
           _setState(SessionState.connected);
         }
+        // Some flutter_webrtc versions fire onTrack with an empty streams list.
+        // onAddStream below handles that case as a fallback.
+      };
+
+      // Fallback: older/some-platform flutter_webrtc delivers the stream here
+      // instead of (or in addition to) onTrack.
+      pc.onAddStream = (stream) {
+        if (_renderer != null && _renderer!.srcObject == null) {
+          _renderer!.srcObject = stream;
+        }
+        if (_state != SessionState.connected) {
+          _setState(SessionState.connected);
+        }
       };
 
       pc.onConnectionState = (s) {
