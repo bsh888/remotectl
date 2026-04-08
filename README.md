@@ -528,13 +528,62 @@ WARNING: Accessibility permission not granted — mouse/keyboard injection will 
 
 ## 安全说明
 
-| 通道 | 加密方式 |
-|------|---------|
-| 信令（WebSocket） | TLS 1.3 |
-| 视频流（WebRTC） | DTLS-SRTP，端对端，服务器不可见 |
-| 鼠标/键盘输入（DataChannel） | DTLS，端对端，服务器不可见 |
-| 键盘输入（WebSocket fallback） | ECDH P-256 + HKDF-SHA256 + AES-256-GCM |
-| Agent 认证 | 每设备独立 token（HMAC-SHA256 挑战响应） |
+### 三条通道的加密机制
+
+#### 1. 信令通道（Agent ↔ Server ↔ Viewer，WebSocket）
+
+```
+Agent ──WSS/TLS 1.2+──▶ Server ──WSS/TLS 1.2+──▶ Viewer
+```
+
+传输层使用 TLS（`wss://`）加密，内容包括认证握手、SDP offer/answer、ICE 候选地址。
+**Server 可以读取这些信令明文**，但信令中不含任何屏幕内容或输入内容。
+
+#### 2. 视频通道（Agent ↔ Viewer，WebRTC Video Track）
+
+```
+Agent ──DTLS-SRTP──▶ Viewer（P2P 直连，或经 TURN 中继转发加密包）
+```
+
+WebRTC 强制要求 DTLS-SRTP，端对端加密。Server 和 TURN 中继只转发加密后的 UDP 包，
+**无法解密视频内容**。每次会话 DTLS 握手生成新的临时密钥，无法重放。
+
+#### 3. 输入通道（Viewer → Agent，两条路）
+
+**主路：WebRTC DataChannel（DTLS）**
+
+```
+Viewer ──DTLS DataChannel──▶ Agent（P2P 直连）
+```
+
+鼠标移动走 `input-move`（unreliable/unordered，低延迟），点击/键盘/滚轮走 `input`
+（reliable/ordered）。Server 只见加密 UDP 包，**无法看到按键内容**。
+
+**备路：WebSocket E2EE fallback**（DataChannel 不可用时）
+
+```
+Viewer ──AES-256-GCM 密文──▶ Server（只转发密文）──▶ Agent
+```
+
+实现在 `agent/session/session.go`，协议如下：
+
+1. Agent 生成临时 ECDH P-256 密钥对，将公钥经 Server 转发给 Viewer
+2. Viewer 生成自己的临时密钥对，公钥回送 Agent
+3. 双方独立 ECDH 计算共享密钥 → HKDF-SHA256（`info="remotectl-v1"`）→ 256-bit AES 密钥
+4. 每条输入消息用 **AES-256-GCM + 随机 12 字节 nonce** 加密，nonce 前置于密文
+5. 私钥从不离开各自端点，Server 只见密文，**无法解密**
+
+### Server 能看到什么
+
+| 数据 | 路径 | Server 可见性 |
+|------|------|-------------|
+| 视频流 | WebRTC DTLS-SRTP | ❌ 只见加密 UDP 包 |
+| 鼠标/键盘（主路） | WebRTC DataChannel DTLS | ❌ 只见加密 UDP 包 |
+| 鼠标/键盘（备路） | WebSocket + AES-256-GCM | ❌ 只见密文 |
+| 信令（SDP/ICE 候选） | WebSocket TLS | ✅ 可见（设备 ID、网络地址） |
+| Agent 认证 | HMAC-SHA256 挑战响应 | ✅ 可见 HMAC，原始 token 不可见 |
+
+> 如果希望信令也不经过第三方，将 Server 部署在自己控制的机器上即可（也是推荐方式）。
 
 ---
 
