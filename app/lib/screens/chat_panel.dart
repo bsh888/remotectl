@@ -1,11 +1,7 @@
-import 'dart:async';
 import 'dart:io';
 
-import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:record/record.dart';
 
 import '../services/chat_service.dart';
 
@@ -29,27 +25,11 @@ class ChatPanel extends StatefulWidget {
 class _ChatPanelState extends State<ChatPanel> {
   final _textCtrl = TextEditingController();
   final _scrollCtrl = ScrollController();
-  final _recorder = AudioRecorder();
-  final _player = AudioPlayer();
-
-  bool _recording = false;
-  String? _playingId;
-  PlayerState _playerState = PlayerState.stopped;
-  StreamSubscription<PlayerState>? _playerSub;
 
   @override
   void initState() {
     super.initState();
     widget.chat.addListener(_onChatChange);
-    _playerSub = _player.onPlayerStateChanged.listen((s) {
-      if (!mounted) return;
-      setState(() {
-        _playerState = s;
-        if (s == PlayerState.completed || s == PlayerState.stopped) {
-          _playingId = null;
-        }
-      });
-    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollBottom());
   }
 
@@ -58,9 +38,6 @@ class _ChatPanelState extends State<ChatPanel> {
     widget.chat.removeListener(_onChatChange);
     _textCtrl.dispose();
     _scrollCtrl.dispose();
-    _playerSub?.cancel();
-    _player.dispose();
-    _recorder.dispose();
     super.dispose();
   }
 
@@ -96,63 +73,6 @@ class _ChatPanelState extends State<ChatPanel> {
     if (path != null) await widget.chat.sendFile(path);
   }
 
-  Future<void> _startRecording() async {
-    try {
-      if (!await _recorder.hasPermission()) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('需要麦克风权限才能录音')),
-          );
-        }
-        return;
-      }
-      final dir = await getTemporaryDirectory();
-      final path = '${dir.path}/voice_${DateTime.now().millisecondsSinceEpoch}.m4a';
-      await _recorder.start(
-        const RecordConfig(encoder: AudioEncoder.aacLc, numChannels: 1, sampleRate: 16000),
-        path: path,
-      );
-      setState(() => _recording = true);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('录音失败: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _stopAndSend() async {
-    if (!_recording) return;
-    try {
-      final path = await _recorder.stop();
-      setState(() => _recording = false);
-      if (path != null && path.isNotEmpty) {
-        await widget.chat.sendVoice(path);
-      }
-    } catch (_) {
-      setState(() => _recording = false);
-    }
-  }
-
-  Future<void> _cancelRecording() async {
-    if (!_recording) return;
-    try {
-      await _recorder.cancel();
-    } catch (_) {}
-    setState(() => _recording = false);
-  }
-
-  Future<void> _togglePlay(ChatMessage msg) async {
-    if (msg.localPath == null) return;
-    if (_playingId == msg.id) {
-      await _player.stop();
-      setState(() => _playingId = null);
-    } else {
-      setState(() => _playingId = msg.id);
-      await _player.play(DeviceFileSource(msg.localPath!));
-    }
-  }
 
   Future<void> _openFile(ChatMessage msg) async {
     if (msg.localPath == null) return;
@@ -294,8 +214,7 @@ class _ChatPanelState extends State<ChatPanel> {
   Widget _buildContent(ChatMessage msg, bool isMe) {
     return switch (msg.type) {
       ChatMsgType.text => _textBubble(msg, isMe),
-      ChatMsgType.voice => _voiceBubble(msg, isMe),
-      ChatMsgType.file => _fileBubble(msg, isMe),
+      ChatMsgType.voice || ChatMsgType.file => _fileBubble(msg, isMe),
     };
   }
 
@@ -315,62 +234,6 @@ class _ChatPanelState extends State<ChatPanel> {
       child: Text(
         msg.text ?? '',
         style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.4),
-      ),
-    );
-  }
-
-  // ── Voice bubble ──────────────────────────────────────────────────────────
-
-  Widget _voiceBubble(ChatMessage msg, bool isMe) {
-    final ready = msg.progress >= 1.0 && msg.localPath != null && !msg.hasError;
-    final transferring = !isMe && msg.progress < 1.0 && !msg.hasError;
-    final playing = _playingId == msg.id && _playerState == PlayerState.playing;
-
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 180),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: isMe ? const Color(0xFF2563EB) : Colors.white12,
-        borderRadius: BorderRadius.circular(14).copyWith(
-          bottomRight: isMe ? const Radius.circular(3) : null,
-          bottomLeft: isMe ? null : const Radius.circular(3),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (transferring) ...[
-            SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                value: msg.progress > 0 ? msg.progress : null,
-                strokeWidth: 2,
-                color: Colors.white60,
-              ),
-            ),
-          ] else if (ready) ...[
-            GestureDetector(
-              onTap: () => _togglePlay(msg),
-              child: MouseRegion(
-                cursor: SystemMouseCursors.click,
-                child: Icon(
-                  playing ? Icons.pause_circle_filled : Icons.play_circle_filled,
-                  color: Colors.white,
-                  size: 26,
-                ),
-              ),
-            ),
-          ] else ...[
-            const Icon(Icons.mic, color: Colors.white60, size: 18),
-          ],
-          const SizedBox(width: 8),
-          _WaveformIcon(color: isMe ? Colors.white70 : Colors.white38),
-          if (msg.hasError) ...[
-            const SizedBox(width: 4),
-            const Icon(Icons.error_outline, color: Colors.redAccent, size: 14),
-          ],
-        ],
       ),
     );
   }
@@ -522,19 +385,7 @@ class _ChatPanelState extends State<ChatPanel> {
             ),
           ),
           const SizedBox(width: 6),
-          // Mic + Send
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_recording)
-                _RecordingBtn(onStop: _stopAndSend, onCancel: _cancelRecording)
-              else ...[
-                _VoiceBtn(onStartRecord: _startRecording),
-                const SizedBox(height: 4),
-                _SendBtn(onSend: _send, enabled: widget.chat.isOpen),
-              ],
-            ],
-          ),
+          _SendBtn(onSend: _send, enabled: widget.chat.isOpen),
         ],
       ),
     );
@@ -588,34 +439,6 @@ class _IconBtn extends StatelessWidget {
   }
 }
 
-class _VoiceBtn extends StatelessWidget {
-  final VoidCallback onStartRecord;
-  const _VoiceBtn({required this.onStartRecord});
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: '长按录音',
-      child: GestureDetector(
-        onLongPressStart: (_) => onStartRecord(),
-        onTap: onStartRecord, // tap also works for desktop
-        child: MouseRegion(
-          cursor: SystemMouseCursors.click,
-          child: Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.07),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(Icons.mic_rounded, color: Colors.white54, size: 15),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _SendBtn extends StatelessWidget {
   final VoidCallback onSend;
   final bool enabled;
@@ -641,65 +464,3 @@ class _SendBtn extends StatelessWidget {
   }
 }
 
-class _RecordingBtn extends StatelessWidget {
-  final VoidCallback onStop;
-  final VoidCallback onCancel;
-  const _RecordingBtn({required this.onStop, required this.onCancel});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        GestureDetector(
-          onTap: onStop,
-          child: MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: Colors.redAccent.withOpacity(0.8),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.stop_rounded, color: Colors.white, size: 15),
-            ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        GestureDetector(
-          onTap: onCancel,
-          child: MouseRegion(
-            cursor: SystemMouseCursors.click,
-            child: const Icon(Icons.close, color: Colors.white38, size: 14),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// Simple waveform decoration icon
-class _WaveformIcon extends StatelessWidget {
-  final Color color;
-  const _WaveformIcon({required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [2.0, 5.0, 8.0, 5.0, 3.0, 7.0, 4.0]
-          .map((h) => Container(
-                width: 2,
-                height: h,
-                margin: const EdgeInsets.symmetric(horizontal: 1),
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(1),
-                ),
-              ))
-          .toList(),
-    );
-  }
-}

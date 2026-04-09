@@ -187,13 +187,6 @@ class ChatService extends ChangeNotifier {
     await _sendBytes(data: data, name: name, mime: mime, type: type);
   }
 
-  Future<void> sendVoice(String filePath) async {
-    final file = File(filePath);
-    if (!file.existsSync()) return;
-    final name = file.uri.pathSegments.last;
-    final data = await file.readAsBytes();
-    await _sendBytes(data: data, name: name, mime: 'audio/m4a', type: ChatMsgType.voice);
-  }
 
   Future<void> _sendBytes({
     required Uint8List data,
