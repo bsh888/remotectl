@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -8,6 +10,7 @@ import (
 	"net/url"
 	"os/exec"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -39,41 +42,89 @@ type chatWSClient struct {
 
 // chatServer serves the browser chat UI and relays messages to/from the
 // DataChannel layer via the sendToViewers callback.
+//
+// Security: all routes are prefixed with a random per-session token so that
+// other processes on the same machine cannot sniff messages by simply hitting
+// http://localhost:17770. The token changes every time the agent restarts.
 type chatServer struct {
 	port          int
+	secret        string // random hex token, part of every URL
 	mu            sync.Mutex
 	clients       map[*chatWSClient]struct{}
-	history       []chatMsgWire
 	sendToViewers func(data []byte) // set by the Agent after construction
 }
 
 func newChatServer(port int) *chatServer {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		panic("rand: " + err.Error())
+	}
 	return &chatServer{
 		port:    port,
+		secret:  hex.EncodeToString(b),
 		clients: make(map[*chatWSClient]struct{}),
 	}
 }
 
+// URL returns the full URL a user should open to access the chat page.
+func (s *chatServer) URL() string {
+	return fmt.Sprintf("http://localhost:%d/%s", s.port, s.secret)
+}
+
 func (s *chatServer) start() {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Header().Set("Cache-Control", "no-cache")
-		w.Write(chatHTMLBytes)
-	})
-	mux.HandleFunc("/ws", s.handleWS)
-	mux.HandleFunc("/files/", s.handleFile)
+	// All routes gated behind the secret token as the first path segment.
+	mux.HandleFunc("/", s.route)
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf("127.0.0.1:%d", s.port),
 		Handler: mux,
 	}
 	go func() {
-		log.Printf("[chat] UI available at http://localhost:%d", s.port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Printf("[chat] server error: %v", err)
 		}
 	}()
+}
+
+// route validates the secret token and dispatches to the right handler.
+// URL structure:
+//
+//	/<secret>           → chat.html
+//	/<secret>/ws        → WebSocket
+//	/<secret>/files/... → file download
+func (s *chatServer) route(w http.ResponseWriter, r *http.Request) {
+	// Strip leading slash and split into segments.
+	path := strings.TrimPrefix(r.URL.Path, "/")
+	parts := strings.SplitN(path, "/", 3)
+
+	// First segment must be the secret token.
+	if len(parts) == 0 || parts[0] != s.secret {
+		http.NotFound(w, r)
+		return
+	}
+
+	sub := ""
+	if len(parts) > 1 {
+		sub = parts[1]
+	}
+
+	switch sub {
+	case "", "index.html":
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Write(chatHTMLBytes) //nolint:errcheck
+	case "ws":
+		s.handleWS(w, r)
+	case "files":
+		encoded := ""
+		if len(parts) > 2 {
+			encoded = parts[2]
+		}
+		s.serveFile(w, r, encoded)
+	default:
+		http.NotFound(w, r)
+	}
 }
 
 var wsUpgrader = websocket.Upgrader{
@@ -86,19 +137,9 @@ func (s *chatServer) handleWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	client := &chatWSClient{conn: conn, send: make(chan []byte, 128)}
-
 	s.mu.Lock()
 	s.clients[client] = struct{}{}
-	// replay history so the page shows previous messages on reconnect/refresh
-	history := make([]chatMsgWire, len(s.history))
-	copy(history, s.history)
 	s.mu.Unlock()
-
-	for _, msg := range history {
-		if data, err := json.Marshal(msg); err == nil {
-			client.send <- data
-		}
-	}
 
 	go client.writePump()
 	go s.readPump(client)
@@ -149,8 +190,8 @@ func (s *chatServer) readPump(client *chatWSClient) {
 			dcData, _ := json.Marshal(wire)
 			s.sendToViewers(dcData)
 		}
-		// Echo the outgoing message to all browser clients (including sender).
-		s.push(chatMsgWire{
+		// Echo the outgoing message back to all browser clients (including sender).
+		s.broadcast(chatMsgWire{
 			Type: "text",
 			From: "agent",
 			Text: text,
@@ -159,14 +200,17 @@ func (s *chatServer) readPump(client *chatWSClient) {
 	}
 }
 
-// push stores a message in history and broadcasts it to all connected browser clients.
+// push delivers a message to all connected browser clients (no history stored).
 func (s *chatServer) push(msg chatMsgWire) {
 	if msg.Ts == 0 {
 		msg.Ts = time.Now().UnixMilli()
 	}
+	s.broadcast(msg)
+}
+
+func (s *chatServer) broadcast(msg chatMsgWire) {
 	data, _ := json.Marshal(msg)
 	s.mu.Lock()
-	s.history = append(s.history, msg)
 	for c := range s.clients {
 		select {
 		case c.send <- data:
@@ -184,25 +228,24 @@ func (s *chatServer) hasClients() bool {
 	return n > 0
 }
 
-// openBrowser opens the chat page in the system default browser.
+// openBrowser opens the chat page (including secret token) in the default browser.
 func (s *chatServer) openBrowser() {
-	u := fmt.Sprintf("http://localhost:%d", s.port)
+	u := s.URL()
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":
 		cmd = exec.Command("open", u)
 	case "windows":
 		cmd = exec.Command("cmd", "/c", "start", u)
-	default: // linux
+	default:
 		cmd = exec.Command("xdg-open", u)
 	}
 	cmd.Start() //nolint:errcheck
 }
 
-// handleFile serves files from the Downloads directory.
-// URL pattern: /files/<url-encoded-absolute-path>
-func (s *chatServer) handleFile(w http.ResponseWriter, r *http.Request) {
-	encoded := r.URL.Path[len("/files/"):]
+// serveFile serves a file at an absolute path that was previously saved by the agent.
+// encoded is the url.PathEscape'd absolute path from the URL.
+func (s *chatServer) serveFile(w http.ResponseWriter, r *http.Request, encoded string) {
 	if encoded == "" {
 		http.NotFound(w, r)
 		return
@@ -215,8 +258,7 @@ func (s *chatServer) handleFile(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, path)
 }
 
-// fileURL returns the relative URL under which the given absolute path will be
-// served by handleFile.
-func fileURL(absPath string) string {
-	return "/files/" + url.PathEscape(absPath)
+// fileURL returns the token-prefixed URL for the given absolute file path.
+func (s *chatServer) fileURL(absPath string) string {
+	return fmt.Sprintf("/%s/files/%s", s.secret, url.PathEscape(absPath))
 }

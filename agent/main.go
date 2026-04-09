@@ -521,7 +521,7 @@ func (a *Agent) saveChatFile(id string, rx *chatFileReceiver) {
 		Name:    name,
 		Mime:    mime,
 		Size:    int64(len(data)),
-		FileURL: fileURL(path),
+		FileURL: a.chatSrv.fileURL(path),
 	})
 	if !a.chatSrv.hasClients() {
 		a.chatSrv.openBrowser()
@@ -1079,10 +1079,11 @@ func main() {
 
 	// Machine-readable marker for the Flutter app to parse (do not change format)
 	fmt.Printf("SESSION_PWD:%s\n", sessionPwd)
-	log.Printf("┌─────────────────────────────────")
+	log.Printf("┌─────────────────────────────────────────────────")
 	log.Printf("│ 设备 ID:  %s", *deviceID)
 	log.Printf("│ 会话密码: %s", sessionPwd)
-	log.Printf("└─────────────────────────────────")
+	log.Printf("│ 聊天界面: %s", chatSrv.URL())
+	log.Printf("└─────────────────────────────────────────────────")
 
 	// ── macOS permission checks (run once at startup) ─────────────────────────
 	appName := "remotectl"
