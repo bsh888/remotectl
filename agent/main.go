@@ -457,6 +457,12 @@ func (a *Agent) handleChatDCMessage(viewerID string, dc *webrtc.DataChannel, msg
 		return
 	}
 	switch ev["type"] {
+	case "chat_open":
+		// Viewer opened the chat panel — open the browser if not already open.
+		if !a.chatSrv.hasClients() {
+			a.chatSrv.openBrowser()
+		}
+
 	case "text":
 		text, _ := ev["text"].(string)
 		if text == "" {

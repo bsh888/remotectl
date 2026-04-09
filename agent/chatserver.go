@@ -46,11 +46,14 @@ type chatWSClient struct {
 // Security: all routes are prefixed with a random per-session token so that
 // other processes on the same machine cannot sniff messages by simply hitting
 // http://localhost:17770. The token changes every time the agent restarts.
+const chatHistoryCap = 50
+
 type chatServer struct {
 	port          int
 	secret        string // random hex token, part of every URL
 	mu            sync.Mutex
 	clients       map[*chatWSClient]struct{}
+	history       []chatMsgWire // recent messages replayed to newly-connected browsers
 	sendToViewers func(data []byte) // set by the Agent after construction
 }
 
@@ -139,6 +142,14 @@ func (s *chatServer) handleWS(w http.ResponseWriter, r *http.Request) {
 	client := &chatWSClient{conn: conn, send: make(chan []byte, 128)}
 	s.mu.Lock()
 	s.clients[client] = struct{}{}
+	// Replay recent history so the browser sees messages sent before it connected.
+	for _, msg := range s.history {
+		data, _ := json.Marshal(msg)
+		select {
+		case client.send <- data:
+		default:
+		}
+	}
 	s.mu.Unlock()
 
 	go client.writePump()
@@ -210,11 +221,18 @@ func (s *chatServer) readPump(client *chatWSClient) {
 	}
 }
 
-// push delivers a message to all connected browser clients (no history stored).
+// push delivers a message to all connected browser clients and stores it in
+// the history buffer so late-connecting browsers can replay recent messages.
 func (s *chatServer) push(msg chatMsgWire) {
 	if msg.Ts == 0 {
 		msg.Ts = time.Now().UnixMilli()
 	}
+	s.mu.Lock()
+	s.history = append(s.history, msg)
+	if len(s.history) > chatHistoryCap {
+		s.history = s.history[len(s.history)-chatHistoryCap:]
+	}
+	s.mu.Unlock()
 	s.broadcast(msg)
 }
 

@@ -161,7 +161,8 @@ class _ChatPanelState extends State<ChatPanel> {
       if (Platform.isMacOS) {
         Process.run('open', [path]);
       } else if (Platform.isWindows) {
-        Process.run('explorer.exe', [path]);
+        // `explorer.exe path` is unreliable with spaces; use cmd start instead.
+        Process.run('cmd', ['/c', 'start', '', path]);
       } else if (Platform.isLinux) {
         Process.run('xdg-open', [path]);
       }

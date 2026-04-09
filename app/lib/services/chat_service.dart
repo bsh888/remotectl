@@ -128,7 +128,13 @@ class ChatService extends ChangeNotifier {
 
   void setPanelOpen(bool open) {
     _panelOpen = open;
-    if (open) _unreadCount = 0;
+    if (open) {
+      _unreadCount = 0;
+      // Tell the agent to open its browser chat page if not already open.
+      if (_dcOpen && _dc != null) {
+        unawaited(_sendRaw({'type': 'chat_open'}));
+      }
+    }
     notifyListeners();
   }
 
