@@ -155,7 +155,9 @@ inp.addEventListener('input',()=>{
 btn.addEventListener('click',send);
 
 function connect(){
-  ws = new WebSocket('ws://'+location.host+'/ws');
+  // URL is /<token>  — derive WebSocket path as /<token>/ws
+  const token = location.pathname.split('/').filter(Boolean)[0] || '';
+  ws = new WebSocket('ws://'+location.host+'/'+token+'/ws');
   ws.onopen=()=>{
     connected=true;
     dot.className='dot';
