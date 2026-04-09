@@ -111,6 +111,13 @@ static VTCompressionSessionRef g_vtSession = NULL;
 static SCStream             *g_stream    = nil;
 static id                    g_output    = nil;
 static BOOL                  g_running   = NO;
+static volatile int          g_force_keyframe = 0;
+
+// rc_pipeline_request_keyframe sets a flag that causes the next encoded frame
+// to be forced as a keyframe (IDR). Called when a viewer sends a PLI/FIR.
+void rc_pipeline_request_keyframe(void) {
+    __atomic_store_n(&g_force_keyframe, 1, __ATOMIC_RELAXED);
+}
 
 // ── SCStream delegate + output ────────────────────────────────────────────────
 
@@ -135,7 +142,18 @@ static BOOL                  g_running   = NO;
     CMTime dur = CMSampleBufferGetDuration(sb);
     VTEncodeInfoFlags fl = 0;
     __atomic_fetch_add(&g_vt_encode_count, 1, __ATOMIC_RELAXED);
-    OSStatus encSt = VTCompressionSessionEncodeFrame(vt, pb, pts, dur, NULL, NULL, &fl);
+
+    // If a keyframe was requested (e.g. via RTCP PLI), pass ForceKeyFrame option.
+    CFDictionaryRef frameProps = NULL;
+    if (__atomic_exchange_n(&g_force_keyframe, 0, __ATOMIC_RELAXED)) {
+        CFTypeRef keys[]   = { kVTEncodeFrameOptionKey_ForceKeyFrame };
+        CFTypeRef values[] = { kCFBooleanTrue };
+        frameProps = CFDictionaryCreate(NULL, keys, values, 1,
+                                        &kCFTypeDictionaryKeyCallBacks,
+                                        &kCFTypeDictionaryValueCallBacks);
+    }
+    OSStatus encSt = VTCompressionSessionEncodeFrame(vt, pb, pts, dur, frameProps, NULL, &fl);
+    if (frameProps) CFRelease(frameProps);
     if (encSt != noErr) {
         __atomic_store_n(&g_last_vt_status, (int)encSt, __ATOMIC_RELAXED);
         NSLog(@"[remotectl/pipeline] VTCompressionSessionEncodeFrame error: %d", (int)encSt);

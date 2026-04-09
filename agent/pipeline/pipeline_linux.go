@@ -66,6 +66,9 @@ func Stop() {
 // Done returns a channel that never closes on Linux.
 func Done() <-chan struct{} { return make(chan struct{}) }
 
+// RequestKeyframe is a no-op on Linux (keyframe forcing not implemented for x264 path).
+func RequestKeyframe() {}
+
 // LogDiag prints diagnostic counters.
 func LogDiag() {
 	var capFrames, encFrames, lastErr C.int

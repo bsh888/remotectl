@@ -14,6 +14,7 @@ int  rc_pipeline_start(double scale, int fps, int bitrate);
 void rc_pipeline_stop(void);
 int  rc_check_screen_recording(void);
 void rc_get_diag(int *stream_frames, int *vt_calls, int *vt_callbacks, int *last_status);
+void rc_pipeline_request_keyframe(void);
 // goStreamStopped is declared here so the .m file can call it via extern
 extern void goStreamStopped(void);
 */
@@ -76,6 +77,12 @@ func Start(scale float64, fps, bitrate int) (<-chan Frame, string) {
 // Stop shuts down the pipeline and closes the channel returned by Start.
 func Stop() {
 	C.rc_pipeline_stop()
+}
+
+// RequestKeyframe asks the encoder to produce an IDR frame on the next encode.
+// Call this when an RTCP PLI or FIR is received from a viewer.
+func RequestKeyframe() {
+	C.rc_pipeline_request_keyframe()
 }
 
 // LogDiag prints internal pipeline counters — call after ~5 s to diagnose zero-frame issues.

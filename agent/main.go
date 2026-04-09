@@ -219,18 +219,13 @@ type Agent struct {
 	chatSrv *chatServer
 }
 
-// chatFileAckWindow is how many chunks the agent receives before sending a
-// file_ack back to the viewer. The viewer pauses after every window and waits
-// for the ACK, keeping the DataChannel send buffer bounded.
-const chatFileAckWindow = 16
 
 // chatFileReceiver buffers incoming file chunks until the transfer completes.
 type chatFileReceiver struct {
-	name     string
-	size     int64
-	mime     string
-	buf      []byte
-	seqCount int // total chunks received so far (for ACK window)
+	name string
+	size int64
+	mime string
+	buf  []byte
 }
 
 // generateSessionPwd returns a random 6-digit numeric string used as the
@@ -317,11 +312,25 @@ func (a *Agent) startRTC(viewerID string) {
 		return
 	}
 
-	if _, err := pc.AddTrack(a.videoTrack); err != nil {
+	sender, err := pc.AddTrack(a.videoTrack)
+	if err != nil {
 		log.Printf("AddTrack for %s: %v", viewerID, err)
 		pc.Close()
 		return
 	}
+	// Drain RTCP packets from the sender. Without this the pion/webrtc
+	// internal buffer fills up and PLI/FIR requests from the viewer are
+	// silently dropped. Any RTCP packet (PLI, FIR, NACK, SR) is treated as
+	// a hint to produce a keyframe so the viewer gets a clean picture immediately.
+	go func() {
+		buf := make([]byte, 1500)
+		for {
+			if _, _, err := sender.Read(buf); err != nil {
+				return
+			}
+			pipeline.RequestKeyframe()
+		}
+	}()
 
 	// Trickle ICE — send candidates as they arrive
 	pc.OnICECandidate(func(c *webrtc.ICECandidate) {
@@ -494,9 +503,8 @@ func (a *Agent) handleChatDCMessage(viewerID string, dc *webrtc.DataChannel, msg
 		isLast, _ := ev["last"].(bool)
 		a.fileRxMu.Lock()
 		rx.buf = append(rx.buf, decoded...)
-		rx.seqCount++
-		shouldAck := isLast || rx.seqCount%chatFileAckWindow == 0
 		a.fileRxMu.Unlock()
+		shouldAck := true // ACK every chunk; Flutter viewer owns all flow control
 		// Send ACK every window and on the last chunk so the sender can
 		// keep its DataChannel send buffer bounded (windowed flow control).
 		if shouldAck {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -171,31 +172,41 @@ func (s *chatServer) readPump(client *chatWSClient) {
 		if json.Unmarshal(data, &m) != nil {
 			continue
 		}
-		if m["type"] != "text" {
-			continue
-		}
-		text, _ := m["text"].(string)
-		if text == "" {
-			continue
-		}
-		// Forward to all connected viewers via DataChannel.
-		if s.sendToViewers != nil {
-			wire := map[string]interface{}{
-				"type": "text",
-				"id":   fmt.Sprintf("%016x", time.Now().UnixNano()),
-				"text": text,
-				"ts":   time.Now().UnixMilli(),
+		switch m["type"] {
+		case "text":
+			text, _ := m["text"].(string)
+			if text == "" {
+				continue
 			}
-			dcData, _ := json.Marshal(wire)
-			s.sendToViewers(dcData)
+			// Forward to all connected viewers via DataChannel.
+			if s.sendToViewers != nil {
+				wire := map[string]interface{}{
+					"type": "text",
+					"id":   fmt.Sprintf("%016x", time.Now().UnixNano()),
+					"text": text,
+					"ts":   time.Now().UnixMilli(),
+				}
+				dcData, _ := json.Marshal(wire)
+				s.sendToViewers(dcData)
+			}
+			// Echo the outgoing message back to all browser clients (including sender).
+			s.broadcast(chatMsgWire{
+				Type: "text",
+				From: "agent",
+				Text: text,
+				Ts:   time.Now().UnixMilli(),
+			})
+
+		case "file_send":
+			name, _ := m["name"].(string)
+			mime, _ := m["mime"].(string)
+			sizeF, _ := m["size"].(float64)
+			dataB64, _ := m["data"].(string)
+			if name == "" || dataB64 == "" {
+				continue
+			}
+			go s.relayFileToDC(name, mime, int64(sizeF), dataB64)
 		}
-		// Echo the outgoing message back to all browser clients (including sender).
-		s.broadcast(chatMsgWire{
-			Type: "text",
-			From: "agent",
-			Text: text,
-			Ts:   time.Now().UnixMilli(),
-		})
 	}
 }
 
@@ -263,4 +274,52 @@ func (s *chatServer) serveFile(w http.ResponseWriter, r *http.Request, encoded s
 // fileURL returns the token-prefixed URL for the given absolute file path.
 func (s *chatServer) fileURL(absPath string) string {
 	return fmt.Sprintf("/%s/files/%s", s.secret, url.PathEscape(absPath))
+}
+
+// relayFileToDC decodes base64 file data received from the browser and
+// forwards it to all connected viewers as file_start + file_chunk messages.
+func (s *chatServer) relayFileToDC(name, mime string, size int64, dataB64 string) {
+	if s.sendToViewers == nil {
+		return
+	}
+	data, err := base64.StdEncoding.DecodeString(dataB64)
+	if err != nil {
+		log.Printf("[chat] relayFileToDC decode error: %v", err)
+		return
+	}
+
+	// Generate a random file ID.
+	b := make([]byte, 8)
+	rand.Read(b) //nolint:errcheck
+	id := hex.EncodeToString(b)
+
+	start, _ := json.Marshal(map[string]interface{}{
+		"type": "file_start",
+		"id":   id,
+		"name": name,
+		"size": size,
+		"mime": mime,
+	})
+	s.sendToViewers(start)
+
+	const chunkSize = 12 * 1024
+	for i, seq := 0, 0; i < len(data); i += chunkSize {
+		end := i + chunkSize
+		if end > len(data) {
+			end = len(data)
+		}
+		isLast := end >= len(data)
+		chunk, _ := json.Marshal(map[string]interface{}{
+			"type": "file_chunk",
+			"id":   id,
+			"seq":  seq,
+			"data": base64.StdEncoding.EncodeToString(data[i:end]),
+			"last": isLast,
+		})
+		s.sendToViewers(chunk)
+		seq++
+		// Yield between chunks so the SCTP send goroutine can drain the buffer.
+		time.Sleep(time.Millisecond)
+	}
+	log.Printf("[chat] relayed file to viewers: %s (%d bytes)", name, len(data))
 }

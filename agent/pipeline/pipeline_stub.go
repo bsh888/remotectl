@@ -18,3 +18,6 @@ func LogDiag() {}
 
 // Done returns a channel that never closes on unsupported platforms.
 func Done() <-chan struct{} { return make(chan struct{}) }
+
+// RequestKeyframe is a no-op on unsupported platforms.
+func RequestKeyframe() {}
