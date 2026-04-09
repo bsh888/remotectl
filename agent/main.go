@@ -466,8 +466,11 @@ func (a *Agent) handleChatDCMessage(viewerID string, dc *webrtc.DataChannel, msg
 		if id == "" || name == "" {
 			return
 		}
+		// Pre-allocate the buffer to the full expected size to avoid
+		// repeated reallocation and copying as chunks arrive.
+		buf := make([]byte, 0, int64(size))
 		a.fileRxMu.Lock()
-		a.fileRx[id] = &chatFileReceiver{name: name, size: int64(size), mime: mime}
+		a.fileRx[id] = &chatFileReceiver{name: name, size: int64(size), mime: mime, buf: buf}
 		a.fileRxMu.Unlock()
 		log.Printf("[chat] incoming file from %s: %s (%.0f bytes, %s)", viewerID[:min(8, len(viewerID))], name, size, mime)
 
@@ -505,7 +508,9 @@ func (a *Agent) handleChatDCMessage(viewerID string, dc *webrtc.DataChannel, msg
 			dc.SendText(string(ackData)) //nolint:errcheck
 		}
 		if isLast {
-			a.saveChatFile(id, rx)
+			// Run in a goroutine so the OnMessage callback returns promptly
+			// and does not block pion/webrtc from processing further messages.
+			go a.saveChatFile(id, rx)
 		}
 	}
 }

@@ -1,4 +1,4 @@
-import 'dart:async' show Completer, TimeoutException;
+import 'dart:async' show Completer, TimeoutException, unawaited;
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -104,7 +104,7 @@ const int _kChunkSize = 12 * 1024;
 // control mechanism — it keeps at most _kWindowSize × 12 KB = 192 KB in
 // the DataChannel send buffer regardless of whether bufferedAmount works
 // correctly on the current platform.
-const int _kWindowSize = 16;
+const int _kWindowSize = 8;
 
 // Secondary back-pressure: also check bufferedAmount when available.
 const int _kHighWaterMark = 256 * 1024; // 256 KB
@@ -166,7 +166,7 @@ class ChatService extends ChangeNotifier {
     final id = _uuid();
     _messages.add(ChatMessage.text(id: id, sender: ChatSender.viewer, text: t));
     notifyListeners();
-    _sendRaw({'type': 'text', 'id': id, 'text': t, 'ts': DateTime.now().millisecondsSinceEpoch});
+    unawaited(_sendRaw({'type': 'text', 'id': id, 'text': t, 'ts': DateTime.now().millisecondsSinceEpoch}));
   }
 
   // ── Send file ─────────────────────────────────────────────────────────────
@@ -213,7 +213,7 @@ class ChatService extends ChangeNotifier {
       return;
     }
 
-    _sendRaw({'type': 'file_start', 'id': id, 'name': name, 'size': data.length, 'mime': mime});
+    await _sendRaw({'type': 'file_start', 'id': id, 'name': name, 'size': data.length, 'mime': mime});
 
     int offset = 0;
     int seq = 0;
@@ -226,17 +226,13 @@ class ChatService extends ChangeNotifier {
         return;
       }
 
-      // Secondary back-pressure: also honour bufferedAmount when available.
-      for (var waited = 0; waited < 200; waited++) {
-        if (!_dcOpen || _dc == null) break;
-        if ((_dc!.bufferedAmount ?? 0) <= _kHighWaterMark) break;
-        await Future.delayed(const Duration(milliseconds: 10));
-      }
-
       final end = (offset + _kChunkSize).clamp(0, data.length);
       final chunk = data.sublist(offset, end);
       final isLast = end >= data.length;
-      final ok = _sendRaw({
+      // await each send — dc.send() uses Flutter MethodChannel (invokeMethod).
+      // Without await, all chunks queue up on the MethodChannel simultaneously,
+      // saturating it and blocking incoming ACK events from being processed.
+      final ok = await _sendRaw({
         'type': 'file_chunk',
         'id': id,
         'seq': seq++,
@@ -250,8 +246,12 @@ class ChatService extends ChangeNotifier {
       }
       offset = end;
       chunksSinceAck++;
-      msg.progress = offset / data.length;
-      notifyListeners();
+      // Throttle UI updates to once per window (not every chunk) to avoid
+      // saturating the event loop with widget rebuilds during large transfers.
+      if (chunksSinceAck >= _kWindowSize || isLast) {
+        msg.progress = offset / data.length;
+        notifyListeners();
+      }
 
       // Primary flow control: after every window, wait for the receiver's ACK
       // before sending more. This bounds the in-flight data to
@@ -374,11 +374,14 @@ class ChatService extends ChangeNotifier {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  /// Returns true if the message was queued successfully, false on error.
-  bool _sendRaw(Map<String, dynamic> data) {
+  /// Sends one DataChannel message and waits for the native MethodChannel
+  /// round-trip to complete. Returning without await caused MethodChannel
+  /// queue saturation on large transfers (all chunks enqueued before any
+  /// completed), which prevented incoming ACK events from being processed.
+  Future<bool> _sendRaw(Map<String, dynamic> data) async {
     if (!_dcOpen || _dc == null) return false;
     try {
-      _dc!.send(RTCDataChannelMessage(jsonEncode(data)));
+      await _dc!.send(RTCDataChannelMessage(jsonEncode(data)));
       return true;
     } catch (_) {
       return false;
