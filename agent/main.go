@@ -214,6 +214,9 @@ type Agent struct {
 	// In-flight inbound file transfers (chat)
 	fileRx   map[string]*chatFileReceiver
 	fileRxMu sync.Mutex
+
+	// Browser-based chat UI
+	chatSrv *chatServer
 }
 
 // chatFileReceiver buffers incoming file chunks until the transfer completes.
@@ -417,6 +420,15 @@ func (a *Agent) handleDCMessage(msg webrtc.DataChannelMessage) {
 	input.Handle(ev)
 }
 
+// broadcastChat sends raw DataChannel bytes to all connected viewers.
+func (a *Agent) broadcastChat(data []byte) {
+	a.chatMu.RLock()
+	defer a.chatMu.RUnlock()
+	for _, dc := range a.chatDCs {
+		dc.SendText(string(data)) //nolint:errcheck
+	}
+}
+
 // handleChatDCMessage processes an incoming chat DataChannel message from a viewer.
 func (a *Agent) handleChatDCMessage(viewerID string, _ *webrtc.DataChannel, msg webrtc.DataChannelMessage) {
 	var ev map[string]interface{}
@@ -430,6 +442,14 @@ func (a *Agent) handleChatDCMessage(viewerID string, _ *webrtc.DataChannel, msg 
 			return
 		}
 		log.Printf("[chat] message from %s: %s", viewerID[:min(8, len(viewerID))], text)
+		ts, _ := ev["ts"].(float64)
+		if ts == 0 {
+			ts = float64(time.Now().UnixMilli())
+		}
+		a.chatSrv.push(chatMsgWire{Type: "text", From: "viewer", Text: text, Ts: int64(ts)})
+		if !a.chatSrv.hasClients() {
+			a.chatSrv.openBrowser()
+		}
 		showNotification("RemoteCtl 新消息", text)
 
 	case "file_start":
@@ -494,6 +514,18 @@ func (a *Agent) saveChatFile(id string, rx *chatFileReceiver) {
 		return
 	}
 	log.Printf("[chat] saved: %s", path)
+	// Push to browser chat UI
+	a.chatSrv.push(chatMsgWire{
+		Type:    "file",
+		From:    "viewer",
+		Name:    name,
+		Mime:    mime,
+		Size:    int64(len(data)),
+		FileURL: fileURL(path),
+	})
+	if !a.chatSrv.hasClients() {
+		a.chatSrv.openBrowser()
+	}
 	if strings.HasPrefix(mime, "audio/") {
 		showNotification("RemoteCtl 语音消息", "已保存到: "+path)
 	} else {
@@ -1019,6 +1051,9 @@ func main() {
 		log.Fatalf("NewTrackLocalStaticSample: %v", err)
 	}
 
+	chatSrv := newChatServer(17770)
+	chatSrv.start()
+
 	sessionPwd := generateSessionPwd()
 	agent := &Agent{
 		serverURL:  *serverURL,
@@ -1038,7 +1073,9 @@ func main() {
 		rtcPeers:   make(map[string]*webrtc.PeerConnection),
 		chatDCs:    make(map[string]*webrtc.DataChannel),
 		fileRx:     make(map[string]*chatFileReceiver),
+		chatSrv:    chatSrv,
 	}
+	chatSrv.sendToViewers = agent.broadcastChat
 
 	// Machine-readable marker for the Flutter app to parse (do not change format)
 	fmt.Printf("SESSION_PWD:%s\n", sessionPwd)
