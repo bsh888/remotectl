@@ -368,26 +368,17 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
               ),
             ),
 
-          // ── Floating buttons column (top-right, shifts left when chat open) ──
+          // ── Floating toolbar (top-right, shifts left when chat open) ──
           Positioned(
             top: 8,
             right: _chatOpen ? 316 : 8,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Control panel toggle
-                _buildToggleButton(context),
-                const SizedBox(height: 6),
-                // Chat toggle (always visible)
-                _buildChatButton(context),
-              ],
-            ),
+            child: _buildToolbar(context),
           ),
 
-          // ── Control panel (expands below buttons when open) ──
+          // ── Control panel (expands below toolbar when open) ──
           if (_panelOpen)
             Positioned(
-              top: 66, // below both buttons + spacing
+              top: 46,
               right: _chatOpen ? 316 : 8,
               child: _buildPanel(context),
             ),
@@ -396,83 +387,46 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
     );
   }
 
-  Widget _buildChatButton(BuildContext context) {
+  Widget _buildToolbar(BuildContext context) {
     final unread = widget.session.chat.unreadCount;
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _chatOpen = !_chatOpen;
-          _panelOpen = false;
-        });
-        widget.session.chat.setPanelOpen(_chatOpen);
-        _focusNode.requestFocus();
-      },
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              width: 26,
-              height: 26,
-              decoration: BoxDecoration(
-                color: _chatOpen
-                    ? const Color(0xFF2563EB).withOpacity(0.8)
-                    : Colors.black.withOpacity(0.45),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Icon(
-                _chatOpen ? Icons.chat_bubble : Icons.chat_bubble_outline,
-                size: 14,
-                color: Colors.white70,
-              ),
-            ),
-            if (unread > 0)
-              Positioned(
-                top: -4,
-                right: -4,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: Colors.redAccent,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    unread > 9 ? '9+' : '$unread',
-                    style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-          ],
-        ),
+    return Container(
+      height: 30,
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.60),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withOpacity(0.12)),
       ),
-    );
-  }
-
-  Widget _buildToggleButton(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        setState(() => _panelOpen = !_panelOpen);
-        // Re-grab focus after toggling so keyboard still works.
-        _focusNode.requestFocus();
-      },
-      child: MouseRegion(
-        cursor: SystemMouseCursors.click,
-        child: Container(
-          width: 26,
-          height: 26,
-          decoration: BoxDecoration(
-            color: _panelOpen
-                ? Colors.white.withOpacity(0.18)
-                : Colors.black.withOpacity(0.45),
-            borderRadius: BorderRadius.circular(6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Control panel toggle
+          _ToolbarBtn(
+            icon: _platformIcon(widget.remotePlatform),
+            active: _panelOpen,
+            tooltip: '控制面板',
+            onTap: () {
+              setState(() => _panelOpen = !_panelOpen);
+              _focusNode.requestFocus();
+            },
           ),
-          child: Icon(
-            _platformIcon(widget.remotePlatform),
-            size: 15,
-            color: Colors.white70,
+          Container(width: 1, height: 16, color: Colors.white.withOpacity(0.15)),
+          // Chat toggle
+          _ToolbarBtn(
+            icon: _chatOpen ? Icons.chat_bubble_rounded : Icons.chat_bubble_outline_rounded,
+            active: _chatOpen,
+            accentColor: const Color(0xFF2563EB),
+            tooltip: '聊天',
+            badge: unread > 0 ? (unread > 9 ? '9+' : '$unread') : null,
+            onTap: () {
+              setState(() {
+                _chatOpen = !_chatOpen;
+                _panelOpen = false;
+              });
+              widget.session.chat.setPanelOpen(_chatOpen);
+              _focusNode.requestFocus();
+            },
           ),
-        ),
+        ],
       ),
     );
   }
@@ -618,7 +572,79 @@ class _CursorPainter extends CustomPainter {
   bool shouldRepaint(_CursorPainter old) => false;
 }
 
-// ── Panel button ──────────────────────────────────────────────────────────────
+// ── Toolbar button (inside the floating pill) ─────────────────────────────────
+
+class _ToolbarBtn extends StatelessWidget {
+  final IconData icon;
+  final bool active;
+  final Color? accentColor;
+  final String? tooltip;
+  final String? badge;
+  final VoidCallback onTap;
+
+  const _ToolbarBtn({
+    required this.icon,
+    required this.onTap,
+    this.active = false,
+    this.accentColor,
+    this.tooltip,
+    this.badge,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = active
+        ? (accentColor ?? Colors.white.withOpacity(0.18)).withOpacity(
+            accentColor != null ? 0.75 : 0.18)
+        : Colors.transparent;
+
+    Widget btn = MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 36,
+          height: 30,
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(7),
+          ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              Icon(icon, size: 15, color: active ? Colors.white : Colors.white60),
+              if (badge != null)
+                Positioned(
+                  top: 2,
+                  right: 2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent,
+                      borderRadius: BorderRadius.circular(5),
+                    ),
+                    child: Text(
+                      badge!,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 7,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    return tooltip != null ? Tooltip(message: tooltip!, child: btn) : btn;
+  }
+}
+
+// ── Panel button (inside the expanded control panel) ──────────────────────────
 
 class _PanelBtn extends StatelessWidget {
   final String? label;

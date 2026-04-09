@@ -518,31 +518,27 @@ class _HostedScreenState extends State<HostedScreen> {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 24),
-
-                            // ── Start / Stop button ──
-                            _GradientButton(
-                              label: running ? '停止共享' : '开始共享',
-                              icon: running
-                                  ? Icons.stop_circle_outlined
-                                  : Icons.play_circle_outlined,
-                              onPressed: _startStop,
-                              isLoading: false,
-                              colors: running
-                                  ? const [
-                                      Color(0xFFB91C1C),
-                                      Color(0xFF7F1D1D),
-                                    ]
-                                  : const [
-                                      Color(0xFF2563EB),
-                                      Color(0xFF7C3AED),
-                                    ],
-                            ),
                             const SizedBox(height: 8),
                           ],
                         ),
                       ),
                     ),
+                  ),
+                ),
+
+                // ── Start / Stop button (fixed, always visible) ──
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+                  child: _GradientButton(
+                    label: running ? '停止共享' : '开始共享',
+                    icon: running
+                        ? Icons.stop_circle_outlined
+                        : Icons.play_circle_outlined,
+                    onPressed: _startStop,
+                    isLoading: false,
+                    colors: running
+                        ? const [Color(0xFFB91C1C), Color(0xFF7F1D1D)]
+                        : const [Color(0xFF2563EB), Color(0xFF7C3AED)],
                   ),
                 ),
 
