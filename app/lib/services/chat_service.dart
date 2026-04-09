@@ -99,6 +99,11 @@ class _InboundFile {
 // Stays well under the SCTP message-size limit (~64 KB) on all platforms.
 const int _kChunkSize = 12 * 1024;
 
+// Back-pressure threshold: pause sending when the DataChannel send buffer
+// exceeds this many bytes. Without this, large files flood the SCTP buffer
+// and chunks are silently dropped (causing the transfer to stall).
+const int _kHighWaterMark = 256 * 1024; // 256 KB
+
 class ChatService extends ChangeNotifier {
   final List<ChatMessage> _messages = [];
   RTCDataChannel? _dc;
@@ -201,21 +206,39 @@ class ChatService extends ChangeNotifier {
     int offset = 0;
     int seq = 0;
     while (offset < data.length) {
+      // Back-pressure: wait until the DataChannel send buffer drains below the
+      // high-water mark. Without this, all chunks are queued immediately and
+      // large files overflow the SCTP buffer, causing silent chunk drops.
+      for (var waited = 0; waited < 500; waited++) {
+        if (!_dcOpen || _dc == null) break;
+        if ((_dc!.bufferedAmount) <= _kHighWaterMark) break;
+        await Future.delayed(const Duration(milliseconds: 10));
+      }
+
+      if (!_dcOpen || _dc == null) {
+        msg.hasError = true;
+        notifyListeners();
+        return;
+      }
+
       final end = (offset + _kChunkSize).clamp(0, data.length);
       final chunk = data.sublist(offset, end);
       final isLast = end >= data.length;
-      _sendRaw({
+      final ok = _sendRaw({
         'type': 'file_chunk',
         'id': id,
         'seq': seq++,
         'data': base64.encode(chunk),
         'last': isLast,
       });
+      if (!ok) {
+        msg.hasError = true;
+        notifyListeners();
+        return;
+      }
       offset = end;
       msg.progress = offset / data.length;
       notifyListeners();
-      // Yield to avoid blocking the event loop when sending large files.
-      if (offset < data.length) await Future.delayed(Duration.zero);
     }
     msg.progress = 1.0;
     notifyListeners();
@@ -308,11 +331,15 @@ class ChatService extends ChangeNotifier {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  void _sendRaw(Map<String, dynamic> data) {
-    if (!_dcOpen || _dc == null) return;
+  /// Returns true if the message was queued successfully, false on error.
+  bool _sendRaw(Map<String, dynamic> data) {
+    if (!_dcOpen || _dc == null) return false;
     try {
       _dc!.send(RTCDataChannelMessage(jsonEncode(data)));
-    } catch (_) {}
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   void clear() {
