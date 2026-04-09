@@ -211,7 +211,7 @@ class ChatService extends ChangeNotifier {
       // large files overflow the SCTP buffer, causing silent chunk drops.
       for (var waited = 0; waited < 500; waited++) {
         if (!_dcOpen || _dc == null) break;
-        if ((_dc!.bufferedAmount) <= _kHighWaterMark) break;
+        if ((_dc!.bufferedAmount ?? 0) <= _kHighWaterMark) break;
         await Future.delayed(const Duration(milliseconds: 10));
       }
 
