@@ -138,6 +138,10 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
   // ── keyboard ───────────────────────────────────────────────────────────────
 
   KeyEventResult _onKey(FocusNode _, KeyEvent event) {
+    // Don't forward to remote when a child widget (e.g. chat TextField) has focus.
+    if (FocusManager.instance.primaryFocus != _focusNode) {
+      return KeyEventResult.ignored;
+    }
     if (event is! KeyDownEvent &&
         event is! KeyUpEvent &&
         event is! KeyRepeatEvent) {

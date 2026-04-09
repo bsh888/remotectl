@@ -362,6 +362,9 @@ class _RemoteScreenState extends State<RemoteScreen> {
 
   bool _handleHardwareKeyEvent(KeyEvent event) {
     if (widget.session.state != SessionState.connected) return false;
+    // Don't capture keyboard when a different widget has focus (e.g. chat TextField).
+    final primaryFocus = FocusManager.instance.primaryFocus;
+    if (primaryFocus != null && primaryFocus != _kbFocus) return false;
     final logical = event.logicalKey;
     final physical = event.physicalKey;
     final isDown = event is KeyDownEvent || event is KeyRepeatEvent;
