@@ -1,4 +1,4 @@
-import 'dart:async';
+import 'dart:async' show Completer, TimeoutException;
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -99,9 +99,14 @@ class _InboundFile {
 // Stays well under the SCTP message-size limit (~64 KB) on all platforms.
 const int _kChunkSize = 12 * 1024;
 
-// Back-pressure threshold: pause sending when the DataChannel send buffer
-// exceeds this many bytes. Without this, large files flood the SCTP buffer
-// and chunks are silently dropped (causing the transfer to stall).
+// ACK window: sender pauses every _kWindowSize chunks and waits for a
+// file_ack from the receiver before continuing. This is the primary flow
+// control mechanism — it keeps at most _kWindowSize × 12 KB = 192 KB in
+// the DataChannel send buffer regardless of whether bufferedAmount works
+// correctly on the current platform.
+const int _kWindowSize = 16;
+
+// Secondary back-pressure: also check bufferedAmount when available.
 const int _kHighWaterMark = 256 * 1024; // 256 KB
 
 class ChatService extends ChangeNotifier {
@@ -111,6 +116,8 @@ class ChatService extends ChangeNotifier {
   final Map<String, _InboundFile> _inbound = {};
   int _unreadCount = 0;
   bool _panelOpen = false;
+  // Pending ACK completers for windowed file transfer flow control.
+  final Map<String, Completer<void>> _ackCompleters = {};
 
   List<ChatMessage> get messages => List.unmodifiable(_messages);
   bool get isOpen => _dcOpen;
@@ -143,6 +150,11 @@ class ChatService extends ChangeNotifier {
     _dc = null;
     _dcOpen = false;
     _inbound.clear();
+    // Unblock any in-progress file transfers waiting for an ACK.
+    for (final c in _ackCompleters.values) {
+      if (!c.isCompleted) c.completeError('DataChannel closed');
+    }
+    _ackCompleters.clear();
     notifyListeners();
   }
 
@@ -205,20 +217,20 @@ class ChatService extends ChangeNotifier {
 
     int offset = 0;
     int seq = 0;
-    while (offset < data.length) {
-      // Back-pressure: wait until the DataChannel send buffer drains below the
-      // high-water mark. Without this, all chunks are queued immediately and
-      // large files overflow the SCTP buffer, causing silent chunk drops.
-      for (var waited = 0; waited < 500; waited++) {
-        if (!_dcOpen || _dc == null) break;
-        if ((_dc!.bufferedAmount ?? 0) <= _kHighWaterMark) break;
-        await Future.delayed(const Duration(milliseconds: 10));
-      }
+    int chunksSinceAck = 0;
 
+    while (offset < data.length) {
       if (!_dcOpen || _dc == null) {
         msg.hasError = true;
         notifyListeners();
         return;
+      }
+
+      // Secondary back-pressure: also honour bufferedAmount when available.
+      for (var waited = 0; waited < 200; waited++) {
+        if (!_dcOpen || _dc == null) break;
+        if ((_dc!.bufferedAmount ?? 0) <= _kHighWaterMark) break;
+        await Future.delayed(const Duration(milliseconds: 10));
       }
 
       final end = (offset + _kChunkSize).clamp(0, data.length);
@@ -237,8 +249,33 @@ class ChatService extends ChangeNotifier {
         return;
       }
       offset = end;
+      chunksSinceAck++;
       msg.progress = offset / data.length;
       notifyListeners();
+
+      // Primary flow control: after every window, wait for the receiver's ACK
+      // before sending more. This bounds the in-flight data to
+      // _kWindowSize × _kChunkSize ≈ 192 KB regardless of bufferedAmount.
+      if (chunksSinceAck >= _kWindowSize || isLast) {
+        final c = Completer<void>();
+        _ackCompleters[id] = c;
+        try {
+          await c.future.timeout(const Duration(seconds: 15));
+        } on TimeoutException {
+          _ackCompleters.remove(id);
+          msg.hasError = true;
+          notifyListeners();
+          return;
+        } catch (_) {
+          // DC was closed (completeError in detach)
+          _ackCompleters.remove(id);
+          msg.hasError = true;
+          notifyListeners();
+          return;
+        }
+        _ackCompleters.remove(id);
+        chunksSinceAck = 0;
+      }
     }
     msg.progress = 1.0;
     notifyListeners();
@@ -275,6 +312,12 @@ class ChatService extends ChangeNotifier {
             fileSize: size,
             mimeType: mime,
           ));
+
+        case 'file_ack':
+          final ackId = ev['id'] as String?;
+          if (ackId != null) {
+            _ackCompleters[ackId]?.complete();
+          }
 
         case 'file_chunk':
           final id = ev['id'] as String?;

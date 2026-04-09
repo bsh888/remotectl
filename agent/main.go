@@ -219,12 +219,18 @@ type Agent struct {
 	chatSrv *chatServer
 }
 
+// chatFileAckWindow is how many chunks the agent receives before sending a
+// file_ack back to the viewer. The viewer pauses after every window and waits
+// for the ACK, keeping the DataChannel send buffer bounded.
+const chatFileAckWindow = 16
+
 // chatFileReceiver buffers incoming file chunks until the transfer completes.
 type chatFileReceiver struct {
-	name string
-	size int64
-	mime string
-	buf  []byte
+	name     string
+	size     int64
+	mime     string
+	buf      []byte
+	seqCount int // total chunks received so far (for ACK window)
 }
 
 // generateSessionPwd returns a random 6-digit numeric string used as the
@@ -430,7 +436,7 @@ func (a *Agent) broadcastChat(data []byte) {
 }
 
 // handleChatDCMessage processes an incoming chat DataChannel message from a viewer.
-func (a *Agent) handleChatDCMessage(viewerID string, _ *webrtc.DataChannel, msg webrtc.DataChannelMessage) {
+func (a *Agent) handleChatDCMessage(viewerID string, dc *webrtc.DataChannel, msg webrtc.DataChannelMessage) {
 	var ev map[string]interface{}
 	if json.Unmarshal(msg.Data, &ev) != nil {
 		return
@@ -481,10 +487,23 @@ func (a *Agent) handleChatDCMessage(viewerID string, _ *webrtc.DataChannel, msg 
 		if err != nil {
 			return
 		}
+		seq, _ := ev["seq"].(float64)
 		isLast, _ := ev["last"].(bool)
 		a.fileRxMu.Lock()
 		rx.buf = append(rx.buf, decoded...)
+		rx.seqCount++
+		shouldAck := isLast || rx.seqCount%chatFileAckWindow == 0
 		a.fileRxMu.Unlock()
+		// Send ACK every window and on the last chunk so the sender can
+		// keep its DataChannel send buffer bounded (windowed flow control).
+		if shouldAck {
+			ackData, _ := json.Marshal(map[string]interface{}{
+				"type": "file_ack",
+				"id":   id,
+				"seq":  int(seq),
+			})
+			dc.SendText(string(ackData)) //nolint:errcheck
+		}
 		if isLast {
 			a.saveChatFile(id, rx)
 		}
