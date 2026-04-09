@@ -65,6 +65,12 @@ make all            # 全量构建
 - 双指手势：`onSecondFingerDown` 时重置 `_prevCentroid` 和 `_prevPinchDist`
 - 竖屏居中：`ListenableBuilder(listenable: renderer)` 监听 videoWidth/videoHeight 变化
 
+### agent — WebRTC PLI / 首帧黑屏修复 (main.go, pipeline_darwin.m)
+
+- `pc.AddTrack` 返回的 `RTPSender` 必须保存并在 goroutine 中持续 `Read()`，否则 pion 内部 RTCP 缓冲区满导致 PLI 丢失
+- 收到任意 RTCP 包 → `pipeline.RequestKeyframe()`（原子标志位），下一帧编码时强制 IDR
+- 各平台 pipeline stub（darwin/windows/linux/stub）均已实现 `RequestKeyframe()` 接口
+
 ### app — 会话内聊天功能
 
 **DataChannel 协议**（DataChannel 名：`chat`，reliable+ordered）
@@ -74,27 +80,35 @@ make all            # 全量构建
 文件开始:  {"type":"file_start", "id":"<hex8>","name":"photo.jpg","size":12345,"mime":"image/jpeg"}
 文件分块:  {"type":"file_chunk", "id":"<hex8>","seq":0,"data":"<base64>","last":false}
 最后分块:  {"type":"file_chunk", "id":"<hex8>","seq":N,"data":"<base64>","last":true}
+ACK:       {"type":"file_ack",   "id":"<hex8>"}   ← 每 8 个分块由 agent 回复一次
+chat_open: {"type":"chat_open"}                   ← Flutter 打开聊天面板时发送，agent 自动打开浏览器
 ```
+
+**流量控制**：Flutter 每发送 `_kWindowSize=8` 个分块后等待 `file_ack` 再继续（最大在途数据 ~96 KB）。
+Completer 必须在发送窗口**之前**注册，否则 ACK 可能在 `await _sendRaw()` 的 Dart 事件循环让步期间到达而被丢弃。
 
 **Flutter 端**
 - `ChatService`（`app/lib/services/chat_service.dart`）：ChangeNotifier，attach/detach DC，持有消息列表
 - `RemoteSession` 在 `pc.onDataChannel` 中识别 label `"chat"` → `_chat.attach(channel)`
 - `session.chat` 暴露给 UI 层
-- 桌面（`remote_screen_desktop.dart`）：控制面板新增 💬 按钮，`ChatPanel(width:300)` 固定宽右侧覆盖层
+- 桌面（`remote_screen_desktop.dart`）：水平 pill 工具栏（控制面板 + 聊天按钮），`ChatPanel(width:300)` 固定宽右侧覆盖层
 - 移动端（`remote_screen.dart`）：工具栏聊天按钮，`ChatPanel`（无 width）作为 `DraggableScrollableSheet`
-- 文件保存：桌面 → `~/Downloads`，移动 → App Documents
-- 语音录制：`record` 包（AAC 16kHz），播放：`audioplayers` 包
+- 文件保存：macOS/Windows/Linux → `~/Downloads`，iOS/Android → App Documents
+- 语音录制功能已移除（`record`/`audioplayers` 包已从 pubspec.yaml 删除）
 
-**Agent 端**（`agent/main.go`，`agent/notify.go`）
+**Agent 端**（`agent/main.go`，`agent/chatserver.go`，`agent/notify.go`）
 - `startRTC()` 中创建 `chat` DC，`handleChatDCMessage()` 处理收到的消息/文件
-- 收到文字/文件/语音 → `showNotification()` 调用系统通知（macOS: osascript，Windows: PowerShell WinForms，Linux: notify-send）
+- 收到文字/文件 → `showNotification()` 调用系统通知（macOS: osascript，Windows: PowerShell WinForms，Linux: notify-send）
 - 文件保存到 `~/Downloads`，重名自动加时间戳后缀
+- `chatserver.go`：WebSocket 服务（浏览器聊天页面），含历史消息环形缓冲（最近 50 条），新连接自动回放
+- 浏览器聊天页面（`chat.html`）支持发送文件，base64 编码后通过 WebSocket 传给 agent 再中转到 Flutter
 
-**iOS/macOS 权限**
-- iOS `Info.plist`：已有 `NSMicrophoneUsageDescription`
-- macOS `Info.plist`：已加 `NSMicrophoneUsageDescription`
-- macOS entitlements：已有 `com.apple.security.device.audio-input`
-- Android：已有 `RECORD_AUDIO` 权限
+**权限配置**
+- iOS `Info.plist`：`NSCameraUsageDescription`、`NSMicrophoneUsageDescription`、`NSLocalNetworkUsageDescription`、`NSBonjourServices`
+- macOS `Info.plist`：`NSMicrophoneUsageDescription`
+- macOS entitlements：`com.apple.security.device.audio-input`、`com.apple.security.device.camera`、`com.apple.security.network.client`、`com.apple.security.files.downloads.read-write`（聊天文件接收保存到 Downloads）
+- Android `AndroidManifest.xml`：`INTERNET`、`CAMERA`、`RECORD_AUDIO`、`MODIFY_AUDIO_SETTINGS`、`WAKE_LOCK`
+- Windows `package.appxmanifest`：`internetClient`、`microphone`、`webcam`
 
 ### app — iOS
 

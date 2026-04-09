@@ -22,5 +22,9 @@
     <true/>
     <key>com.apple.security.device.camera</key>
     <true/>
+
+    <!-- Chat file transfer: save received files to ~/Downloads -->
+    <key>com.apple.security.files.downloads.read-write</key>
+    <true/>
 </dict>
 </plist>
