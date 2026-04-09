@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os/exec"
 	"runtime"
 	"strings"
 )
@@ -14,7 +13,7 @@ func showNotification(title, body string) {
 	case "darwin":
 		// osascript is available on all modern macOS versions.
 		script := `display notification ` + asStr(body) + ` with title ` + asStr(title)
-		exec.Command("osascript", "-e", script).Start() //nolint:errcheck
+		hiddenCmd("osascript", "-e", script).Start() //nolint:errcheck
 	case "windows":
 		// PowerShell balloon-tip via Windows Forms — no third-party dependency.
 		ps := `Add-Type -AssemblyName System.Windows.Forms;` +
@@ -23,9 +22,9 @@ func showNotification(title, body string) {
 			`$n.Visible=$true;` +
 			`$n.ShowBalloonTip(4000,'` + psStr(title) + `','` + psStr(body) + `',[System.Windows.Forms.ToolTipIcon]::Info);` +
 			`Start-Sleep -Milliseconds 4500;$n.Visible=$false;$n.Dispose()`
-		exec.Command("powershell", "-WindowStyle", "Hidden", "-NonInteractive", "-Command", ps).Start() //nolint:errcheck
+		hiddenCmd("powershell", "-WindowStyle", "Hidden", "-NonInteractive", "-Command", ps).Start() //nolint:errcheck
 	case "linux":
-		exec.Command("notify-send", "--app-name=RemoteCtl", "--expire-time=5000", title, body).Start() //nolint:errcheck
+		hiddenCmd("notify-send", "--app-name=RemoteCtl", "--expire-time=5000", title, body).Start() //nolint:errcheck
 	}
 }
 

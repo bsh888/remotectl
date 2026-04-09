@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"os/exec"
 	"runtime"
 	"strings"
 	"sync"
@@ -231,16 +230,19 @@ func (s *chatServer) hasClients() bool {
 // openBrowser opens the chat page (including secret token) in the default browser.
 func (s *chatServer) openBrowser() {
 	u := s.URL()
-	var cmd *exec.Cmd
+	var cmd string
+	var args []string
 	switch runtime.GOOS {
 	case "darwin":
-		cmd = exec.Command("open", u)
+		cmd, args = "open", []string{u}
 	case "windows":
-		cmd = exec.Command("cmd", "/c", "start", u)
+		// Use PowerShell Start-Process so no CMD window flashes.
+		// hiddenCmd sets CREATE_NO_WINDOW at the process level.
+		cmd, args = "powershell", []string{"-WindowStyle", "Hidden", "-NonInteractive", "-Command", "Start-Process '" + u + "'"}
 	default:
-		cmd = exec.Command("xdg-open", u)
+		cmd, args = "xdg-open", []string{u}
 	}
-	cmd.Start() //nolint:errcheck
+	hiddenCmd(cmd, args...).Start() //nolint:errcheck
 }
 
 // serveFile serves a file at an absolute path that was previously saved by the agent.
