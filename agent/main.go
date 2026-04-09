@@ -222,11 +222,17 @@ type Agent struct {
 
 // chatFileReceiver buffers incoming file chunks until the transfer completes.
 type chatFileReceiver struct {
-	name string
-	size int64
-	mime string
-	buf  []byte
+	name     string
+	size     int64
+	mime     string
+	buf      []byte
+	seqCount int // total chunks received, used for ACK windowing
 }
+
+// chatFileAckWindow must match _kWindowSize in chat_service.dart.
+// The agent sends one ACK per window; Flutter pauses after each window waiting
+// for that ACK before sending the next batch.
+const chatFileAckWindow = 8
 
 // generateSessionPwd returns a random 6-digit numeric string used as the
 // ephemeral session password viewers must provide to connect.
@@ -503,10 +509,9 @@ func (a *Agent) handleChatDCMessage(viewerID string, dc *webrtc.DataChannel, msg
 		isLast, _ := ev["last"].(bool)
 		a.fileRxMu.Lock()
 		rx.buf = append(rx.buf, decoded...)
+		rx.seqCount++
+		shouldAck := isLast || rx.seqCount%chatFileAckWindow == 0
 		a.fileRxMu.Unlock()
-		shouldAck := true // ACK every chunk; Flutter viewer owns all flow control
-		// Send ACK every window and on the last chunk so the sender can
-		// keep its DataChannel send buffer bounded (windowed flow control).
 		if shouldAck {
 			ackData, _ := json.Marshal(map[string]interface{}{
 				"type": "file_ack",

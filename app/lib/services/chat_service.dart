@@ -217,7 +217,6 @@ class ChatService extends ChangeNotifier {
 
     int offset = 0;
     int seq = 0;
-    int chunksSinceAck = 0;
 
     while (offset < data.length) {
       if (!_dcOpen || _dc == null) {
@@ -226,56 +225,62 @@ class ChatService extends ChangeNotifier {
         return;
       }
 
-      final end = (offset + _kChunkSize).clamp(0, data.length);
-      final chunk = data.sublist(offset, end);
-      final isLast = end >= data.length;
-      // await each send — dc.send() uses Flutter MethodChannel (invokeMethod).
-      // Without await, all chunks queue up on the MethodChannel simultaneously,
-      // saturating it and blocking incoming ACK events from being processed.
-      final ok = await _sendRaw({
-        'type': 'file_chunk',
-        'id': id,
-        'seq': seq++,
-        'data': base64.encode(chunk),
-        'last': isLast,
-      });
-      if (!ok) {
-        msg.hasError = true;
-        notifyListeners();
-        return;
-      }
-      offset = end;
-      chunksSinceAck++;
-      // Throttle UI updates to once per window (not every chunk) to avoid
-      // saturating the event loop with widget rebuilds during large transfers.
-      if (chunksSinceAck >= _kWindowSize || isLast) {
-        msg.progress = offset / data.length;
-        notifyListeners();
-      }
+      // Register the Completer BEFORE sending any chunks in this window.
+      // If we registered it after, the ACK could arrive during one of the
+      // `await _sendRaw()` calls (which yield to the event loop) and be
+      // silently discarded because no Completer existed yet.
+      final c = Completer<void>();
+      _ackCompleters[id] = c;
 
-      // Primary flow control: after every window, wait for the receiver's ACK
-      // before sending more. This bounds the in-flight data to
-      // _kWindowSize × _kChunkSize ≈ 192 KB regardless of bufferedAmount.
-      if (chunksSinceAck >= _kWindowSize || isLast) {
-        final c = Completer<void>();
-        _ackCompleters[id] = c;
-        try {
-          await c.future.timeout(const Duration(seconds: 15));
-        } on TimeoutException {
-          _ackCompleters.remove(id);
-          msg.hasError = true;
-          notifyListeners();
-          return;
-        } catch (_) {
-          // DC was closed (completeError in detach)
+      // Send up to _kWindowSize chunks.
+      int chunksSent = 0;
+      while (offset < data.length && chunksSent < _kWindowSize) {
+        if (!_dcOpen || _dc == null) {
           _ackCompleters.remove(id);
           msg.hasError = true;
           notifyListeners();
           return;
         }
-        _ackCompleters.remove(id);
-        chunksSinceAck = 0;
+        final end = (offset + _kChunkSize).clamp(0, data.length);
+        final isLast = end >= data.length;
+        final ok = await _sendRaw({
+          'type': 'file_chunk',
+          'id': id,
+          'seq': seq++,
+          'data': base64.encode(data.sublist(offset, end)),
+          'last': isLast,
+        });
+        if (!ok) {
+          _ackCompleters.remove(id);
+          msg.hasError = true;
+          notifyListeners();
+          return;
+        }
+        offset = end;
+        chunksSent++;
       }
+
+      msg.progress = offset / data.length;
+      notifyListeners();
+
+      // Wait for the agent's ACK before sending the next window.
+      // If the ACK already arrived during one of the sends above,
+      // c.future is already complete and this returns immediately.
+      try {
+        await c.future.timeout(const Duration(seconds: 15));
+      } on TimeoutException {
+        _ackCompleters.remove(id);
+        msg.hasError = true;
+        notifyListeners();
+        return;
+      } catch (_) {
+        // DC was closed (completeError in detach).
+        _ackCompleters.remove(id);
+        msg.hasError = true;
+        notifyListeners();
+        return;
+      }
+      _ackCompleters.remove(id);
     }
     msg.progress = 1.0;
     notifyListeners();
