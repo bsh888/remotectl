@@ -17,7 +17,6 @@ class _ConnectScreenState extends State<ConnectScreen> {
   final _serverCtrl = TextEditingController();
   final _deviceCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
-  bool _allowSelfSigned = false;
 
   final _session = RemoteSession();
 
@@ -33,7 +32,6 @@ class _ConnectScreenState extends State<ConnectScreen> {
     setState(() {
       _serverCtrl.text = prefs.getString('server') ?? '';
       _deviceCtrl.text = prefs.getString('device') ?? '';
-      _allowSelfSigned = prefs.getBool('allow_self_signed') ?? false;
     });
   }
 
@@ -41,7 +39,6 @@ class _ConnectScreenState extends State<ConnectScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('server', _serverCtrl.text.trim());
     await prefs.setString('device', _deviceCtrl.text.trim());
-    await prefs.setBool('allow_self_signed', _allowSelfSigned);
   }
 
   void _onSessionChanged() {
@@ -79,7 +76,6 @@ class _ConnectScreenState extends State<ConnectScreen> {
       serverURL: server,
       deviceID: device,
       password: pass,
-      allowSelfSigned: _allowSelfSigned,
     );
   }
 
@@ -242,24 +238,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                   icon: Icons.lock_outline,
                                   obscure: true,
                                 ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Switch(
-                                      value: _allowSelfSigned,
-                                      onChanged: (v) => setState(() => _allowSelfSigned = v),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      '允许自签名证书',
-                                      style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.70),
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 20),
 
                                 // Connect button
                                 _GradientButton(

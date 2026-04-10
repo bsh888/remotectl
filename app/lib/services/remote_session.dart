@@ -40,7 +40,6 @@ class RemoteSession extends ChangeNotifier {
     required String serverURL,
     required String deviceID,
     required String password,
-    bool allowSelfSigned = false,
   }) async {
     await disconnect();
     _setState(SessionState.connecting);
@@ -56,7 +55,7 @@ class RemoteSession extends ChangeNotifier {
 
     try {
       final uri = _wsUri(serverURL);
-      if (allowSelfSigned && !kIsWeb) {
+      if (!kIsWeb) {
         _ws = ws_io.IOWebSocketChannel.connect(uri,
             customClient: _buildInsecureClient());
       } else {
