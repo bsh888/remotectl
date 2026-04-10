@@ -271,6 +271,48 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
     );
   }
 
+  // Manually letterbox the video so it fits within whatever space the Stack
+  // gives us, regardless of whether RTCVideoView.objectFit works on this
+  // platform. The math mirrors _toVideoCoords so mouse mapping stays correct.
+  Widget _buildVideoFit(RTCVideoRenderer renderer) {
+    final vW = renderer.videoWidth.toDouble();
+    final vH = renderer.videoHeight.toDouble();
+    // No dimensions yet — fill the space; video will snap into place once they arrive.
+    if (vW <= 0 || vH <= 0) {
+      return RTCVideoView(renderer,
+          objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+          mirror: false);
+    }
+    return LayoutBuilder(builder: (context, constraints) {
+      final cW = constraints.maxWidth;
+      final cH = constraints.maxHeight;
+      final vAspect = vW / vH;
+      final cAspect = cW / cH;
+
+      final double rW, rH, oX, oY;
+      if (vAspect > cAspect) {
+        rW = cW;
+        rH = cW / vAspect;
+        oX = 0;
+        oY = (cH - rH) / 2;
+      } else {
+        rW = cH * vAspect;
+        rH = cH;
+        oX = (cW - rW) / 2;
+        oY = 0;
+      }
+
+      return Stack(clipBehavior: Clip.hardEdge, children: [
+        Positioned(
+          left: oX, top: oY, width: rW, height: rH,
+          child: RTCVideoView(renderer,
+              objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+              mirror: false),
+        ),
+      ]);
+    });
+  }
+
   Widget _buildError(BuildContext context) {
     return Center(
       child: Padding(
@@ -302,11 +344,15 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
       child: Stack(
         children: [
           // ── Video layer ──
+          // RTCVideoView.objectFit is unreliable on macOS/Windows Flutter
+          // desktop (the native platform view may render at 1:1 pixels,
+          // ignoring the Flutter constraint). Instead, manually letterbox the
+          // view by computing the contain rectangle in Flutter layout space and
+          // giving the platform view an explicit, correctly-sized slot.
           Positioned.fill(
-            child: RTCVideoView(
-              widget.session.renderer!,
-              objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
-              mirror: false,
+            child: ListenableBuilder(
+              listenable: widget.session.renderer!,
+              builder: (context, _) => _buildVideoFit(widget.session.renderer!),
             ),
           ),
 
