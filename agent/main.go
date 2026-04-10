@@ -33,6 +33,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+
+
 // ── Protocol types (must match server) ───────────────────────────────────────
 
 const (
@@ -217,8 +219,6 @@ type Agent struct {
 	fileRx   map[string]*chatFileReceiver
 	fileRxMu sync.Mutex
 
-	// Browser-based chat UI
-	chatSrv *chatServer
 }
 
 
@@ -494,15 +494,6 @@ func (a *Agent) handleDCMessage(msg webrtc.DataChannelMessage) {
 	input.Handle(ev)
 }
 
-// broadcastChat sends raw DataChannel bytes to all connected viewers.
-func (a *Agent) broadcastChat(data []byte) {
-	a.chatMu.RLock()
-	defer a.chatMu.RUnlock()
-	for _, dc := range a.chatDCs {
-		dc.SendText(string(data)) //nolint:errcheck
-	}
-}
-
 // handleChatDCMessage processes an incoming chat DataChannel message from a viewer.
 func (a *Agent) handleChatDCMessage(viewerID string, dc *webrtc.DataChannel, msg webrtc.DataChannelMessage) {
 	var ev map[string]interface{}
@@ -510,26 +501,12 @@ func (a *Agent) handleChatDCMessage(viewerID string, dc *webrtc.DataChannel, msg
 		return
 	}
 	switch ev["type"] {
-	case "chat_open":
-		// Viewer opened the chat panel — open the browser if not already open.
-		if !a.chatSrv.hasClients() {
-			a.chatSrv.openBrowser()
-		}
-
 	case "text":
 		text, _ := ev["text"].(string)
 		if text == "" {
 			return
 		}
 		log.Printf("[chat] message from %s: %s", viewerID[:min(8, len(viewerID))], text)
-		ts, _ := ev["ts"].(float64)
-		if ts == 0 {
-			ts = float64(time.Now().UnixMilli())
-		}
-		a.chatSrv.push(chatMsgWire{Type: "text", From: "viewer", Text: text, Ts: int64(ts)})
-		if !a.chatSrv.hasClients() {
-			a.chatSrv.openBrowser()
-		}
 		showNotification("RemoteCtl 新消息", text)
 
 	case "file_start":
@@ -593,7 +570,6 @@ func (a *Agent) saveChatFile(id string, rx *chatFileReceiver) {
 	data := make([]byte, len(rx.buf))
 	copy(data, rx.buf)
 	name := rx.name
-	mime := rx.mime
 	delete(a.fileRx, id)
 	a.fileRxMu.Unlock()
 
@@ -610,23 +586,7 @@ func (a *Agent) saveChatFile(id string, rx *chatFileReceiver) {
 		return
 	}
 	log.Printf("[chat] saved: %s", path)
-	// Push to browser chat UI
-	a.chatSrv.push(chatMsgWire{
-		Type:    "file",
-		From:    "viewer",
-		Name:    name,
-		Mime:    mime,
-		Size:    int64(len(data)),
-		FileURL: a.chatSrv.fileURL(path),
-	})
-	if !a.chatSrv.hasClients() {
-		a.chatSrv.openBrowser()
-	}
-	if strings.HasPrefix(mime, "audio/") {
-		showNotification("RemoteCtl 语音消息", "已保存到: "+path)
-	} else {
-		showNotification("RemoteCtl 文件已接收", name+" 已保存到下载目录")
-	}
+	showNotification("RemoteCtl 文件已接收", name+" 已保存到下载目录")
 }
 
 // chatDownloadsDir returns the best directory for saving received files.
@@ -1149,9 +1109,6 @@ func main() {
 		log.Fatalf("NewTrackLocalStaticSample: %v", err)
 	}
 
-	chatSrv := newChatServer(17770)
-	chatSrv.start()
-
 	sessionPwd := generateSessionPwd()
 	agent := &Agent{
 		serverURL:  *serverURL,
@@ -1171,16 +1128,13 @@ func main() {
 		rtcPeers:   make(map[string]*webrtc.PeerConnection),
 		chatDCs:    make(map[string]*webrtc.DataChannel),
 		fileRx:     make(map[string]*chatFileReceiver),
-		chatSrv:    chatSrv,
 	}
-	chatSrv.sendToViewers = agent.broadcastChat
 
 	// Machine-readable marker for the Flutter app to parse (do not change format)
 	fmt.Printf("SESSION_PWD:%s\n", sessionPwd)
 	log.Printf("┌─────────────────────────────────────────────────")
 	log.Printf("│ 设备 ID:  %s", *deviceID)
 	log.Printf("│ 会话密码: %s", sessionPwd)
-	log.Printf("│ 聊天界面: %s", chatSrv.URL())
 	log.Printf("└─────────────────────────────────────────────────")
 
 	// ── macOS permission checks (run once at startup) ─────────────────────────
