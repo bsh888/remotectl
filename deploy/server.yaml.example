@@ -34,7 +34,14 @@ agent_token: "replace-with-a-strong-secret"
 # ── TURN 中继 ─────────────────────────────────────────────────────────────────
 # 移动网络 / 对称型 NAT 必须配置，否则会出现 "WebRTC connection failed"。
 # 局域网内使用可留空。
+#
+# 使用 docker-compose 时，coturn 已内置，将下方 url 改为服务器公网 IP 即可。
+# turn.user / turn.password 须与 docker-compose.yml 中 coturn 的 --user 参数一致。
+#
+# OCI 用户注意：需同时在 OCI 安全列表 AND 实例 iptables 中放行：
+#   UDP/TCP 3478  (TURN/STUN)
+#   UDP 49152-65535  (TURN 中继数据)
 turn:
-  url:      ""          # e.g. turn:1.2.3.4:3478
-  user:     "remotectl"
-  password: "changeme"
+  url:      ""                  # e.g. turn:1.2.3.4:3478（填服务器公网 IP）
+  user:     "remotectl"         # 须与 docker-compose.yml coturn --user 一致
+  password: "changeme"          # 须与 docker-compose.yml coturn --user 的密码一致

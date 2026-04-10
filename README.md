@@ -440,12 +440,23 @@ turn:
   password: "自定义强密码"
 ```
 
-ECS 安全组需放行：
+安全组 / 防火墙需放行：
 
 | 端口 | 协议 | 用途 |
 |------|------|------|
 | 3478 | UDP + TCP | TURN/STUN |
 | 49152–65535 | UDP | TURN 中继数据 |
+
+> **OCI（Oracle Cloud）特别说明**：OCI 有两层防火墙——安全列表（Security List）和实例 OS 防火墙（iptables / firewalld）。两层都需要放行上述端口，否则 TURN 无法工作：
+> ```bash
+> # Ubuntu/Debian（实例内部防火墙）
+> sudo iptables -I INPUT -p udp --dport 3478 -j ACCEPT
+> sudo iptables -I INPUT -p tcp --dport 3478 -j ACCEPT
+> sudo iptables -I INPUT -p udp --dport 49152:65535 -j ACCEPT
+> # 保存规则（Ubuntu）
+> sudo netfilter-persistent save
+> ```
+> OCI 控制台 → 网络 → 虚拟云网络 → 安全列表，同样添加这些入站规则。
 
 TURN 配置只需在服务端设置一次，服务端会在信令握手时自动下发给所有 agent 和控制端。
 
