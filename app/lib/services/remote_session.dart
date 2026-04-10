@@ -1,11 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:web_socket_channel/io.dart' as ws_io;
 import 'chat_service.dart';
 import 'crypto_service.dart';
 
@@ -40,7 +38,6 @@ class RemoteSession extends ChangeNotifier {
     required String serverURL,
     required String deviceID,
     required String password,
-    String caCertPath = '',
   }) async {
     await disconnect();
     _setState(SessionState.connecting);
@@ -56,16 +53,7 @@ class RemoteSession extends ChangeNotifier {
 
     try {
       final uri = _wsUri(serverURL);
-      final WebSocketChannel ws;
-      if (caCertPath.isNotEmpty) {
-        ws = ws_io.IOWebSocketChannel.connect(uri,
-            customClient: _buildClientWithCert(caCertPath));
-      } else {
-        ws = WebSocketChannel.connect(uri);
-      }
-      _ws = ws;
-
-      ws.sink.add(jsonEncode({
+      _ws!.sink.add(jsonEncode({
         'type': 'connect',
         'payload': {
           'device_id': deviceID,
@@ -73,7 +61,7 @@ class RemoteSession extends ChangeNotifier {
         },
       }));
 
-      ws.stream.listen(
+      _ws!.stream.listen(
         (raw) => _onMessage(raw as String),
         onError: (e) => _setError('WebSocket error: $e'),
         onDone: () {
@@ -335,12 +323,6 @@ class RemoteSession extends ChangeNotifier {
       scheme: u.scheme == 'https' ? 'wss' : 'ws',
       path: '/ws/viewer',
     );
-  }
-
-  static HttpClient _buildClientWithCert(String certPath) {
-    final ctx = SecurityContext(withTrustedRoots: false)
-      ..setTrustedCertificates(certPath);
-    return HttpClient(context: ctx);
   }
 
   @override

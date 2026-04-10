@@ -13,7 +13,6 @@ class AgentConfig {
   int fps;
   int bitrate; // bits/sec
   double scale;
-  bool insecure;
   String caCert; // path to custom CA certificate (.crt)
 
   AgentConfig({
@@ -24,7 +23,6 @@ class AgentConfig {
     this.fps = 30,
     this.bitrate = 6000000,
     this.scale = 0.75,
-    this.insecure = false,
     this.caCert = '',
   });
 
@@ -36,7 +34,6 @@ class AgentConfig {
         fps: (j['fps'] as int?) ?? 30,
         bitrate: (j['bitrate'] as int?) ?? 6000000,
         scale: ((j['scale'] as num?) ?? 0.75).toDouble(),
-        insecure: (j['insecure'] as bool?) ?? false,
         caCert: (j['ca_cert'] as String?) ?? '',
       );
 
@@ -48,7 +45,6 @@ class AgentConfig {
         'fps': fps,
         'bitrate': bitrate,
         'scale': scale,
-        'insecure': insecure,
         'ca_cert': caCert,
       };
 }
@@ -223,7 +219,6 @@ class AgentService extends ChangeNotifier {
         '--fps', _config.fps.toString(),
         '--bitrate', _config.bitrate.toString(),
         '--scale', _config.scale.toStringAsFixed(2),
-        if (_config.insecure) '--insecure',
         if (_config.caCert.isNotEmpty) ...['--ca-cert', _config.caCert],
       ];
 

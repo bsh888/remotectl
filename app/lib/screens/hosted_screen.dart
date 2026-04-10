@@ -22,7 +22,6 @@ class _HostedScreenState extends State<HostedScreen> {
   late final TextEditingController _bitrateCtrl;
   late final TextEditingController _caCertCtrl;
   double _scale = 0.75;
-  bool _insecure = false;
   bool _showAdvanced = false;
 
   final _logScroll = ScrollController();
@@ -40,7 +39,6 @@ class _HostedScreenState extends State<HostedScreen> {
         TextEditingController(text: (cfg.bitrate ~/ 1000).toString());
     _caCertCtrl = TextEditingController(text: cfg.caCert);
     _scale = cfg.scale;
-    _insecure = cfg.insecure;
 
     widget.agentService.addListener(_onAgentChanged);
     widget.agentService.loadConfig().then((_) {
@@ -59,7 +57,6 @@ class _HostedScreenState extends State<HostedScreen> {
       _bitrateCtrl.text = (cfg.bitrate ~/ 1000).toString();
       _caCertCtrl.text = cfg.caCert;
       _scale = cfg.scale;
-      _insecure = cfg.insecure;
     });
   }
 
@@ -102,7 +99,6 @@ class _HostedScreenState extends State<HostedScreen> {
         fps: int.tryParse(_fpsCtrl.text) ?? 30,
         bitrate: (int.tryParse(_bitrateCtrl.text) ?? 6000) * 1000,
         scale: _scale,
-        insecure: _insecure,
         caCert: _caCertCtrl.text.trim(),
       );
 
@@ -479,24 +475,6 @@ class _HostedScreenState extends State<HostedScreen> {
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(height: 12),
-                                        Row(children: [
-                                          Switch(
-                                            value: _insecure,
-                                            onChanged: running
-                                                ? null
-                                                : (v) => setState(
-                                                    () => _insecure = v),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            '跳过证书验证（不安全）',
-                                            style: TextStyle(
-                                              color: Colors.white.withValues(
-                                                  alpha: running ? 0.24 : 0.70),
-                                            ),
-                                          ),
-                                        ]),
                                         const SizedBox(height: 8),
                                       ],
                                     ],

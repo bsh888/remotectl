@@ -17,7 +17,6 @@ class _ConnectScreenState extends State<ConnectScreen> {
   final _serverCtrl = TextEditingController();
   final _deviceCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
-  final _caCertCtrl = TextEditingController();
 
   final _session = RemoteSession();
 
@@ -33,7 +32,6 @@ class _ConnectScreenState extends State<ConnectScreen> {
     setState(() {
       _serverCtrl.text = prefs.getString('server') ?? '';
       _deviceCtrl.text = prefs.getString('device') ?? '';
-      _caCertCtrl.text = prefs.getString('ca_cert') ?? '';
     });
   }
 
@@ -41,7 +39,6 @@ class _ConnectScreenState extends State<ConnectScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('server', _serverCtrl.text.trim());
     await prefs.setString('device', _deviceCtrl.text.trim());
-    await prefs.setString('ca_cert', _caCertCtrl.text.trim());
   }
 
   void _onSessionChanged() {
@@ -79,7 +76,6 @@ class _ConnectScreenState extends State<ConnectScreen> {
       serverURL: server,
       deviceID: device,
       password: pass,
-      caCertPath: _caCertCtrl.text.trim(),
     );
   }
 
@@ -90,7 +86,6 @@ class _ConnectScreenState extends State<ConnectScreen> {
     _serverCtrl.dispose();
     _deviceCtrl.dispose();
     _passCtrl.dispose();
-    _caCertCtrl.dispose();
     super.dispose();
   }
 
@@ -242,15 +237,6 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                   hint: '被控端显示的8位数字',
                                   icon: Icons.lock_outline,
                                   obscure: true,
-                                ),
-                                const SizedBox(height: 14),
-
-                                _labeledField(
-                                  context: context,
-                                  label: 'CA 证书路径',
-                                  controller: _caCertCtrl,
-                                  hint: '/path/to/server.crt',
-                                  icon: Icons.verified_outlined,
                                 ),
                                 const SizedBox(height: 20),
 
