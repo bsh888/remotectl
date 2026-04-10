@@ -10,7 +10,7 @@
 #
 # Output:
 #   app\build\windows\x64\runner\Release\   (run in place)
-#   bin\remotectl-windows-amd64.zip         (distribute this)
+#   deploy\bin\remotectl-windows-amd64.zip  (distribute this)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -23,8 +23,8 @@ Write-Host ""
 Write-Host "=== RemoteCtl Windows Build ===" -ForegroundColor Cyan
 Write-Host ""
 
-# -- 1. Create bin/ directory -------------------------------------------------
-New-Item -ItemType Directory -Force -Path "bin" | Out-Null
+# -- 1. Create deploy/bin/ directory ------------------------------------------
+New-Item -ItemType Directory -Force -Path "deploy\bin" | Out-Null
 
 # -- 2. Build agent -----------------------------------------------------------
 Write-Host "[1/4] Building agent..." -ForegroundColor Yellow
@@ -37,12 +37,12 @@ $env:CC          = "gcc"   # provided by MSYS2 MinGW-w64
 Push-Location "agent"
 try {
     go build -ldflags="-s -w -H windowsgui" `
-             -o "..\bin\remotectl-agent-windows-amd64.exe" .
+             -o "..\deploy\bin\remotectl-agent-windows-amd64.exe" .
 } finally {
     Pop-Location
 }
 
-Write-Host "      OK: bin\remotectl-agent-windows-amd64.exe" -ForegroundColor Green
+Write-Host "      OK: deploy\bin\remotectl-agent-windows-amd64.exe" -ForegroundColor Green
 Write-Host ""
 
 # -- 3. Build Flutter Windows app ---------------------------------------------
@@ -66,14 +66,14 @@ if (-not (Test-Path $dest)) {
     Write-Error "Flutter build output not found: $dest"
 }
 
-Copy-Item "bin\remotectl-agent-windows-amd64.exe" "$dest\remotectl-agent.exe" -Force
+Copy-Item "deploy\bin\remotectl-agent-windows-amd64.exe" "$dest\remotectl-agent.exe" -Force
 Write-Host "      OK: $dest\remotectl-agent.exe" -ForegroundColor Green
 Write-Host ""
 
 # -- 5. Package into zip ------------------------------------------------------
 Write-Host "[4/4] Packaging into zip..." -ForegroundColor Yellow
 
-$zip = "bin\remotectl-windows-amd64.zip"
+$zip = "deploy\bin\remotectl-windows-amd64.zip"
 if (Test-Path $zip) { Remove-Item $zip -Force }
 Compress-Archive -Path "$dest\*" -DestinationPath $zip
 Write-Host "      OK: $zip" -ForegroundColor Green

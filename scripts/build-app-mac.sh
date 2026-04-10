@@ -9,7 +9,7 @@
 #   ./scripts/build-app-mac.sh
 #
 # Output:
-#   bin/remotectl-macos.zip   (unzip and run remotectl.app on any Mac)
+#   deploy/bin/remotectl-macos.zip   (unzip and run remotectl.app on any Mac)
 
 set -euo pipefail
 
@@ -19,24 +19,24 @@ echo ""
 echo "=== RemoteCtl macOS Build ==="
 echo ""
 
-mkdir -p bin
+mkdir -p deploy/bin
 
 # -- 1. Build universal agent (arm64 + amd64) ---------------------------------
 echo "[1/4] Building agent (arm64)..."
 cd agent && CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 \
-    go build -ldflags="-s -w" -o ../bin/remotectl-agent-mac-arm64 .
+    go build -ldflags="-s -w" -o ../deploy/bin/remotectl-agent-mac-arm64 .
 cd ..
 
 echo "[1/4] Building agent (amd64)..."
 cd agent && CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 \
-    go build -ldflags="-s -w" -o ../bin/remotectl-agent-mac-amd64 .
+    go build -ldflags="-s -w" -o ../deploy/bin/remotectl-agent-mac-amd64 .
 cd ..
 
 lipo -create \
-    bin/remotectl-agent-mac-arm64 \
-    bin/remotectl-agent-mac-amd64 \
-    -output bin/remotectl-agent-mac
-echo "      OK: bin/remotectl-agent-mac (universal)"
+    deploy/bin/remotectl-agent-mac-arm64 \
+    deploy/bin/remotectl-agent-mac-amd64 \
+    -output deploy/bin/remotectl-agent-mac
+echo "      OK: deploy/bin/remotectl-agent-mac (universal)"
 echo ""
 
 # -- 2. Build Flutter macOS app -----------------------------------------------
@@ -51,7 +51,7 @@ echo ""
 
 # -- 3. Inject agent into .app bundle + re-sign --------------------------------
 echo "[3/4] Injecting agent into .app bundle..."
-cp bin/remotectl-agent-mac "$APP/Contents/MacOS/remotectl-agent"
+cp deploy/bin/remotectl-agent-mac "$APP/Contents/MacOS/remotectl-agent"
 chmod +x "$APP/Contents/MacOS/remotectl-agent"
 # Ad-hoc sign the agent binary, then re-sign the whole bundle so macOS
 # accepts the modified app without Gatekeeper errors.
@@ -62,7 +62,7 @@ echo ""
 
 # -- 4. Package into zip -------------------------------------------------------
 echo "[4/4] Packaging into zip..."
-ZIP="$(pwd)/bin/remotectl-macos.zip"
+ZIP="$(pwd)/deploy/bin/remotectl-macos.zip"
 rm -f "$ZIP"
 cd "app/build/macos/Build/Products/Release"
 zip -r --symlinks "$ZIP" remotectl.app
@@ -73,7 +73,7 @@ echo ""
 # -- Done ----------------------------------------------------------------------
 echo "=== Build complete ==="
 echo "  Run in place : $APP"
-echo "  Distribute   : $(pwd)/$ZIP"
+echo "  Distribute   : $ZIP"
 echo ""
 echo "  Unzip on the target Mac and double-click remotectl.app to launch."
 echo ""

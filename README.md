@@ -236,7 +236,7 @@ docker compose up -d
 
 **直接运行：**
 ```bash
-./bin/remotectl-server --config deploy/server.yaml
+./deploy/bin/remotectl-server --config deploy/server.yaml
 ```
 
 服务端所有参数均可通过配置文件或命令行 flag 指定，flag 优先级更高：
@@ -281,17 +281,17 @@ insecure: false
 
 **macOS：**
 ```bash
-./bin/remotectl-agent-mac-arm64 --config deploy/agent.yaml
+./deploy/bin/remotectl-agent-mac-arm64 --config deploy/agent.yaml
 ```
 
 **Windows（PowerShell）：**
 ```powershell
-.\remotectl-agent-windows-amd64.exe --config deploy/agent.yaml
+.\deploy\bin\remotectl-agent-windows-amd64.exe --config deploy\agent.yaml
 ```
 
 **Linux：**
 ```bash
-./remotectl-agent-linux-amd64 --config deploy/agent.yaml
+./deploy/bin/remotectl-agent-linux-amd64 --config deploy/agent.yaml
 ```
 
 命令行 flag 可覆盖配置文件中的任意值：
@@ -341,7 +341,7 @@ flutter run              # Android / iOS（连接手机后自动选择）
 > make agent-win      # Windows
 > make agent-linux    # Linux
 > ```
-> `AgentService` 会自动在项目 `bin/` 目录中寻找二进制作为 fallback。
+> `AgentService` 会自动在项目 `deploy/bin/` 目录中寻找二进制作为 fallback。
 
 #### 发布打包（一键脚本）
 
