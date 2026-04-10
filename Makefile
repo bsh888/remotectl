@@ -17,6 +17,7 @@ tidy:
 # ── 前端 (输出到 deploy/static/) ──────────────
 client:
 	cd client && npm run build
+	@touch deploy/static/.gitkeep
 	@echo "✓ client built → deploy/static/"
 
 # ── 服务端 ────────────────────────────────────
