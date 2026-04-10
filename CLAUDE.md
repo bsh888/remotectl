@@ -49,13 +49,12 @@ make all            # 全量构建
 - 认证失败时 agent 打印 `AUTH_FAILED:…` 到 stdout 并以 exit(1) 退出
 - Windows 进程清理：`ProcessSignal.sigkill`（`WidgetsBindingObserver.didChangeAppLifecycleState(detached)`）
 
-### server — 两层认证 (main.go)
+### server — 认证 (main.go)
 
-- Layer 1：viewer 发来的 `server_password` 字段 vs `h.password`（server.yaml `password`，**必填**），先于设备查找进行校验
-- Layer 2：viewer 发来的 `password` 字段 vs `agent.sessionPwd`（8 位会话密码）
-- `ConnectPayload` 新增 `ServerPassword string json:"server_password,omitempty"`
-- 两层均为强制校验，无 dev 模式：`password` 和 `tokens` 均必须配置，否则启动时 fatal
-- Agent 认证：仅支持 per-device tokens（`server.yaml` → `tokens: {device_id: secret}`），已移除 `agent_token` 全局 token 和 dev 模式（无 token 直接拒绝）
+- viewer 连接：发来的 `password` 字段 vs `agent.sessionPwd`（8 位会话密码），无需服务器密码
+- `ConnectPayload`：仅 `device_id` + `password`，已移除 `server_password` 字段
+- `tokens` 必须配置，否则启动时 fatal；已移除 `password` / `agent_token` 字段及 dev 模式
+- Agent 认证：仅支持 per-device tokens（`server.yaml` → `tokens: {device_id: secret}`）
 
 ### agent — WebRTC SDP (main.go)
 

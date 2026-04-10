@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { DeviceInfo } from '../types'
 
 interface Props {
-  onConnect: (serverURL: string, deviceID: string, password: string, serverPassword: string) => void
+  onConnect: (serverURL: string, deviceID: string, password: string) => void
   onFetchDevices: (serverURL: string) => Promise<void>
   devices: DeviceInfo[]
   error: string
@@ -11,7 +11,6 @@ interface Props {
 
 export default function ConnectPanel({ onConnect, onFetchDevices, devices, error, connecting }: Props) {
   const [serverURL, setServerURL] = useState(() => localStorage.getItem('rc_server') ?? 'http://localhost:8080')
-  const [serverPassword, setServerPassword] = useState(() => localStorage.getItem('rc_server_pass') ?? '')
   const [deviceID, setDeviceID] = useState(() => localStorage.getItem('rc_device') ?? '')
   const [password, setPassword] = useState('')
 
@@ -20,16 +19,12 @@ export default function ConnectPanel({ onConnect, onFetchDevices, devices, error
   }, [serverURL])
 
   useEffect(() => {
-    localStorage.setItem('rc_server_pass', serverPassword)
-  }, [serverPassword])
-
-  useEffect(() => {
     localStorage.setItem('rc_device', deviceID)
   }, [deviceID])
 
   const handleConnect = (e: React.FormEvent) => {
     e.preventDefault()
-    onConnect(serverURL, deviceID, password, serverPassword)
+    onConnect(serverURL, deviceID, password)
   }
 
   const handleRefresh = () => onFetchDevices(serverURL)
@@ -47,17 +42,6 @@ export default function ConnectPanel({ onConnect, onFetchDevices, devices, error
               onChange={e => setServerURL(e.target.value)}
               placeholder="http://your-server:8080"
               required
-            />
-          </label>
-
-          <label style={styles.label}>
-            服务器密码
-            <input
-              style={styles.input}
-              type="password"
-              value={serverPassword}
-              onChange={e => setServerPassword(e.target.value)}
-              placeholder="server.yaml 中的 password（可选）"
             />
           </label>
 

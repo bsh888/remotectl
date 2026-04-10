@@ -12,7 +12,6 @@ interface SessionOptions {
   serverURL: string
   deviceID: string
   password: string
-  serverPassword?: string
 }
 
 interface RemoteSession {
@@ -57,7 +56,7 @@ export function useRemoteSession(): RemoteSession {
     setState('idle')
   }, [])
 
-  const connect = useCallback(({ serverURL, deviceID, password, serverPassword }: SessionOptions) => {
+  const connect = useCallback(({ serverURL, deviceID, password }: SessionOptions) => {
     disconnect()
     setState('connecting')
     setError('')
@@ -72,7 +71,7 @@ export function useRemoteSession(): RemoteSession {
     socket.onopen = () => {
       socket.send(JSON.stringify({
         type: 'connect',
-        payload: { device_id: deviceID, password, ...(serverPassword ? { server_password: serverPassword } : {}) },
+        payload: { device_id: deviceID, password },
       }))
     }
 

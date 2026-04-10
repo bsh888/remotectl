@@ -111,9 +111,8 @@ type AuthPayload struct {
 }
 
 type ConnectPayload struct {
-	DeviceID       string `json:"device_id"`
-	Password       string `json:"password"`
-	ServerPassword string `json:"server_password,omitempty"`
+	DeviceID string `json:"device_id"`
+	Password string `json:"password"`
 }
 
 // ICEServerConfig is sent to both agent and viewer so they use the same ICE servers.
@@ -190,20 +189,18 @@ type TURNConfig struct {
 }
 
 type ServerConfig struct {
-	Addr     string            `yaml:"addr"`
-	Password string            `yaml:"password"`
-	TLSCert  string            `yaml:"tls_cert"`
-	TLSKey   string            `yaml:"tls_key"`
-	Static   string            `yaml:"static"`
-	Tokens   map[string]string `yaml:"tokens"` // per-device tokens: device_id → secret
-	TURN     TURNConfig        `yaml:"turn"`
+	Addr    string            `yaml:"addr"`
+	TLSCert string            `yaml:"tls_cert"`
+	TLSKey  string            `yaml:"tls_key"`
+	Static  string            `yaml:"static"`
+	Tokens  map[string]string `yaml:"tokens"` // per-device tokens: device_id → secret
+	TURN    TURNConfig        `yaml:"turn"`
 }
 
 func defaultServerConfig() ServerConfig {
 	return ServerConfig{
-		Addr:     ":8080",
-		Password: "remotectl",
-		Static:   "./static",
+		Addr:   ":8080",
+		Static: "./static",
 	}
 }
 
@@ -241,15 +238,13 @@ func findConfigFlag() string {
 type Hub struct {
 	agents     map[string]*Agent
 	mu         sync.RWMutex
-	password   string
-	tokens map[string]string // per-device tokens: device_id → secret
+	tokens     map[string]string // per-device tokens: device_id → secret
 	iceServers []ICEServerConfig
 }
 
-func newHub(password string, tokens map[string]string, iceServers []ICEServerConfig) *Hub {
+func newHub(tokens map[string]string, iceServers []ICEServerConfig) *Hub {
 	return &Hub{
 		agents:     make(map[string]*Agent),
-		password:   password,
 		tokens:     tokens,
 		iceServers: iceServers,
 	}
@@ -669,15 +664,7 @@ func (h *Hub) handleViewer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Layer 1: server password (always required).
-	if cp.ServerPassword != h.password {
-		log.Printf("[viewer] server password rejected from %s", conn.RemoteAddr())
-		replyErr(conn, "invalid password")
-		conn.Close()
-		return
-	}
-
-	// Layer 2: look up device and validate session password.
+	// Look up device and validate session password.
 	h.mu.RLock()
 	agent, ok := h.agents[cp.DeviceID]
 	h.mu.RUnlock()
@@ -687,8 +674,7 @@ func (h *Hub) handleViewer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Session password: set by agent per run. If agent hasn't set one (dev mode), allow all.
-	if agent.sessionPwd != "" && cp.Password != agent.sessionPwd {
+	if cp.Password != agent.sessionPwd {
 		log.Printf("[viewer] session password rejected for device %s (remote %s)", cp.DeviceID, conn.RemoteAddr())
 		replyErr(conn, "invalid password")
 		conn.Close()
@@ -782,7 +768,6 @@ func main() {
 
 	configFile := flag.String("config", "", "path to YAML config file")
 	addr := flag.String("addr", cfg.Addr, "listen address")
-	password := flag.String("password", cfg.Password, "viewer connection password")
 	tlsCert := flag.String("tls-cert", cfg.TLSCert, "TLS certificate file")
 	tlsKey := flag.String("tls-key", cfg.TLSKey, "TLS key file")
 	staticDir := flag.String("static", cfg.Static, "client build directory")
@@ -799,9 +784,6 @@ func main() {
 		}
 	}
 
-	if *password == "" {
-		log.Fatal("config: password must be set (Layer 1 server password is required)")
-	}
 	tokens := cfg.Tokens
 	if len(tokens) == 0 {
 		log.Fatal("config: tokens must be set — add at least one device_id: secret entry under 'tokens:'")
@@ -820,7 +802,7 @@ func main() {
 		log.Printf("TURN enabled: %s (user=%s)", *turnURL, *turnUser)
 	}
 
-	hub := newHub(*password, tokens, iceServers)
+	hub := newHub(tokens, iceServers)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws/agent", hub.handleAgent)

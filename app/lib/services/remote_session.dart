@@ -63,7 +63,6 @@ class RemoteSession extends ChangeNotifier {
     required String serverURL,
     required String deviceID,
     required String password,
-    String serverPassword = '',
     bool allowSelfSigned = false,
   }) async {
     await disconnect();
@@ -93,7 +92,6 @@ class RemoteSession extends ChangeNotifier {
         'payload': {
           'device_id': deviceID,
           'password': password,
-          if (serverPassword.isNotEmpty) 'server_password': serverPassword,
         },
       }));
 

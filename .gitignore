@@ -1,6 +1,4 @@
 # ── 配置文件（含敏感信息，仅提交 .example 版本）──────────────
-server.yaml
-agent.yaml
 deploy/server.yaml
 deploy/agent.yaml
 
@@ -12,10 +10,6 @@ deploy/certs/*
 *.pem
 
 # ── 编译产物 ─────────────────────────────────────────────────
-/bin/
-server/static/
-server/server
-server/remotectl-server*
 deploy/bin/*
 !deploy/bin/.gitkeep
 deploy/static/*
