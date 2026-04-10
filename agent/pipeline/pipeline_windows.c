@@ -34,8 +34,10 @@ static volatile int     g_running   = 0;
 static HANDLE           g_thread    = NULL;
 static x264_t          *g_encoder   = NULL;
 static x264_picture_t   g_pic_in;
-static int              g_width     = 0;
-static int              g_height    = 0;
+static int              g_width     = 0;  // output (encoded) width
+static int              g_height    = 0;  // output (encoded) height
+static int              g_screen_w  = 0;  // physical screen width
+static int              g_screen_h  = 0;  // physical screen height
 static int              g_fps       = 15;
 static int              g_bitrate   = 1000000;
 
@@ -85,11 +87,23 @@ static DWORD WINAPI capture_thread(LPVOID param) {
     DWORD frame_ms = (g_fps > 0) ? (1000 / g_fps) : 66;
     DWORD pts = 0;
 
+    // When output size == screen size, use fast 1:1 BitBlt.
+    // When scale < 1, use StretchBlt with HALFTONE interpolation for quality.
+    int need_scale = (g_width != g_screen_w || g_height != g_screen_h);
+
     while (g_running) {
         DWORD t0 = GetTickCount();
 
-        // Capture
-        BitBlt(mem_dc, 0, 0, g_width, g_height, screen_dc, 0, 0, SRCCOPY | CAPTUREBLT);
+        // Capture (and scale if needed)
+        if (need_scale) {
+            SetStretchBltMode(mem_dc, HALFTONE);
+            SetBrushOrgEx(mem_dc, 0, 0, NULL);
+            StretchBlt(mem_dc, 0, 0, g_width, g_height,
+                       screen_dc, 0, 0, g_screen_w, g_screen_h,
+                       SRCCOPY | CAPTUREBLT);
+        } else {
+            BitBlt(mem_dc, 0, 0, g_width, g_height, screen_dc, 0, 0, SRCCOPY | CAPTUREBLT);
+        }
         GetDIBits(mem_dc, bmp, 0, g_height, bgr_buf, (BITMAPINFO *)&bi, DIB_RGB_COLORS);
         InterlockedIncrement((LONG volatile *)&g_cap_frames);
 
@@ -158,8 +172,10 @@ int rc_win_start(int width, int height, int fps, int bitrate) {
     EnterCriticalSection(&g_cs);
     if (g_running) { LeaveCriticalSection(&g_cs); return 1; }
 
-    g_width   = (width  > 0) ? width  : GetSystemMetrics(SM_CXSCREEN);
-    g_height  = (height > 0) ? height : GetSystemMetrics(SM_CYSCREEN);
+    g_screen_w = GetSystemMetrics(SM_CXSCREEN);
+    g_screen_h = GetSystemMetrics(SM_CYSCREEN);
+    g_width   = (width  > 0) ? width  : g_screen_w;
+    g_height  = (height > 0) ? height : g_screen_h;
     // x264 requires dimensions divisible by 2; round down if odd.
     g_width  &= ~1;
     g_height &= ~1;

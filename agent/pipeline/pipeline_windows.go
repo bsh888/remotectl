@@ -8,6 +8,7 @@ package pipeline
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <windows.h>
 
 int  rc_win_start(int width, int height, int fps, int bitrate);
 void rc_win_stop(void);
@@ -33,8 +34,23 @@ func CheckScreenRecording() bool { return true }
 func Start(scale float64, fps, bitrate int) (<-chan Frame, string) {
 	gFPS = fps
 	gFrameCh = make(chan Frame, 16)
-	_ = scale // dimensions are determined from GetSystemMetrics in C code
-	ret := int(C.rc_win_start(C.int(0), C.int(0), C.int(fps), C.int(bitrate)))
+
+	// Apply scale to reduce capture resolution (bandwidth / CPU savings).
+	// GetSystemMetrics(0/1) returns SM_CXSCREEN / SM_CYSCREEN.
+	screenW := int(C.GetSystemMetrics(0))
+	screenH := int(C.GetSystemMetrics(1))
+	if scale <= 0 {
+		scale = 1.0
+	}
+	w := int(float64(screenW)*scale) & ^1 // round down to even
+	h := int(float64(screenH)*scale) & ^1
+	if w <= 0 {
+		w = screenW & ^1
+	}
+	if h <= 0 {
+		h = screenH & ^1
+	}
+	ret := int(C.rc_win_start(C.int(w), C.int(h), C.int(fps), C.int(bitrate)))
 	if ret != 0 {
 		return gFrameCh, winError(ret)
 	}
