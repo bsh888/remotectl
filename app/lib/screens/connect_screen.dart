@@ -15,6 +15,7 @@ class ConnectScreen extends StatefulWidget {
 
 class _ConnectScreenState extends State<ConnectScreen> {
   final _serverCtrl = TextEditingController();
+  final _serverPassCtrl = TextEditingController();
   final _deviceCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   bool _selfSigned = false;
@@ -33,6 +34,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _serverCtrl.text = prefs.getString('server') ?? '';
+      _serverPassCtrl.text = prefs.getString('server_pass') ?? '';
       _deviceCtrl.text = prefs.getString('device') ?? '';
       _selfSigned = prefs.getBool('selfSigned') ?? false;
     });
@@ -41,6 +43,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
   Future<void> _savePrefs() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('server', _serverCtrl.text.trim());
+    await prefs.setString('server_pass', _serverPassCtrl.text);
     await prefs.setString('device', _deviceCtrl.text.trim());
     await prefs.setBool('selfSigned', _selfSigned);
   }
@@ -85,6 +88,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
       serverURL: server,
       deviceID: device,
       password: pass,
+      serverPassword: _serverPassCtrl.text,
       allowSelfSigned: _selfSigned,
     );
   }
@@ -102,6 +106,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
     _session.removeListener(_onSessionChanged);
     _session.dispose();
     _serverCtrl.dispose();
+    _serverPassCtrl.dispose();
     _deviceCtrl.dispose();
     _passCtrl.dispose();
     super.dispose();
@@ -238,6 +243,15 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                   keyboardType: TextInputType.url,
                                 ),
                                 const SizedBox(height: 16),
+                                _labeledField(
+                                  context: context,
+                                  label: '服务器密码',
+                                  controller: _serverPassCtrl,
+                                  hint: '服务端配置的 password（可选）',
+                                  icon: Icons.lock_outlined,
+                                  obscure: true,
+                                ),
+                                const SizedBox(height: 16),
 
                                 // Device row with refresh
                                 Row(
@@ -305,7 +319,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                   context: context,
                                   label: '会话密码',
                                   controller: _passCtrl,
-                                  hint: '被控端显示的6位数字',
+                                  hint: '被控端显示的8位数字',
                                   icon: Icons.lock_outline,
                                   obscure: true,
                                 ),

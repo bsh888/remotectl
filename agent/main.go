@@ -234,14 +234,52 @@ type chatFileReceiver struct {
 // for that ACK before sending the next batch.
 const chatFileAckWindow = 8
 
-// generateSessionPwd returns a random 6-digit numeric string used as the
+// generateSessionPwd returns a random 8-digit numeric string used as the
 // ephemeral session password viewers must provide to connect.
 func generateSessionPwd() string {
-	n, err := rand.Int(rand.Reader, big.NewInt(1_000_000))
+	n, err := rand.Int(rand.Reader, big.NewInt(100_000_000))
 	if err != nil {
-		return "000000"
+		return "00000000"
 	}
-	return fmt.Sprintf("%06d", n)
+	return fmt.Sprintf("%08d", n)
+}
+
+// deviceIDFilePath returns the path where the auto-generated device ID is persisted.
+func deviceIDFilePath() (string, error) {
+	// Windows: %APPDATA%\remotectl\device.id
+	if appdata := os.Getenv("APPDATA"); appdata != "" {
+		return filepath.Join(appdata, "remotectl", "device.id"), nil
+	}
+	// macOS / Linux: ~/.config/remotectl/device.id
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".config", "remotectl", "device.id"), nil
+}
+
+// loadOrGenerateDeviceID reads the persisted device ID or creates a new 9-digit one.
+func loadOrGenerateDeviceID() string {
+	path, err := deviceIDFilePath()
+	if err == nil {
+		if data, err := os.ReadFile(path); err == nil {
+			id := strings.TrimSpace(string(data))
+			if len(id) == 9 {
+				return id
+			}
+		}
+	}
+	// Generate: 100000000 – 999999999
+	n, err := rand.Int(rand.Reader, big.NewInt(900_000_000))
+	if err != nil {
+		n = big.NewInt(0)
+	}
+	id := fmt.Sprintf("%d", 100_000_000+n.Int64())
+	if path != "" {
+		_ = os.MkdirAll(filepath.Dir(path), 0o700)
+		_ = os.WriteFile(path, []byte(id), 0o600)
+	}
+	return id
 }
 
 // ── WebRTC helpers ─────────────────────────────────────────────────────────────
@@ -1078,7 +1116,7 @@ func main() {
 	retry := &retryDur
 
 	if *deviceID == "" {
-		log.Fatal("--id (or config id:) is required")
+		*deviceID = loadOrGenerateDeviceID()
 	}
 	if *name == "" {
 		*name = *deviceID

@@ -16,7 +16,6 @@ class HostedScreen extends StatefulWidget {
 
 class _HostedScreenState extends State<HostedScreen> {
   late final TextEditingController _serverCtrl;
-  late final TextEditingController _idCtrl;
   late final TextEditingController _tokenCtrl;
   late final TextEditingController _nameCtrl;
   late final TextEditingController _fpsCtrl;
@@ -34,7 +33,6 @@ class _HostedScreenState extends State<HostedScreen> {
     super.initState();
     final cfg = widget.agentService.config;
     _serverCtrl = TextEditingController(text: cfg.server);
-    _idCtrl = TextEditingController(text: cfg.id);
     _tokenCtrl = TextEditingController(text: cfg.token);
     _nameCtrl = TextEditingController(text: cfg.name);
     _fpsCtrl = TextEditingController(text: cfg.fps.toString());
@@ -55,8 +53,6 @@ class _HostedScreenState extends State<HostedScreen> {
     final cfg = widget.agentService.config;
     setState(() {
       _serverCtrl.text = cfg.server;
-      // Auto-fill device ID from hostname if not set
-      _idCtrl.text = cfg.id.isNotEmpty ? cfg.id : _defaultDeviceId();
       _tokenCtrl.text = cfg.token;
       _nameCtrl.text = cfg.name;
       _fpsCtrl.text = cfg.fps.toString();
@@ -65,14 +61,6 @@ class _HostedScreenState extends State<HostedScreen> {
       _scale = cfg.scale;
       _insecure = cfg.insecure;
     });
-  }
-
-  String _defaultDeviceId() {
-    try {
-      return Platform.localHostname.toLowerCase().replaceAll(' ', '-');
-    } catch (_) {
-      return '';
-    }
   }
 
   void _onAgentChanged() {
@@ -97,7 +85,6 @@ class _HostedScreenState extends State<HostedScreen> {
   void dispose() {
     widget.agentService.removeListener(_onAgentChanged);
     _serverCtrl.dispose();
-    _idCtrl.dispose();
     _tokenCtrl.dispose();
     _nameCtrl.dispose();
     _fpsCtrl.dispose();
@@ -109,7 +96,7 @@ class _HostedScreenState extends State<HostedScreen> {
 
   AgentConfig _buildConfig() => AgentConfig(
         server: _serverCtrl.text.trim(),
-        id: _idCtrl.text.trim(),
+        id: widget.agentService.config.id,
         token: _tokenCtrl.text.trim(),
         name: _nameCtrl.text.trim(),
         fps: int.tryParse(_fpsCtrl.text) ?? 30,
@@ -140,7 +127,7 @@ class _HostedScreenState extends State<HostedScreen> {
   }
 
   void _copyDeviceId() {
-    final id = _idCtrl.text.trim();
+    final id = widget.agentService.config.id;
     if (id.isEmpty) return;
     Clipboard.setData(ClipboardData(text: id));
     ScaffoldMessenger.of(context).showSnackBar(
@@ -295,13 +282,12 @@ class _HostedScreenState extends State<HostedScreen> {
                           children: [
                             // ── Device ID card ──
                             _DeviceIdCard(
-                              idController: _idCtrl,
+                              deviceId: svc.config.id,
                               status: svc.status,
                               error: svc.error,
                               sessionPwd: svc.sessionPassword,
                               onCopy: _copyDeviceId,
                               onCopyPwd: _copySessionPwd,
-                              enabled: !running,
                             ),
                             const SizedBox(height: 20),
 
@@ -859,23 +845,29 @@ class _GradientButton extends StatelessWidget {
 // ── Device ID card ─────────────────────────────────────────────────────────────
 
 class _DeviceIdCard extends StatelessWidget {
-  final TextEditingController idController;
+  final String deviceId;
   final AgentStatus status;
   final String error;
   final String sessionPwd;
   final VoidCallback onCopy;
   final VoidCallback onCopyPwd;
-  final bool enabled;
 
   const _DeviceIdCard({
-    required this.idController,
+    required this.deviceId,
     required this.status,
     required this.error,
     required this.sessionPwd,
     required this.onCopy,
     required this.onCopyPwd,
-    required this.enabled,
   });
+
+  /// Format 9-digit device ID as XXX XXX XXX for display.
+  static String _fmt(String id) {
+    if (id.length == 9) {
+      return '${id.substring(0, 3)} ${id.substring(3, 6)} ${id.substring(6)}';
+    }
+    return id;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -981,26 +973,14 @@ class _DeviceIdCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: TextField(
-                  controller: idController,
-                  enabled: enabled,
-                  autocorrect: false,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
+                child: Text(
+                  deviceId.isNotEmpty ? _fmt(deviceId) : '—',
+                  style: TextStyle(
+                    color: deviceId.isNotEmpty ? Colors.white : Colors.white24,
+                    fontSize: 26,
                     fontWeight: FontWeight.bold,
-                    letterSpacing: 1,
-                  ),
-                  decoration: InputDecoration(
-                    isDense: true,
-                    contentPadding: EdgeInsets.zero,
-                    border: InputBorder.none,
-                    hintText: '设备标识',
-                    hintStyle: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.20),
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    letterSpacing: 2,
+                    fontFamily: 'monospace',
                   ),
                 ),
               ),

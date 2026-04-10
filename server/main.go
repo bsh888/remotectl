@@ -111,8 +111,9 @@ type AuthPayload struct {
 }
 
 type ConnectPayload struct {
-	DeviceID string `json:"device_id"`
-	Password string `json:"password"`
+	DeviceID       string `json:"device_id"`
+	Password       string `json:"password"`
+	ServerPassword string `json:"server_password,omitempty"`
 }
 
 // ICEServerConfig is sent to both agent and viewer so they use the same ICE servers.
@@ -680,7 +681,15 @@ func (h *Hub) handleViewer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Look up the agent first so we can validate against its session password.
+	// Layer 1: server password (if configured, viewer must supply it).
+	if h.password != "" && cp.ServerPassword != h.password {
+		log.Printf("[viewer] server password rejected from %s", conn.RemoteAddr())
+		replyErr(conn, "invalid password")
+		conn.Close()
+		return
+	}
+
+	// Layer 2: look up device and validate session password.
 	h.mu.RLock()
 	agent, ok := h.agents[cp.DeviceID]
 	h.mu.RUnlock()
@@ -690,21 +699,9 @@ func (h *Hub) handleViewer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Password priority:
-	//  1. Agent session_pwd (ephemeral, generated per run) — preferred
-	//  2. Global server password from config — backward-compat fallback
-	//  3. Neither configured (dev mode) — accept all
-	var validPwd bool
-	switch {
-	case agent.sessionPwd != "":
-		validPwd = cp.Password == agent.sessionPwd
-	case h.password != "":
-		validPwd = cp.Password == h.password
-	default:
-		validPwd = true // dev mode: no password set anywhere
-	}
-	if !validPwd {
-		log.Printf("[viewer] password rejected for device %s (remote %s)", cp.DeviceID, conn.RemoteAddr())
+	// Session password: set by agent per run. If agent hasn't set one (dev mode), allow all.
+	if agent.sessionPwd != "" && cp.Password != agent.sessionPwd {
+		log.Printf("[viewer] session password rejected for device %s (remote %s)", cp.DeviceID, conn.RemoteAddr())
 		replyErr(conn, "invalid password")
 		conn.Close()
 		return

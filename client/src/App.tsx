@@ -7,9 +7,9 @@ export default function App() {
   const session = useRemoteSession()
   const [connectedDevice, setConnectedDevice] = useState('')
 
-  const handleConnect = (serverURL: string, deviceID: string, password: string) => {
+  const handleConnect = (serverURL: string, deviceID: string, password: string, serverPassword: string) => {
     setConnectedDevice(deviceID)
-    session.connect({ serverURL, deviceID, password })
+    session.connect({ serverURL, deviceID, password, serverPassword })
   }
 
   if (session.state === 'connected') {

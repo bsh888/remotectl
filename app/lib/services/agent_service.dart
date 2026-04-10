@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -79,11 +80,22 @@ class AgentService extends ChangeNotifier {
   Future<void> loadConfig() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString('agent_config');
-    if (raw == null) return;
-    try {
-      _config = AgentConfig.fromJson(jsonDecode(raw) as Map<String, dynamic>);
-      notifyListeners();
-    } catch (_) {}
+    if (raw != null) {
+      try {
+        _config = AgentConfig.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+      } catch (_) {}
+    }
+    // Auto-generate a persistent 9-digit device ID on first use.
+    if (_config.id.isEmpty) {
+      _config.id = _generateDeviceId();
+      await prefs.setString('agent_config', jsonEncode(_config.toJson()));
+    }
+    notifyListeners();
+  }
+
+  static String _generateDeviceId() {
+    final r = Random.secure();
+    return (100000000 + r.nextInt(900000000)).toString();
   }
 
   Future<void> saveConfig(AgentConfig cfg) async {
@@ -97,13 +109,6 @@ class AgentService extends ChangeNotifier {
 
   Future<void> start() async {
     if (isRunning) return;
-    if (_config.id.trim().isEmpty) {
-      _status = AgentStatus.error;
-      _error = '设备 ID 不能为空';
-      notifyListeners();
-      return;
-    }
-
     _status = AgentStatus.starting;
     _error = '';
     _logs.clear();
