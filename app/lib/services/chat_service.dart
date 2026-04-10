@@ -162,7 +162,11 @@ class ChatService extends ChatServiceBase {
       notifyListeners();
     };
     dc.onMessage = (RTCDataChannelMessage msg) {
-      if (!msg.isBinary) _handleIncoming(msg.text);
+      // Guard: handle both text and binary.
+      // Some iOS builds of flutter_webrtc deliver the peer's SendText as
+      // isBinary=true (raw bytes). Accept either form so no messages are lost.
+      final text = msg.isBinary ? utf8.decode(msg.binary) : msg.text;
+      if (text.isNotEmpty) _handleIncoming(text);
     };
   }
 

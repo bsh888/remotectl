@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -68,10 +69,27 @@ class _ChatPanelState extends State<ChatPanel> {
   }
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.platform.pickFiles(allowMultiple: false);
+    // On iOS, FilePicker may return path=null for iCloud/Files-app items.
+    // Request withData:true so bytes are always available as a fallback.
+    final needBytes = !kIsWeb && Platform.isIOS;
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: false,
+      withData: needBytes,
+    );
     if (result == null || result.files.isEmpty) return;
-    final path = result.files.first.path;
-    if (path != null) await widget.chat.sendFile(path);
+    final picked = result.files.first;
+    final path = picked.path;
+    if (path != null) {
+      await widget.chat.sendFile(path);
+    } else {
+      // iOS path unavailable — write bytes to a temp file and send from there.
+      final bytes = picked.bytes;
+      if (bytes == null || bytes.isEmpty) return;
+      final tmp = await Directory.systemTemp.createTemp('remotectl_');
+      final tmpFile = File('${tmp.path}/${picked.name}');
+      await tmpFile.writeAsBytes(bytes);
+      await widget.chat.sendFile(tmpFile.path);
+    }
   }
 
 
