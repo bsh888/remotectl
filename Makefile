@@ -165,16 +165,13 @@ untrust-cert:
 	@echo "Certificate removed from trust store."
 
 # ── 开发模式 ──────────────────────────────────
+# 需先复制配置文件：cp deploy/server.yaml.example deploy/server.yaml
 dev-server:
-	cd server && go run . \
-		--addr :8080 \
-		--password remotectl \
-		--static ../deploy/static
+	cd server && go run . --config ../deploy/server.yaml --addr :8080 --static ../deploy/static
 
 dev-server-tls:
-	cd server && go run . \
+	cd server && go run . --config ../deploy/server.yaml \
 		--addr :8443 \
-		--password remotectl \
 		--static ../deploy/static \
 		--tls-cert ../deploy/certs/server.crt \
 		--tls-key  ../deploy/certs/server.key

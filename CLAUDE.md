@@ -51,10 +51,11 @@ make all            # 全量构建
 
 ### server — 两层认证 (main.go)
 
-- Layer 1：viewer 发来的 `server_password` 字段 vs `h.password`（server.yaml `password`），先于设备查找进行校验
+- Layer 1：viewer 发来的 `server_password` 字段 vs `h.password`（server.yaml `password`，**必填**），先于设备查找进行校验
 - Layer 2：viewer 发来的 `password` 字段 vs `agent.sessionPwd`（8 位会话密码）
 - `ConnectPayload` 新增 `ServerPassword string json:"server_password,omitempty"`
-- 两层独立校验，旧客户端若未发送 `server_password` 且服务端配了密码则连接被拒
+- 两层均为强制校验，无 dev 模式：`password` 和 `tokens` 均必须配置，否则启动时 fatal
+- Agent 认证：仅支持 per-device tokens（`server.yaml` → `tokens: {device_id: secret}`），已移除 `agent_token` 全局 token 和 dev 模式（无 token 直接拒绝）
 
 ### agent — WebRTC SDP (main.go)
 

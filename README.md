@@ -194,31 +194,24 @@ cp deploy/server.yaml.example deploy/server.yaml
 `deploy/server.yaml` 内容说明：
 
 ```yaml
-addr:     ":8443"
+addr: ":8443"
 
-# Layer 1（服务器密码）：控制端连接服务器时必须提供此密码，防止未授权方扫描设备。
+# Layer 1（服务器密码，必填）：控制端连接服务器时必须提供此密码，防止未授权方扫描设备。
 # 控制端 App"服务器密码"字段 / Web 端"服务器密码"输入框填此值。
-# 留空 → 不检查（dev 模式，不推荐生产）。
 password: "your-server-password"
 
 # Layer 2（会话密码）：agent 每次启动自动生成 8 位随机数字，显示在"共享本机"页。
 # 由 agent 自动管理，此处无需配置。
 
-tls_cert: "/certs/server.crt"
-tls_key:  "/certs/server.key"
-static:   "/app/static"
+tls_cert: "./certs/server.crt"
+tls_key:  "./certs/server.key"
+static:   "./static"
 
-# Agent 认证（三选一）：
-#
-# 推荐：全局 token — 任意设备只要持有此 token 就能注册，新增设备无需改配置。
-#   App"共享本机"→"设备密钥"填这个值。
-agent_token: "replace-with-a-strong-secret"
-
-# 可选：按设备单独配置（优先级高于 agent_token，需要细粒度控制时使用）
-# tokens:
-#   123456789: "device-specific-secret"   # key = 9位设备 ID
-
-# 两者均留空 → dev 模式，接受所有 agent（仅本地开发）
+# Agent 认证（必填）：按设备 ID 单独配置 token。
+# key = 9 位设备 ID，value = 自定义强密钥（与 agent.yaml 中的 token 一致）。
+tokens:
+  123456789: "replace-with-a-strong-secret"
+# 987654321: "another-device-secret"
 
 # TURN 中继（移动网络 / 对称型 NAT 必须配置，否则出现 WebRTC connection failed）
 turn:
@@ -251,7 +244,7 @@ docker compose up -d
 | `turn.url` | `--turn-url` | TURN 服务器地址 | — |
 | `turn.user` | `--turn-user` | TURN 用户名 | — |
 | `turn.password` | `--turn-credential` | TURN 密码 | — |
-| `tokens` | — | 仅支持配置文件 | — |
+| `tokens` | — | 按设备 ID 配置 token（必填，仅配置文件） | — |
 
 ### 4. 配置并启动被控端
 
@@ -263,7 +256,7 @@ cp deploy/agent.yaml.example deploy/agent.yaml
 
 ```yaml
 server:   "https://your-server:8443"
-token:    "replace-with-a-strong-secret"   # 与 server.yaml agent_token 一致
+token:    "replace-with-a-strong-secret"   # 与 server.yaml tokens.<device_id> 一致
 name:     "My Mac"                         # 控制端显示的设备名称（可选）
 
 # id 字段可留空：首次运行自动生成 9 位随机数字 ID 并持久化到本地文件。
@@ -388,7 +381,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-app-win.ps1
 |------|------|------|
 | **服务器密码**（"远程控制"页） | `server.yaml` → `password` | Layer 1：访问信令服务器的密码，阻止未授权方扫描设备 |
 | **会话密码**（"远程控制"页） | 被控端每次启动自动生成 | Layer 2：8 位随机数字，显示在"共享本机"页，重启后更新 |
-| **设备密钥**（"共享本机"页） | `server.yaml` → `agent_token` | 被控端向服务器注册时的 HMAC 鉴权密钥（≠ 以上两个密码） |
+| **设备密钥**（"共享本机"页） | `server.yaml` → `tokens.<device_id>` | 被控端向服务器注册时的 HMAC 鉴权密钥（≠ 以上两个密码） |
 
 #### 设备 ID
 
