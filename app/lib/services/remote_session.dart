@@ -53,6 +53,7 @@ class RemoteSession extends ChangeNotifier {
 
     try {
       final uri = _wsUri(serverURL);
+      _ws = WebSocketChannel.connect(uri);
       _ws!.sink.add(jsonEncode({
         'type': 'connect',
         'payload': {
