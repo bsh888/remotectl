@@ -2,7 +2,17 @@
 # Copy to server.yaml and edit before starting.
 
 addr: ":8443"
-password: "your-viewer-password"   # 控制端 App 里的"服务器密码"
+
+# ── 两层认证密码 ───────────────────────────────────────────────────────────────
+#
+# Layer 1（服务器密码）：控制端连接信令服务器时必须提供此密码，用于阻止未授权方
+#   访问服务器上任何设备。控制端 App"服务器密码"字段 / Web 端"服务器密码"输入框。
+#   留空 → 不检查，任何人都能连接服务器（dev 模式，不推荐生产环境）。
+password: "your-server-password"
+
+# Layer 2（会话密码）：被控端每次启动时随机生成 8 位数字，显示在 App"共享本机"页面。
+#   控制端必须输入此密码才能连到具体设备，Layer 1 通过后才会检查 Layer 2。
+#   此密码由 agent 自动管理，服务端无需配置。
 
 tls_cert: "/certs/server.crt"
 tls_key:  "/certs/server.key"
@@ -16,13 +26,14 @@ agent_token: "replace-with-a-strong-secret"
 
 # 方式二：按设备单独配置 token（优先级高于 agent_token，可做精细权限控制）
 # tokens:
-#   my-mac: "mac-specific-secret"
-#   work-pc: "pc-specific-secret"
+#   123456789: "device-specific-secret"   # key = 9-digit device ID
+#   987654321: "another-device-secret"
 
 # 方式三：两者均留空 → dev 模式，接受所有 agent（仅本地开发用，不要用于生产）
 
 # ── TURN 中继 ─────────────────────────────────────────────────────────────────
-# 移动网络 / 对称型 NAT 必须配置，局域网可留空。
+# 移动网络 / 对称型 NAT 必须配置，否则会出现 "WebRTC connection failed"。
+# 局域网内使用可留空。
 turn:
   url:      ""          # e.g. turn:1.2.3.4:3478
   user:     "remotectl"

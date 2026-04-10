@@ -14,6 +14,8 @@
 - **TLS 加密传输**：信令通道全程 TLS，支持自签名证书
 - **自动重连**：被控端 pipeline 异常中断后自动重启，无需人工干预
 - **一体化桌面 App**：macOS/Windows/Linux 原生 App 同时内置"远程控制"和"共享本机"两种模式，一个程序搞定；iOS/Android 作纯控制端
+- **两层认证**：服务器密码（Layer 1）+ 每次启动随机生成的 8 位会话密码（Layer 2），防暴力猜测
+- **自动设备 ID**：被控端首次运行自动生成 9 位随机数字 ID 并持久化，无需手动配置
 - **YAML 配置文件**：服务端和 agent 均支持配置文件，无需记忆命令行参数
 - **Docker 部署**：服务器一键容器化部署
 
@@ -190,7 +192,14 @@ cp server.yaml.example server.yaml
 
 ```yaml
 addr:     ":8443"
-password: "your-viewer-password"   # 控制端 App 里的"服务器密码"
+
+# Layer 1（服务器密码）：控制端连接服务器时必须提供此密码，防止未授权方扫描设备。
+# 控制端 App"服务器密码"字段 / Web 端"服务器密码"输入框填此值。
+# 留空 → 不检查（dev 模式，不推荐生产）。
+password: "your-server-password"
+
+# Layer 2（会话密码）：agent 每次启动自动生成 8 位随机数字，显示在"共享本机"页。
+# 由 agent 自动管理，此处无需配置。
 
 tls_cert: "/certs/server.crt"
 tls_key:  "/certs/server.key"
@@ -204,12 +213,11 @@ agent_token: "replace-with-a-strong-secret"
 
 # 可选：按设备单独配置（优先级高于 agent_token，需要细粒度控制时使用）
 # tokens:
-#   my-mac: "mac-secret"
-#   work-pc: "pc-secret"
+#   123456789: "device-specific-secret"   # key = 9位设备 ID
 
 # 两者均留空 → dev 模式，接受所有 agent（仅本地开发）
 
-# TURN 中继（移动网络 / 对称型 NAT 必须配置，局域网可留空）
+# TURN 中继（移动网络 / 对称型 NAT 必须配置，否则出现 WebRTC connection failed）
 turn:
   url:      ""            # 例如 turn:1.2.3.4:3478
   user:     "remotectl"
@@ -252,9 +260,12 @@ cp agent.yaml.example agent.yaml
 
 ```yaml
 server:   "https://your-server:8443"
-id:       "my-mac"          # 与 server.yaml tokens 中的键一致
-token:    "replace-with-a-strong-secret"
-name:     "My Mac"          # 控制端显示的设备名称
+token:    "replace-with-a-strong-secret"   # 与 server.yaml agent_token 一致
+name:     "My Mac"                         # 控制端显示的设备名称（可选）
+
+# id 字段可留空：首次运行自动生成 9 位随机数字 ID 并持久化到本地文件。
+# 若需固定 ID（按设备配置 token 时），在此填入：
+# id: "123456789"
 
 fps:      30
 bitrate:  6000000           # 6 Mbps
@@ -285,7 +296,7 @@ insecure: false
 | 配置项 | Flag | 说明 | 默认值 |
 |--------|------|------|--------|
 | `server` | `--server` | 中继服务器地址 | 必填 |
-| `id` | `--id` | 设备唯一标识 | 必填 |
+| `id` | `--id` | 设备唯一标识（留空自动生成 9 位数字） | 自动生成 |
 | `token` | `--token` | 认证 token | — |
 | `name` | `--name` | 设备显示名称 | 同 id |
 | `ca_cert` | `--ca-cert` | 自签名 CA 证书路径 | — |
@@ -296,7 +307,14 @@ insecure: false
 
 ### 5. 浏览器访问
 
-打开 `https://your-server:8443`，输入服务器地址、设备 ID、**服务器密码**（即 `server.yaml` 中的 `password`）即可。
+打开 `https://your-server:8443`，填入：
+
+| 字段 | 来源 |
+|------|------|
+| 服务器地址 | 部署服务器的地址 |
+| **服务器密码** | `server.yaml` 中的 `password`（Layer 1） |
+| 设备 ID | 被控端 App"共享本机"页面显示的 9 位数字 |
+| **会话密码** | 被控端每次启动生成的 8 位数字（Layer 2） |
 
 ### 6. 原生客户端 App
 
@@ -361,17 +379,23 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-app-win.ps1
 
 #### App 密码说明
 
-App 中有两处密码，含义不同，请勿混淆：
+连接一台被控端需要两个密码，各自作用不同，请勿混淆：
 
-| 字段 | 对应配置 | 说明 |
-|------|---------|------|
-| **服务器密码**（"远程控制"标签页） | `server.yaml` → `password` | 访问信令服务器的密码，控制端与服务器之间 |
-| **设备密钥**（"共享本机"标签页） | `server.yaml` → `tokens.<id>` | 被控端向服务器注册时用于身份验证的 HMAC 密钥 |
+| 字段 | 来源 | 说明 |
+|------|------|------|
+| **服务器密码**（"远程控制"页） | `server.yaml` → `password` | Layer 1：访问信令服务器的密码，阻止未授权方扫描设备 |
+| **会话密码**（"远程控制"页） | 被控端每次启动自动生成 | Layer 2：8 位随机数字，显示在"共享本机"页，重启后更新 |
+| **设备密钥**（"共享本机"页） | `server.yaml` → `agent_token` | 被控端向服务器注册时的 HMAC 鉴权密钥（≠ 以上两个密码） |
 
-#### 设备 ID 自动生成
+#### 设备 ID
 
-App 首次启动时会自动以本机主机名作为设备 ID（转小写、空格转 `-`），无需手动填写。
-若需修改，在"共享本机"标签页顶部的设备卡片直接编辑，点击复制图标可复制 ID。
+首次运行时自动生成 9 位随机数字 ID（如 `372 918 405`），永久保存到本地：
+
+- macOS / Linux：`~/.config/remotectl/device.id`
+- Windows：`%APPDATA%\remotectl\device.id`
+
+ID 显示在"共享本机"页面顶部，点击复制图标可复制。如需固定 ID（例如按设备配置 token），
+在"共享本机" → **连接配置** 中指定，或通过 `agent.yaml` 的 `id:` 字段配置。
 
 #### CA 证书配置（被控端）
 
@@ -527,6 +551,15 @@ WARNING: Accessibility permission not granted — mouse/keyboard injection will 
 ---
 
 ## 安全说明
+
+### 两层身份认证
+
+连接一台被控设备需要通过两层独立校验：
+
+1. **Layer 1 — 服务器密码**：控制端必须知道 `server.yaml` 中的 `password` 才能与信令服务器交互，阻止未授权方枚举在线设备。
+2. **Layer 2 — 会话密码**：agent 每次启动随机生成 8 位数字（10⁸ 空间），控制端还需输入此密码才能接入具体设备。
+
+两者独立校验，只知道其中一个无法连接。设备 ID 为 9 位随机数（10⁹ 空间），首次运行自动生成，不再使用可猜测的主机名。
 
 ### 三条通道的加密机制
 

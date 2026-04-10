@@ -42,13 +42,19 @@ make all            # 全量构建
 - 设置了 `ExpectedFrameRate`、`DataRateLimits`（2× 目标码率/秒，防止关键帧突发）
 - `AllowFrameReordering = false`，保证低延迟
 
-### agent — 会话密码与认证
+### agent — 设备 ID 与会话密码
 
-- `generateSessionPwd()` 启动时生成 6 位随机数字密码
-- 打印 `SESSION_PWD:XXXXXX` 到 stdout，Flutter App 解析后在共享页面显示
-- viewer 连接时必须提供会话密码（`h.password` 字段）；server 校验后才放行
-- 认证失败时 agent 打印 `AUTH_FAILED:…` 到 stdout（Flutter App 解析后显示错误）并以 exit(1) 退出
+- 设备 ID：若 `--id` 为空，自动生成 9 位随机数（100000000–999999999），持久化到 `~/.config/remotectl/device.id`（Windows：`%APPDATA%\remotectl\device.id`）
+- `generateSessionPwd()` 启动时生成 **8 位**随机数字密码，打印 `SESSION_PWD:XXXXXXXX` 到 stdout
+- 认证失败时 agent 打印 `AUTH_FAILED:…` 到 stdout 并以 exit(1) 退出
 - Windows 进程清理：`ProcessSignal.sigkill`（`WidgetsBindingObserver.didChangeAppLifecycleState(detached)`）
+
+### server — 两层认证 (main.go)
+
+- Layer 1：viewer 发来的 `server_password` 字段 vs `h.password`（server.yaml `password`），先于设备查找进行校验
+- Layer 2：viewer 发来的 `password` 字段 vs `agent.sessionPwd`（8 位会话密码）
+- `ConnectPayload` 新增 `ServerPassword string json:"server_password,omitempty"`
+- 两层独立校验，旧客户端若未发送 `server_password` 且服务端配了密码则连接被拒
 
 ### agent — WebRTC SDP (main.go)
 

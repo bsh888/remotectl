@@ -2,9 +2,13 @@
 # Copy to agent.yaml and edit before starting.
 
 server:   "https://your-server:8443"
-id:       "my-mac"
-token:    "replace-with-a-strong-secret"  # must match server tokens.my-mac
-name:     "My Mac"
+token:    "replace-with-a-strong-secret"  # must match server agent_token or tokens.<id>
+name:     "My Mac"                        # display name shown in control app (optional)
+
+# id: ""   # Device ID is auto-generated on first run (9-digit number) and
+#           # persisted to ~/.config/remotectl/device.id (Linux/macOS) or
+#           # %APPDATA%\remotectl\device.id (Windows).
+#           # Override here only if you need a fixed ID.
 
 fps:      30
 bitrate:  3000000   # 3 Mbps
