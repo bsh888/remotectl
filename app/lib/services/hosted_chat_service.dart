@@ -122,6 +122,13 @@ class HostedChatService extends ChatServiceBase {
     final t = text.trim();
     if (t.isEmpty || !_connected) return;
     _onSend?.call(jsonEncode({'action': 'send_text', 'text': t}));
+    // Show the outgoing message locally immediately.
+    _messages.add(ChatMessage.text(
+      id: _uuid(),
+      sender: ChatSender.viewer, // "me" = right side
+      text: t,
+    ));
+    notifyListeners();
   }
 
   @override
@@ -131,6 +138,38 @@ class HostedChatService extends ChatServiceBase {
     if (!file.existsSync()) return;
     final name = file.uri.pathSegments.last;
     _onSend?.call(jsonEncode({'action': 'send_file', 'name': name, 'path': filePath}));
+    // Show the outgoing file locally immediately.
+    final mime = _guessMime(name);
+    final msgType = mime.startsWith('audio/') ? ChatMsgType.voice : ChatMsgType.file;
+    final stat = await file.stat();
+    final msg = ChatMessage.transfer(
+      id: _uuid(),
+      sender: ChatSender.viewer,
+      type: msgType,
+      fileName: name,
+      fileSize: stat.size,
+      mimeType: mime,
+      localPath: filePath,
+    );
+    msg.progress = 1.0;
+    _messages.add(msg);
+    notifyListeners();
+  }
+
+  static String _guessMime(String name) {
+    final ext = name.contains('.') ? name.split('.').last.toLowerCase() : '';
+    return switch (ext) {
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'png' => 'image/png',
+      'gif' => 'image/gif',
+      'webp' => 'image/webp',
+      'pdf' => 'application/pdf',
+      'txt' || 'md' => 'text/plain',
+      'mp4' || 'mov' => 'video/mp4',
+      'mp3' => 'audio/mpeg',
+      'wav' => 'audio/wav',
+      _ => 'application/octet-stream',
+    };
   }
 
   static String _uuid() {
