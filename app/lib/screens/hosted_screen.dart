@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/agent_service.dart';
+import 'chat_panel.dart';
 
 class HostedScreen extends StatefulWidget {
   final AgentService agentService;
@@ -26,6 +27,7 @@ class _HostedScreenState extends State<HostedScreen> {
 
   final _logScroll = ScrollController();
   bool _logExpanded = false;
+  bool _chatOpen = false;
 
   @override
   void initState() {
@@ -41,6 +43,7 @@ class _HostedScreenState extends State<HostedScreen> {
     _scale = cfg.scale;
 
     widget.agentService.addListener(_onAgentChanged);
+    widget.agentService.chat.addListener(_onChatChanged);
     widget.agentService.loadConfig().then((_) {
       if (!mounted) return;
       _syncFromConfig();
@@ -58,6 +61,10 @@ class _HostedScreenState extends State<HostedScreen> {
       _caCertCtrl.text = cfg.caCert;
       _scale = cfg.scale;
     });
+  }
+
+  void _onChatChanged() {
+    if (mounted) setState(() {});
   }
 
   void _onAgentChanged() {
@@ -80,6 +87,7 @@ class _HostedScreenState extends State<HostedScreen> {
 
   @override
   void dispose() {
+    widget.agentService.chat.removeListener(_onChatChanged);
     widget.agentService.removeListener(_onAgentChanged);
     _serverCtrl.dispose();
     _tokenCtrl.dispose();
@@ -493,16 +501,33 @@ class _HostedScreenState extends State<HostedScreen> {
                 // ── Start / Stop button (fixed, always visible) ──
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-                  child: _GradientButton(
-                    label: running ? '停止共享' : '开始共享',
-                    icon: running
-                        ? Icons.stop_circle_outlined
-                        : Icons.play_circle_outlined,
-                    onPressed: _startStop,
-                    isLoading: false,
-                    colors: running
-                        ? const [Color(0xFFB91C1C), Color(0xFF7F1D1D)]
-                        : const [Color(0xFF2563EB), Color(0xFF7C3AED)],
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _GradientButton(
+                          label: running ? '停止共享' : '开始共享',
+                          icon: running
+                              ? Icons.stop_circle_outlined
+                              : Icons.play_circle_outlined,
+                          onPressed: _startStop,
+                          isLoading: false,
+                          colors: running
+                              ? const [Color(0xFFB91C1C), Color(0xFF7F1D1D)]
+                              : const [Color(0xFF2563EB), Color(0xFF7C3AED)],
+                        ),
+                      ),
+                      if (widget.agentService.chat.isOpen) ...[
+                        const SizedBox(width: 8),
+                        _ChatIconButton(
+                          unread: widget.agentService.chat.unreadCount,
+                          active: _chatOpen,
+                          onTap: () {
+                            setState(() => _chatOpen = !_chatOpen);
+                            widget.agentService.chat.setPanelOpen(_chatOpen);
+                          },
+                        ),
+                      ],
+                    ],
                   ),
                 ),
 
@@ -622,6 +647,25 @@ class _HostedScreenState extends State<HostedScreen> {
               ],
             ),
           ),
+          if (_chatOpen)
+            Positioned(
+              top: 0,
+              right: 0,
+              bottom: 0,
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 8, 8, 8),
+                  child: ChatPanel(
+                    width: 300,
+                    chat: widget.agentService.chat,
+                    onClose: () {
+                      setState(() => _chatOpen = false);
+                      widget.agentService.chat.setPanelOpen(false);
+                    },
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -1052,6 +1096,86 @@ class _DeviceIdCard extends StatelessWidget {
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── Chat icon button ───────────────────────────────────────────────────────────
+
+class _ChatIconButton extends StatelessWidget {
+  final int unread;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _ChatIconButton({
+    required this.unread,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 52,
+      height: 52,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: active
+                    ? const [Color(0xFF1E3A8A), Color(0xFF1E40AF)]
+                    : [
+                        Colors.white.withValues(alpha: 0.08),
+                        Colors.white.withValues(alpha: 0.08),
+                      ],
+              ),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: active
+                    ? const Color(0xFF2563EB).withValues(alpha: 0.6)
+                    : Colors.white.withValues(alpha: 0.12),
+              ),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(12),
+                child: const Center(
+                  child: Icon(
+                    Icons.chat_bubble_outline_rounded,
+                    color: Colors.white70,
+                    size: 22,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (unread > 0)
+            Positioned(
+              top: -4,
+              right: -4,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  unread > 9 ? '9+' : '$unread',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

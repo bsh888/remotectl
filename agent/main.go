@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"crypto/hmac"
 	"crypto/rand"
@@ -501,6 +502,10 @@ func (a *Agent) handleChatDCMessage(viewerID string, dc *webrtc.DataChannel, msg
 		return
 	}
 	switch ev["type"] {
+	case "chat_open":
+		// Viewer opened their chat panel — tell the Flutter hosted screen.
+		fmt.Println(`CHAT_MSG:{"type":"chat_open"}`)
+
 	case "text":
 		text, _ := ev["text"].(string)
 		if text == "" {
@@ -508,6 +513,16 @@ func (a *Agent) handleChatDCMessage(viewerID string, dc *webrtc.DataChannel, msg
 		}
 		log.Printf("[chat] message from %s: %s", viewerID[:min(8, len(viewerID))], text)
 		showNotification("RemoteCtl 新消息", text)
+		// Forward to Flutter hosted screen via stdout.
+		if out, err := json.Marshal(map[string]interface{}{
+			"type": "text",
+			"from": "viewer",
+			"id":   ev["id"],
+			"text": text,
+			"ts":   ev["ts"],
+		}); err == nil {
+			fmt.Printf("CHAT_MSG:%s\n", out)
+		}
 
 	case "file_start":
 		id, _ := ev["id"].(string)
@@ -516,6 +531,17 @@ func (a *Agent) handleChatDCMessage(viewerID string, dc *webrtc.DataChannel, msg
 		mime, _ := ev["mime"].(string)
 		if id == "" || name == "" {
 			return
+		}
+		// Notify Flutter hosted screen.
+		if out, err := json.Marshal(map[string]interface{}{
+			"type": "file_start",
+			"from": "viewer",
+			"id":   id,
+			"name": name,
+			"size": int64(size),
+			"mime": mime,
+		}); err == nil {
+			fmt.Printf("CHAT_MSG:%s\n", out)
 		}
 		// Pre-allocate the buffer to the full expected size to avoid
 		// repeated reallocation and copying as chunks arrive.
@@ -587,6 +613,16 @@ func (a *Agent) saveChatFile(id string, rx *chatFileReceiver) {
 	}
 	log.Printf("[chat] saved: %s", path)
 	showNotification("RemoteCtl 文件已接收", name+" 已保存到下载目录")
+	// Notify Flutter hosted screen so it can show the "open file" button.
+	if out, err := json.Marshal(map[string]interface{}{
+		"type": "file_saved",
+		"from": "viewer",
+		"id":   id,
+		"name": filepath.Base(path),
+		"path": path,
+	}); err == nil {
+		fmt.Printf("CHAT_MSG:%s\n", out)
+	}
 }
 
 // chatDownloadsDir returns the best directory for saving received files.
@@ -599,6 +635,144 @@ func chatDownloadsDir() string {
 		}
 	}
 	return os.TempDir()
+}
+
+// randomHex8 returns a cryptographically random 8-character hex string
+// used as a message or file transfer ID.
+func randomHex8() string {
+	var b [4]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return fmt.Sprintf("%08x", time.Now().UnixNano()&0xffffffff)
+	}
+	return hex.EncodeToString(b[:])
+}
+
+// readStdinChatCommands reads CHAT_SEND: lines from stdin and forwards them
+// to all connected viewer DataChannels. This is how the Flutter hosted screen
+// sends chat messages and files without opening any network port.
+func (a *Agent) readStdinChatCommands() {
+	scanner := bufio.NewScanner(os.Stdin)
+	// Allow up to 16 MB lines for large file paths / base64 payloads.
+	scanner.Buffer(make([]byte, 16<<20), 16<<20)
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, "CHAT_SEND:") {
+			continue
+		}
+		payload := line[len("CHAT_SEND:"):]
+		var msg map[string]interface{}
+		if json.Unmarshal([]byte(payload), &msg) != nil {
+			continue
+		}
+		action, _ := msg["action"].(string)
+		switch action {
+		case "send_text":
+			text, _ := msg["text"].(string)
+			text = strings.TrimSpace(text)
+			if text == "" {
+				continue
+			}
+			id := randomHex8()
+			data, _ := json.Marshal(map[string]interface{}{
+				"type": "text",
+				"id":   id,
+				"text": text,
+				"ts":   time.Now().UnixMilli(),
+			})
+			a.broadcastChat(data)
+
+		case "send_file":
+			name, _ := msg["name"].(string)
+			path, _ := msg["path"].(string)
+			if name == "" || path == "" {
+				continue
+			}
+			go a.sendFileFromPath(name, path)
+		}
+	}
+}
+
+// sendFileFromPath reads a file and sends it to all viewer DataChannels in chunks.
+func (a *Agent) sendFileFromPath(name, path string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		log.Printf("[chat] cannot read file %q: %v", path, err)
+		return
+	}
+	mime := guessMimeFromName(name)
+	id := randomHex8()
+	start, _ := json.Marshal(map[string]interface{}{
+		"type": "file_start",
+		"id":   id,
+		"name": name,
+		"size": len(data),
+		"mime": mime,
+	})
+	a.broadcastChat(start)
+
+	const chunkSize = 12 * 1024
+	offset, seq := 0, 0
+	for offset < len(data) {
+		end := offset + chunkSize
+		if end > len(data) {
+			end = len(data)
+		}
+		chunk, _ := json.Marshal(map[string]interface{}{
+			"type": "file_chunk",
+			"id":   id,
+			"seq":  seq,
+			"data": base64.StdEncoding.EncodeToString(data[offset:end]),
+			"last": end >= len(data),
+		})
+		a.broadcastChat(chunk)
+		offset = end
+		seq++
+	}
+}
+
+// guessMimeFromName returns a MIME type based on the file extension.
+func guessMimeFromName(name string) string {
+	parts := strings.Split(name, ".")
+	if len(parts) < 2 {
+		return "application/octet-stream"
+	}
+	switch strings.ToLower(parts[len(parts)-1]) {
+	case "jpg", "jpeg":
+		return "image/jpeg"
+	case "png":
+		return "image/png"
+	case "gif":
+		return "image/gif"
+	case "webp":
+		return "image/webp"
+	case "pdf":
+		return "application/pdf"
+	case "txt", "md":
+		return "text/plain"
+	case "mp4", "mov":
+		return "video/mp4"
+	case "mp3":
+		return "audio/mpeg"
+	case "wav":
+		return "audio/wav"
+	}
+	return "application/octet-stream"
+}
+
+// broadcastChat sends a raw JSON chat message to every connected viewer's
+// chat DataChannel.
+func (a *Agent) broadcastChat(data []byte) {
+	a.chatMu.RLock()
+	dcs := make([]*webrtc.DataChannel, 0, len(a.chatDCs))
+	for _, dc := range a.chatDCs {
+		dcs = append(dcs, dc)
+	}
+	a.chatMu.RUnlock()
+	for _, dc := range dcs {
+		if dc.ReadyState() == webrtc.DataChannelStateOpen {
+			dc.SendText(string(data)) //nolint:errcheck
+		}
+	}
 }
 
 // enqueue marshals and queues a message for the write pump (non-blocking).
@@ -1129,6 +1303,10 @@ func main() {
 		chatDCs:    make(map[string]*webrtc.DataChannel),
 		fileRx:     make(map[string]*chatFileReceiver),
 	}
+
+	// Forward CHAT_SEND: commands from Flutter hosted screen to viewer DataChannels.
+	// No network port — uses the existing stdin pipe from the Flutter subprocess.
+	go agent.readStdinChatCommands()
 
 	// Machine-readable marker for the Flutter app to parse (do not change format)
 	fmt.Printf("SESSION_PWD:%s\n", sessionPwd)

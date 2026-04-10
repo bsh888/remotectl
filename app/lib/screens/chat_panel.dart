@@ -10,7 +10,7 @@ import '../services/chat_service.dart';
 // or inside a bottom sheet (mobile).
 
 class ChatPanel extends StatefulWidget {
-  final ChatService chat;
+  final ChatServiceBase chat;
   final VoidCallback onClose;
   /// Fixed width for the panel. If null, the panel fills available width
   /// (used when embedded in a bottom sheet on mobile).

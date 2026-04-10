@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'hosted_chat_service.dart';
 
 class AgentConfig {
   String server;
@@ -58,12 +59,14 @@ class AgentService extends ChangeNotifier {
   Process? _process;
   AgentConfig _config = AgentConfig();
   String _sessionPwd = '';
+  final _chatSvc = HostedChatService();
 
   AgentStatus get status => _status;
   String get error => _error;
   List<String> get logs => List.unmodifiable(_logs);
   AgentConfig get config => _config;
   String get sessionPassword => _sessionPwd;
+  HostedChatService get chat => _chatSvc;
   bool get isRunning =>
       _status == AgentStatus.running || _status == AgentStatus.starting;
 
@@ -121,6 +124,10 @@ class AgentService extends ChangeNotifier {
 
       _process = await Process.start(binary, args);
       _status = AgentStatus.running;
+      _chatSvc.setSendCallback((json) {
+        _process?.stdin.writeln('CHAT_SEND:$json');
+      });
+      _chatSvc.setConnected(true);
       notifyListeners();
 
       _process!.stdout
@@ -152,6 +159,7 @@ class AgentService extends ChangeNotifier {
     _status = AgentStatus.stopped;
     _error = '';
     _sessionPwd = '';
+    _chatSvc.setConnected(false);
     // On Windows, SIGTERM maps to a console event that may not reliably
     // terminate the subprocess; use SIGKILL (TerminateProcess) instead.
     final sig =
@@ -172,6 +180,10 @@ class AgentService extends ChangeNotifier {
     if (line.startsWith('SESSION_PWD:')) {
       _sessionPwd = line.substring('SESSION_PWD:'.length).trim();
       notifyListeners();
+      return;
+    }
+    if (line.startsWith('CHAT_MSG:')) {
+      _chatSvc.receive(line.substring('CHAT_MSG:'.length));
       return;
     }
     if (line.startsWith('AUTH_FAILED:')) {
@@ -225,6 +237,7 @@ class AgentService extends ChangeNotifier {
   @override
   void dispose() {
     stop();
+    _chatSvc.dispose();
     super.dispose();
   }
 }

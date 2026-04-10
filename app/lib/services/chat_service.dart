@@ -8,6 +8,20 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:path_provider/path_provider.dart';
 
+// ── Abstract base shared by ChatService and HostedChatService ─────────────────
+
+/// Abstract interface shared by ChatService (DataChannel) and
+/// HostedChatService (local WebSocket). ChatPanel accepts this type.
+abstract class ChatServiceBase extends ChangeNotifier {
+  List<ChatMessage> get messages;
+  bool get isOpen;
+  int get unreadCount;
+  bool get panelOpen;
+  void setPanelOpen(bool open);
+  Future<void> sendText(String text);
+  Future<void> sendFile(String path);
+}
+
 // ── Message models ─────────────────────────────────────────────────────────────
 
 enum ChatSender { viewer, agent }
@@ -109,7 +123,7 @@ const int _kWindowSize = 8;
 // Secondary back-pressure: also check bufferedAmount when available.
 const int _kHighWaterMark = 256 * 1024; // 256 KB
 
-class ChatService extends ChangeNotifier {
+class ChatService extends ChatServiceBase {
   final List<ChatMessage> _messages = [];
   RTCDataChannel? _dc;
   bool _dcOpen = false;
