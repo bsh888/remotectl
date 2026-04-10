@@ -87,14 +87,15 @@ make all            # 全量构建
 文件分块:  {"type":"file_chunk", "id":"<hex8>","seq":0,"data":"<base64>","last":false}
 最后分块:  {"type":"file_chunk", "id":"<hex8>","seq":N,"data":"<base64>","last":true}
 ACK:       {"type":"file_ack",   "id":"<hex8>"}   ← 每 8 个分块由 agent 回复一次
-chat_open: {"type":"chat_open"}                   ← Flutter 打开聊天面板时发送，agent 自动打开浏览器
+chat_open: {"type":"chat_open"}                   ← 控制端打开聊天面板时发送
 ```
 
 **流量控制**：Flutter 每发送 `_kWindowSize=8` 个分块后等待 `file_ack` 再继续（最大在途数据 ~96 KB）。
 Completer 必须在发送窗口**之前**注册，否则 ACK 可能在 `await _sendRaw()` 的 Dart 事件循环让步期间到达而被丢弃。
 
-**Flutter 端**
-- `ChatService`（`app/lib/services/chat_service.dart`）：ChangeNotifier，attach/detach DC，持有消息列表
+**控制端 Flutter（`remote_screen.dart` / `remote_screen_desktop.dart`）**
+- `ChatServiceBase`（`chat_service.dart`）：抽象基类，`ChatService` 和 `HostedChatService` 均继承它，`ChatPanel` 接受此类型
+- `ChatService`：ChangeNotifier，attach/detach DataChannel，持有消息列表
 - `RemoteSession` 在 `pc.onDataChannel` 中识别 label `"chat"` → `_chat.attach(channel)`
 - `session.chat` 暴露给 UI 层
 - 桌面（`remote_screen_desktop.dart`）：水平 pill 工具栏（控制面板 + 聊天按钮），`ChatPanel(width:300)` 固定宽右侧覆盖层
@@ -102,12 +103,36 @@ Completer 必须在发送窗口**之前**注册，否则 ACK 可能在 `await _s
 - 文件保存：macOS/Windows/Linux → `~/Downloads`，iOS/Android → App Documents
 - 语音录制功能已移除（`record`/`audioplayers` 包已从 pubspec.yaml 删除）
 
-**Agent 端**（`agent/main.go`，`agent/chatserver.go`，`agent/notify.go`）
+**被控端 Flutter（`hosted_screen.dart`）**
+- `HostedChatService`（`hosted_chat_service.dart`）：继承 `ChatServiceBase`，通过 stdio IPC 与 agent 通信，不开任何网络端口
+- `AgentService` 持有 `HostedChatService chat`，通过 `chat` getter 暴露给 UI
+- agent running 时 `chat.isOpen == true`，`hosted_screen.dart` 据此显示聊天按钮
+- 发送：`sendText` / `sendFile` 调用 `_onSend` 回调 → `AgentService` 写 `CHAT_SEND:<json>` 到 agent stdin；同时立即将消息插入本地列表（右侧显示）
+- 接收：`AgentService._appendLog` 解析 `CHAT_MSG:<json>` → `chat.receive(json)` → 追加到消息列表（左侧显示）
+
+**Agent stdio IPC 协议**（被控端 Flutter ↔ agent 子进程）
+
+```
+# agent → Flutter stdout
+CHAT_MSG:{"type":"text",       "from":"viewer","id":"…","text":"…","ts":…}
+CHAT_MSG:{"type":"file_start", "from":"viewer","id":"…","name":"…","size":…,"mime":"…"}
+CHAT_MSG:{"type":"file_saved", "from":"viewer","id":"…","name":"…","path":"/…/Downloads/…"}
+CHAT_MSG:{"type":"chat_open"}
+
+# Flutter → agent stdin
+CHAT_SEND:{"action":"send_text","text":"…"}
+CHAT_SEND:{"action":"send_file","name":"photo.jpg","path":"/…/photo.jpg"}
+```
+
+- `send_file`：agent 读本地文件，分 12 KB 块通过 DataChannel 广播给所有 viewer
+- `from="agent"` → 被控端自己发的（右侧蓝色）；`from="viewer"` → 控制端发来的（左侧灰色）
+
+**Agent 端**（`agent/main.go`，`agent/notify.go`）
 - `startRTC()` 中创建 `chat` DC，`handleChatDCMessage()` 处理收到的消息/文件
 - 收到文字/文件 → `showNotification()` 调用系统通知（macOS: osascript，Windows: PowerShell WinForms，Linux: notify-send）
+- 收到消息/文件时同时打印 `CHAT_MSG:` 到 stdout，供被控端 Flutter 显示
+- `readStdinChatCommands()`：goroutine 扫描 stdin，处理 `CHAT_SEND:` 命令
 - 文件保存到 `~/Downloads`，重名自动加时间戳后缀
-- `chatserver.go`：WebSocket 服务（浏览器聊天页面），含历史消息环形缓冲（最近 50 条），新连接自动回放
-- 浏览器聊天页面（`chat.html`）支持发送文件，base64 编码后通过 WebSocket 传给 agent 再中转到 Flutter
 
 **权限配置**
 - iOS `Info.plist`：`NSCameraUsageDescription`、`NSMicrophoneUsageDescription`、`NSLocalNetworkUsageDescription`、`NSBonjourServices`
