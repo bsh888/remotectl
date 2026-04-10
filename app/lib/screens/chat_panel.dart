@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../services/chat_service.dart';
 
@@ -221,20 +222,59 @@ class _ChatPanelState extends State<ChatPanel> {
   // ── Text bubble ───────────────────────────────────────────────────────────
 
   Widget _textBubble(ChatMessage msg, bool isMe) {
-    return Container(
-      constraints: const BoxConstraints(maxWidth: 220),
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-      decoration: BoxDecoration(
-        color: isMe ? const Color(0xFF2563EB) : Colors.white12,
-        borderRadius: BorderRadius.circular(14).copyWith(
-          bottomRight: isMe ? const Radius.circular(3) : null,
-          bottomLeft: isMe ? null : const Radius.circular(3),
+    final text = msg.text ?? '';
+    return GestureDetector(
+      onLongPress: () => _copyToClipboard(text),
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 220),
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+        decoration: BoxDecoration(
+          color: isMe ? const Color(0xFF2563EB) : Colors.white12,
+          borderRadius: BorderRadius.circular(14).copyWith(
+            bottomRight: isMe ? const Radius.circular(3) : null,
+            bottomLeft: isMe ? null : const Radius.circular(3),
+          ),
+        ),
+        child: SelectableText(
+          text,
+          style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.4),
+          contextMenuBuilder: (context, editableTextState) =>
+              _buildContextMenu(context, editableTextState, text),
         ),
       ),
-      child: Text(
-        msg.text ?? '',
-        style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.4),
+    );
+  }
+
+  void _copyToClipboard(String text) {
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      const SnackBar(
+        content: Text('已复制'),
+        duration: Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
       ),
+    );
+  }
+
+  Widget _buildContextMenu(
+    BuildContext context,
+    EditableTextState editableTextState,
+    String fullText,
+  ) {
+    final anchor = editableTextState.contextMenuAnchors.primaryAnchor;
+    final buttons = [
+      ...editableTextState.contextMenuButtonItems,
+      ContextMenuButtonItem(
+        label: '复制全部',
+        onPressed: () {
+          ContextMenuController.removeAny();
+          _copyToClipboard(fullText);
+        },
+      ),
+    ];
+    return AdaptiveTextSelectionToolbar.buttonItems(
+      anchors: TextSelectionToolbarAnchors(primaryAnchor: anchor),
+      buttonItems: buttons,
     );
   }
 
