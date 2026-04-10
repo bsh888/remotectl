@@ -160,6 +160,9 @@ int rc_win_start(int width, int height, int fps, int bitrate) {
 
     g_width   = (width  > 0) ? width  : GetSystemMetrics(SM_CXSCREEN);
     g_height  = (height > 0) ? height : GetSystemMetrics(SM_CYSCREEN);
+    // x264 requires dimensions divisible by 2; round down if odd.
+    g_width  &= ~1;
+    g_height &= ~1;
     g_fps     = (fps    > 0) ? fps    : 15;
     g_bitrate = bitrate;
 

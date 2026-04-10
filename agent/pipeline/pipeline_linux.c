@@ -191,6 +191,9 @@ int rc_linux_start(int fps, int bitrate) {
     g_width     = DisplayWidth(dpy, screen);
     g_height    = DisplayHeight(dpy, screen);
     XCloseDisplay(dpy);
+    // x264 requires dimensions divisible by 2; round down if odd.
+    g_width  &= ~1;
+    g_height &= ~1;
 
     g_fps     = (fps     > 0) ? fps     : 15;
     g_bitrate = (bitrate > 0) ? bitrate : 1000000;
