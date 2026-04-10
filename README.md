@@ -352,7 +352,7 @@ flutter run              # Android / iOS（连接手机后自动选择）
 前提：Xcode Command Line Tools、Flutter
 ```bash
 ./scripts/build-app-mac.sh
-# 输出：bin/remotectl-macos.zip
+# 输出：deploy/bin/remotectl-macos.zip
 # 发布：将 zip 拷贝到目标 Mac，解压后双击 remotectl.app 即可运行
 ```
 
@@ -361,7 +361,7 @@ flutter run              # Android / iOS（连接手机后自动选择）
 前提：Go（.msi）、MSYS2 MinGW-w64（`C:\msys64\mingw64\bin` 在 PATH）、Flutter、开发者模式已开启
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\build-app-win.ps1
-# 输出：bin\remotectl-windows-amd64.zip
+# 输出：deploy\bin\remotectl-windows-amd64.zip
 # 发布：将 zip 拷贝到目标 Windows，解压后运行 remotectl.exe 即可
 ```
 
@@ -373,7 +373,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-app-win.ps1
 前提：GCC、libx264-dev、libX11-dev、Flutter
 ```bash
 ./scripts/build-app-linux.sh
-# 输出：bin/remotectl-linux-amd64.tar.gz
+# 输出：deploy/bin/remotectl-linux-amd64.tar.gz
 # 发布：将 tar.gz 拷贝到目标 Linux，解压后运行 bundle/remotectl 即可
 ```
 
