@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react'
-import type { DeviceInfo } from '../types'
 
 interface Props {
   onConnect: (serverURL: string, deviceID: string, password: string) => void
-  onFetchDevices: (serverURL: string) => Promise<void>
-  devices: DeviceInfo[]
   error: string
   connecting: boolean
 }
 
-export default function ConnectPanel({ onConnect, onFetchDevices, devices, error, connecting }: Props) {
+export default function ConnectPanel({ onConnect, error, connecting }: Props) {
   const [serverURL, setServerURL] = useState(() => localStorage.getItem('rc_server') ?? 'http://localhost:8080')
   const [deviceID, setDeviceID] = useState(() => localStorage.getItem('rc_device') ?? '')
   const [password, setPassword] = useState('')
@@ -26,8 +23,6 @@ export default function ConnectPanel({ onConnect, onFetchDevices, devices, error
     e.preventDefault()
     onConnect(serverURL, deviceID, password)
   }
-
-  const handleRefresh = () => onFetchDevices(serverURL)
 
   return (
     <div style={styles.container}>
@@ -47,38 +42,14 @@ export default function ConnectPanel({ onConnect, onFetchDevices, devices, error
 
           <label style={styles.label}>
             设备 ID
-            <div style={{ display: 'flex', gap: 8 }}>
-              <input
-                style={{ ...styles.input, flex: 1 }}
-                value={deviceID}
-                onChange={e => setDeviceID(e.target.value)}
-                placeholder="office-mac"
-                required
-              />
-              <button type="button" style={styles.btnSecondary} onClick={handleRefresh}>
-                刷新
-              </button>
-            </div>
+            <input
+              style={styles.input}
+              value={deviceID}
+              onChange={e => setDeviceID(e.target.value)}
+              placeholder="9位数字设备ID"
+              required
+            />
           </label>
-
-          {devices.length > 0 && (
-            <div style={styles.deviceList}>
-              {devices.map(d => (
-                <div
-                  key={d.id}
-                  style={styles.deviceItem}
-                  onClick={() => setDeviceID(d.id)}
-                >
-                  <span style={styles.dot} />
-                  <span style={{ flex: 1 }}>{d.name || d.id}</span>
-                  <span style={styles.badge}>{d.platform}</span>
-                  {d.viewer_count > 0 && (
-                    <span style={styles.viewerBadge}>{d.viewer_count} 人连接</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
 
           <label style={styles.label}>
             连接密码
@@ -156,52 +127,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     cursor: 'pointer',
     marginTop: 4,
-  },
-  btnSecondary: {
-    background: '#334155',
-    color: '#e2e8f0',
-    border: 'none',
-    borderRadius: 6,
-    padding: '10px 14px',
-    fontSize: 13,
-    cursor: 'pointer',
-  },
-  deviceList: {
-    border: '1px solid #334155',
-    borderRadius: 6,
-    overflow: 'hidden',
-  },
-  deviceItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 10,
-    padding: '10px 12px',
-    cursor: 'pointer',
-    fontSize: 13,
-    borderBottom: '1px solid #1e293b',
-    background: '#0f172a',
-    transition: 'background 0.15s',
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: '50%',
-    background: '#22c55e',
-    flexShrink: 0,
-  },
-  badge: {
-    fontSize: 11,
-    background: '#334155',
-    padding: '2px 6px',
-    borderRadius: 4,
-    color: '#94a3b8',
-  },
-  viewerBadge: {
-    fontSize: 11,
-    background: '#1d4ed8',
-    padding: '2px 6px',
-    borderRadius: 4,
-    color: '#bfdbfe',
   },
   error: {
     background: '#450a0a',

@@ -11,38 +11,15 @@ import 'crypto_service.dart';
 
 enum SessionState { idle, connecting, connected, error }
 
-class DeviceInfo {
-  final String id;
-  final String name;
-  final String platform;
-  final int viewerCount;
-
-  const DeviceInfo({
-    required this.id,
-    required this.name,
-    required this.platform,
-    required this.viewerCount,
-  });
-
-  factory DeviceInfo.fromJson(Map<String, dynamic> j) => DeviceInfo(
-        id: j['id'] as String,
-        name: (j['name'] as String?) ?? j['id'] as String,
-        platform: (j['platform'] as String?) ?? '',
-        viewerCount: (j['viewer_count'] as int?) ?? 0,
-      );
-}
-
 class RemoteSession extends ChangeNotifier {
   SessionState _state = SessionState.idle;
   String _error = '';
   RTCVideoRenderer? _renderer;
-  List<DeviceInfo> _devices = [];
   final ChatService _chat = ChatService();
 
   SessionState get state => _state;
   String get error => _error;
   RTCVideoRenderer? get renderer => _renderer;
-  List<DeviceInfo> get devices => _devices;
   ChatService get chat => _chat;
 
   WebSocketChannel? _ws;
@@ -167,32 +144,6 @@ class RemoteSession extends ChangeNotifier {
       final data = await _crypto.encrypt(Uint8List.fromList(plaintext));
       ws.sink.add(jsonEncode({'type': 'input_enc', 'payload': {'data': data}}));
     } catch (_) {}
-  }
-
-  // ── fetchDevices ─────────────────────────────────────────────────────────────
-
-  Future<void> fetchDevices(String serverURL, {bool allowSelfSigned = false}) async {
-    try {
-      final uri = Uri.parse(serverURL).replace(path: '/api/devices');
-      final client = HttpClient()
-        ..connectionTimeout = const Duration(seconds: 10);
-      if (allowSelfSigned) {
-        client.badCertificateCallback = (cert, host, port) => true;
-      }
-      final body = await client.getUrl(uri)
-          .then((req) => req.close())
-          .then((res) => res.transform(utf8.decoder).join())
-          .timeout(const Duration(seconds: 10));
-      client.close();
-      final list = jsonDecode(body) as List<dynamic>;
-      _devices = list
-          .map((e) => DeviceInfo.fromJson(e as Map<String, dynamic>))
-          .toList();
-      notifyListeners();
-    } catch (_) {
-      _devices = [];
-      notifyListeners();
-    }
   }
 
   // ── WebSocket message handler ─────────────────────────────────────────────────

@@ -6,7 +6,7 @@ import {
   generateKeyPair,
   type ECDHKeyPair,
 } from '../crypto'
-import type { ConnectionState, DeviceInfo, InputEvent, WsMessage } from '../types'
+import type { ConnectionState, InputEvent, WsMessage } from '../types'
 
 interface SessionOptions {
   serverURL: string
@@ -18,11 +18,9 @@ interface RemoteSession {
   state: ConnectionState
   error: string
   videoStream: MediaStream | null
-  devices: DeviceInfo[]
   connect: (opts: SessionOptions) => void
   disconnect: () => void
   sendInput: (e: InputEvent) => void
-  fetchDevices: (serverURL: string) => Promise<void>
 }
 
 interface E2EEState {
@@ -41,8 +39,6 @@ export function useRemoteSession(): RemoteSession {
   const [state, setState] = useState<ConnectionState>('idle')
   const [error, setError] = useState('')
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null)
-  const [devices, setDevices] = useState<DeviceInfo[]>([])
-
   const disconnect = useCallback(() => {
     inputDC.current = null
     inputMoveDC.current = null
@@ -233,21 +229,10 @@ export function useRemoteSession(): RemoteSession {
     }
   }, [])
 
-  const fetchDevices = useCallback(async (serverURL: string) => {
-    try {
-      const u = new URL('/api/devices', serverURL)
-      const res = await fetch(u.toString())
-      const data: DeviceInfo[] = await res.json()
-      setDevices(data)
-    } catch {
-      setDevices([])
-    }
-  }, [])
-
   useEffect(() => () => {
     pc.current?.close()
     ws.current?.close()
   }, [])
 
-  return { state, error, videoStream, devices, connect, disconnect, sendInput, fetchDevices }
+  return { state, error, videoStream, connect, disconnect, sendInput }
 }

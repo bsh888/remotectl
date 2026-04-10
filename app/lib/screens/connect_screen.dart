@@ -18,7 +18,6 @@ class _ConnectScreenState extends State<ConnectScreen> {
   final _deviceCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
   bool _selfSigned = false;
-  bool _loadingDevices = false;
 
   final _session = RemoteSession();
 
@@ -52,23 +51,18 @@ class _ConnectScreenState extends State<ConnectScreen> {
       final isDesktop =
           Platform.isMacOS || Platform.isWindows || Platform.isLinux;
       final deviceID = _deviceCtrl.text.trim();
-      final deviceInfo = _session.devices.firstWhere(
-        (d) => d.id == deviceID,
-        orElse: () => DeviceInfo(
-            id: deviceID, name: deviceID, platform: '', viewerCount: 0),
-      );
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => isDesktop
               ? RemoteScreenDesktop(
                   session: _session,
-                  deviceName: deviceInfo.name,
-                  remotePlatform: deviceInfo.platform,
+                  deviceName: deviceID,
+                  remotePlatform: '',
                 )
               : RemoteScreen(
                   session: _session,
-                  deviceName: deviceInfo.name,
-                  remotePlatform: deviceInfo.platform,
+                  deviceName: deviceID,
+                  remotePlatform: '',
                 ),
         ),
       );
@@ -87,14 +81,6 @@ class _ConnectScreenState extends State<ConnectScreen> {
       password: pass,
       allowSelfSigned: _selfSigned,
     );
-  }
-
-  Future<void> _loadDevices() async {
-    final server = _serverCtrl.text.trim();
-    if (server.isEmpty) return;
-    setState(() => _loadingDevices = true);
-    await _session.fetchDevices(server, allowSelfSigned: _selfSigned);
-    setState(() => _loadingDevices = false);
   }
 
   @override
@@ -238,65 +224,13 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                   keyboardType: TextInputType.url,
                                 ),
                                 const SizedBox(height: 16),
-                                // Device row with refresh
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Expanded(
-                                      child: _labeledField(
-                                        context: context,
-                                        label: '设备 ID',
-                                        controller: _deviceCtrl,
-                                        hint: 'my-mac',
-                                        icon: Icons.computer_outlined,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    SizedBox(
-                                      width: 48,
-                                      height: 48,
-                                      child: _loadingDevices
-                                          ? Center(
-                                              child: SizedBox(
-                                                width: 20,
-                                                height: 20,
-                                                child: CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  color: primary,
-                                                ),
-                                              ),
-                                            )
-                                          : Tooltip(
-                                              message: '获取设备列表',
-                                              child: Material(
-                                                color: Colors.white.withValues(alpha: 0.06),
-                                                borderRadius: BorderRadius.circular(10),
-                                                child: InkWell(
-                                                  onTap: _loadDevices,
-                                                  borderRadius: BorderRadius.circular(10),
-                                                  child: Icon(
-                                                    Icons.refresh_rounded,
-                                                    color: Colors.white.withValues(alpha: 0.54),
-                                                    size: 20,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                    ),
-                                  ],
+                                _labeledField(
+                                  context: context,
+                                  label: '设备 ID',
+                                  controller: _deviceCtrl,
+                                  hint: '9位数字设备ID',
+                                  icon: Icons.computer_outlined,
                                 ),
-
-                                // Device list
-                                if (_session.devices.isNotEmpty) ...[
-                                  const SizedBox(height: 8),
-                                  _DeviceList(
-                                    devices: _session.devices,
-                                    selected: _deviceCtrl.text,
-                                    onTap: (id) =>
-                                        setState(() => _deviceCtrl.text = id),
-                                  ),
-                                ],
-
                                 const SizedBox(height: 16),
 
                                 // Password
@@ -584,151 +518,3 @@ class _GlowOrb extends StatelessWidget {
   }
 }
 
-// ── Device list ────────────────────────────────────────────────────────────────
-
-class _DeviceList extends StatelessWidget {
-  final List<DeviceInfo> devices;
-  final String selected;
-  final ValueChanged<String> onTap;
-
-  const _DeviceList({
-    required this.devices,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-    return Column(
-      children: devices.map((d) {
-        final isSelected = d.id == selected;
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? primary.withValues(alpha: 0.10)
-                  : Colors.white.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isSelected
-                    ? primary.withValues(alpha: 0.30)
-                    : Colors.white.withValues(alpha: 0.08),
-              ),
-            ),
-            child: Material(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(10),
-              child: InkWell(
-                onTap: () => onTap(d.id),
-                borderRadius: BorderRadius.circular(10),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 10),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? primary.withValues(alpha: 0.20)
-                              : Colors.white.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          _platformIcon(d.platform),
-                          size: 16,
-                          color: isSelected
-                              ? primary
-                              : Colors.white.withValues(alpha: 0.54),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              d.name.isNotEmpty ? d.name : d.id,
-                              style: TextStyle(
-                                color: isSelected
-                                    ? Colors.white
-                                    : Colors.white.withValues(alpha: 0.70),
-                                fontWeight: isSelected
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
-                                fontSize: 14,
-                              ),
-                            ),
-                            if (d.id != d.name)
-                              Text(
-                                d.id,
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.38),
-                                  fontSize: 11,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      if (d.viewerCount > 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 7, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: Colors.greenAccent.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: Colors.greenAccent.withValues(alpha: 0.30),
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 5,
-                                height: 5,
-                                decoration: const BoxDecoration(
-                                  color: Colors.greenAccent,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${d.viewerCount}',
-                                style: const TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.greenAccent,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  static IconData _platformIcon(String platform) {
-    switch (platform.toLowerCase()) {
-      case 'darwin':
-        return Icons.laptop_mac;
-      case 'windows':
-        return Icons.laptop_windows;
-      case 'linux':
-        return Icons.computer;
-      default:
-        return Icons.devices_other_rounded;
-    }
-  }
-}

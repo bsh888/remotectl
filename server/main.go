@@ -173,13 +173,6 @@ type InputEncAgentPayload struct {
 	Data     string `json:"data"`
 }
 
-type DeviceInfo struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Platform    string `json:"platform"`
-	ViewerCount int    `json:"viewer_count"`
-}
-
 // ── Config file ──────────────────────────────────────────────────────────────
 
 type TURNConfig struct {
@@ -704,25 +697,6 @@ func (h *Hub) handleViewer(w http.ResponseWriter, r *http.Request) {
 	viewer.readPump()
 }
 
-func (h *Hub) handleDevices(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-
-	h.mu.RLock()
-	list := make([]DeviceInfo, 0, len(h.agents))
-	for _, a := range h.agents {
-		list = append(list, DeviceInfo{
-			ID:          a.id,
-			Name:        a.name,
-			Platform:    a.platform,
-			ViewerCount: a.viewerCount(),
-		})
-	}
-	h.mu.RUnlock()
-
-	json.NewEncoder(w).Encode(list)
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 func marshalMsg(msgType string, payload any) []byte {
@@ -807,7 +781,6 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws/agent", hub.handleAgent)
 	mux.HandleFunc("/ws/viewer", hub.handleViewer)
-	mux.HandleFunc("/api/devices", hub.handleDevices)
 	mux.Handle("/", http.FileServer(http.Dir(*staticDir)))
 
 	srv := &http.Server{Addr: *addr, Handler: mux}

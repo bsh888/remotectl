@@ -13,14 +13,13 @@ export default function App() {
   }
 
   if (session.state === 'connected') {
-    const deviceInfo = session.devices.find(d => d.id === connectedDevice)
     return (
       <RemoteScreen
         videoStream={session.videoStream}
         onInput={session.sendInput}
         onDisconnect={session.disconnect}
         deviceName={connectedDevice}
-        remotePlatform={deviceInfo?.platform ?? ''}
+        remotePlatform=''
       />
     )
   }
@@ -28,8 +27,6 @@ export default function App() {
   return (
     <ConnectPanel
       onConnect={handleConnect}
-      onFetchDevices={session.fetchDevices}
-      devices={session.devices}
       error={session.error}
       connecting={session.state === 'connecting'}
     />
