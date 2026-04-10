@@ -244,6 +244,19 @@ func generateSessionPwd() string {
 	return fmt.Sprintf("%08d", n)
 }
 
+// isValidDeviceID reports whether id is a valid 9-digit numeric device ID.
+func isValidDeviceID(id string) bool {
+	if len(id) != 9 {
+		return false
+	}
+	for _, c := range id {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
+}
+
 // deviceIDFilePath returns the path where the auto-generated device ID is persisted.
 func deviceIDFilePath() (string, error) {
 	// Windows: %APPDATA%\remotectl\device.id
@@ -1115,7 +1128,7 @@ func main() {
 	}
 	retry := &retryDur
 
-	if *deviceID == "" {
+	if !isValidDeviceID(*deviceID) {
 		*deviceID = loadOrGenerateDeviceID()
 	}
 	if *name == "" {

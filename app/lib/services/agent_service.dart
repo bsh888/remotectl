@@ -85,13 +85,16 @@ class AgentService extends ChangeNotifier {
         _config = AgentConfig.fromJson(jsonDecode(raw) as Map<String, dynamic>);
       } catch (_) {}
     }
-    // Auto-generate a persistent 9-digit device ID on first use.
-    if (_config.id.isEmpty) {
+    // Ensure device ID is a 9-digit number. Migrate legacy hostname-style IDs.
+    if (!_isValidDeviceId(_config.id)) {
       _config.id = _generateDeviceId();
       await prefs.setString('agent_config', jsonEncode(_config.toJson()));
     }
     notifyListeners();
   }
+
+  static bool _isValidDeviceId(String id) =>
+      RegExp(r'^\d{9}$').hasMatch(id);
 
   static String _generateDeviceId() {
     final r = Random.secure();
