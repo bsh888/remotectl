@@ -1,7 +1,7 @@
 .PHONY: all server server-mac server-win server-linux \
         agent-mac agent-win agent-linux \
         app-mac app-win app-linux \
-        client dev-server dev-client tidy cert clean
+        client dev-server dev-client tidy cert trust-cert untrust-cert clean
 
 # ── 完整构建 ──────────────────────────────────
 # agent-* 需要对应平台的 CGO 工具链，单独调用：
@@ -165,11 +165,8 @@ untrust-cert:
 	@echo "Certificate removed from trust store."
 
 # ── 开发模式 ──────────────────────────────────
-# 需先复制配置文件：cp deploy/server.yaml.example deploy/server.yaml
+# 需先：make cert && cp deploy/server.yaml.example deploy/server.yaml
 dev-server:
-	cd server && go run . --config ../deploy/server.yaml --addr :8080 --static ../deploy/static
-
-dev-server-tls:
 	cd server && go run . --config ../deploy/server.yaml \
 		--addr :8443 \
 		--static ../deploy/static \

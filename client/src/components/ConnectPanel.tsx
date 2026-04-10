@@ -35,7 +35,7 @@ export default function ConnectPanel({ onConnect, error, connecting }: Props) {
               style={styles.input}
               value={serverURL}
               onChange={e => setServerURL(e.target.value)}
-              placeholder="http://your-server:8080"
+              placeholder="https://your-server:8443"
               required
             />
           </label>

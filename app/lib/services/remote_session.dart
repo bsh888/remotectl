@@ -40,7 +40,7 @@ class RemoteSession extends ChangeNotifier {
     required String serverURL,
     required String deviceID,
     required String password,
-    bool allowSelfSigned = false,
+    String caCertPath = '',
   }) async {
     await disconnect();
     _setState(SessionState.connecting);
@@ -57,8 +57,9 @@ class RemoteSession extends ChangeNotifier {
     try {
       final uri = _wsUri(serverURL);
       final WebSocketChannel ws;
-      if (allowSelfSigned) {
-        ws = ws_io.IOWebSocketChannel.connect(uri, customClient: _buildInsecureClient());
+      if (caCertPath.isNotEmpty) {
+        ws = ws_io.IOWebSocketChannel.connect(uri,
+            customClient: _buildClientWithCert(caCertPath));
       } else {
         ws = WebSocketChannel.connect(uri);
       }
@@ -336,10 +337,10 @@ class RemoteSession extends ChangeNotifier {
     );
   }
 
-  static HttpClient _buildInsecureClient() {
-    final client = HttpClient()
-      ..badCertificateCallback = (cert, host, port) => true;
-    return client;
+  static HttpClient _buildClientWithCert(String certPath) {
+    final ctx = SecurityContext(withTrustedRoots: false)
+      ..setTrustedCertificates(certPath);
+    return HttpClient(context: ctx);
   }
 
   @override

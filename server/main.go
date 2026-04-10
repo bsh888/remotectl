@@ -1,7 +1,7 @@
 // remotectl relay server
 //
 // Security model:
-//   - Transport:    TLS (WSS) — mandatory in production (--tls-cert / --tls-key)
+//   - Transport:    TLS (WSS) — mandatory (--tls-cert / --tls-key required)
 //   - Agent auth:   HMAC-SHA256 challenge-response (prevents replay attacks)
 //   - E2EE input:   ECDH P-256 + HKDF-SHA256 + AES-256-GCM for input events
 //   - Video:        WebRTC H.264 P2P (server relays SDP/ICE, never sees video)
@@ -74,8 +74,9 @@ const (
 	TypeConnected    = "connected"
 	TypeViewerJoined = "viewer_joined"
 	TypeViewerLeft   = "viewer_left"
-	TypeAgentOffline = "agent_offline"
-	TypeError        = "error"
+	TypeAgentOffline  = "agent_offline"
+	TypeRejectViewer  = "reject_viewer" // agent → server: refuse a specific viewer
+	TypeError         = "error"
 
 	// E2EE key exchange (server relays opaquely)
 	TypeKeyOffer  = "key_offer"  // agent → viewer (via server)
@@ -192,7 +193,7 @@ type ServerConfig struct {
 
 func defaultServerConfig() ServerConfig {
 	return ServerConfig{
-		Addr:   ":8080",
+		Addr:   ":8443",
 		Static: "./static",
 	}
 }
@@ -395,6 +396,26 @@ func (a *Agent) readPump() {
 					"candidate": p.Candidate,
 					"sdp_mid":   p.SDPMid,
 				})
+			}
+
+		// Agent rejects a viewer (e.g. allow_control=false)
+		case TypeRejectViewer:
+			var p struct {
+				ViewerID string `json:"viewer_id"`
+			}
+			if err := json.Unmarshal(msg.Payload, &p); err != nil {
+				continue
+			}
+			a.mu.Lock()
+			v, ok := a.viewers[p.ViewerID]
+			if ok {
+				delete(a.viewers, p.ViewerID)
+			}
+			a.mu.Unlock()
+			if ok {
+				sendJSON(v.send, TypeError, map[string]string{"message": "controlled device rejected the connection"})
+				v.conn.Close()
+				log.Printf("[agent] viewer %s rejected by agent %s", p.ViewerID, a.id)
 			}
 		}
 	}
@@ -798,14 +819,11 @@ func main() {
 
 	log.Printf("remotectl server on %s", *addr)
 
-	var listenErr error
-	if *tlsCert != "" && *tlsKey != "" {
-		log.Println("TLS enabled")
-		listenErr = srv.ListenAndServeTLS(*tlsCert, *tlsKey)
-	} else {
-		log.Println("WARNING: TLS not configured — use --tls-cert / --tls-key in production")
-		listenErr = srv.ListenAndServe()
+	if *tlsCert == "" || *tlsKey == "" {
+		log.Fatal("config: tls_cert and tls_key are required (run 'make cert' to generate)")
 	}
+	log.Println("TLS enabled")
+	listenErr := srv.ListenAndServeTLS(*tlsCert, *tlsKey)
 	if listenErr != nil && listenErr != http.ErrServerClosed {
 		log.Fatal(listenErr)
 	}

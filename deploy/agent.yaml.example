@@ -10,10 +10,10 @@ name:     "My Mac"                        # display name shown in control app (o
 #           # %APPDATA%\remotectl\device.id (Windows).
 #           # Override here only if you need a fixed ID.
 
-fps:      30
-bitrate:  3000000   # 3 Mbps
-scale:    0.5       # 0.5 = capture at 50% of screen resolution
-retry:    "5s"      # reconnect interval
+fps:           30
+bitrate:       3000000   # 3 Mbps
+scale:         0.5       # 0.5 = capture at 50% of screen resolution
+retry:         "5s"      # reconnect interval
+allow_control: true      # set false to block all incoming remote-control connections
 
-insecure: false     # set true to skip TLS cert check (dev only)
-# ca_cert: "certs/ca.crt"   # custom CA for self-signed certs
+ca_cert: "deploy/certs/server.crt"   # path to CA cert for self-signed server cert (required when not using a public CA)

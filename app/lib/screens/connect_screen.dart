@@ -17,7 +17,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
   final _serverCtrl = TextEditingController();
   final _deviceCtrl = TextEditingController();
   final _passCtrl = TextEditingController();
-  bool _selfSigned = false;
+  final _caCertCtrl = TextEditingController();
 
   final _session = RemoteSession();
 
@@ -33,7 +33,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
     setState(() {
       _serverCtrl.text = prefs.getString('server') ?? '';
       _deviceCtrl.text = prefs.getString('device') ?? '';
-      _selfSigned = prefs.getBool('selfSigned') ?? false;
+      _caCertCtrl.text = prefs.getString('ca_cert') ?? '';
     });
   }
 
@@ -41,7 +41,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('server', _serverCtrl.text.trim());
     await prefs.setString('device', _deviceCtrl.text.trim());
-    await prefs.setBool('selfSigned', _selfSigned);
+    await prefs.setString('ca_cert', _caCertCtrl.text.trim());
   }
 
   void _onSessionChanged() {
@@ -79,7 +79,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
       serverURL: server,
       deviceID: device,
       password: pass,
-      allowSelfSigned: _selfSigned,
+      caCertPath: _caCertCtrl.text.trim(),
     );
   }
 
@@ -90,6 +90,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
     _serverCtrl.dispose();
     _deviceCtrl.dispose();
     _passCtrl.dispose();
+    _caCertCtrl.dispose();
     super.dispose();
   }
 
@@ -244,28 +245,12 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                 ),
                                 const SizedBox(height: 14),
 
-                                // Self-signed cert toggle
-                                Row(
-                                  children: [
-                                    SizedBox(
-                                      height: 28,
-                                      child: Switch(
-                                        value: _selfSigned,
-                                        onChanged: (v) =>
-                                            setState(() => _selfSigned = v),
-                                        materialTapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      '允许自签名证书',
-                                      style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.60),
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                  ],
+                                _labeledField(
+                                  context: context,
+                                  label: 'CA 证书路径',
+                                  controller: _caCertCtrl,
+                                  hint: '/path/to/server.crt',
+                                  icon: Icons.verified_outlined,
                                 ),
                                 const SizedBox(height: 20),
 

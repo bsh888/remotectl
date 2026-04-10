@@ -39,9 +39,10 @@ const (
 	TypeChallenge    = "challenge"
 	TypeAuth         = "auth"
 	TypeRegistered   = "registered"
-	TypeViewerJoined = "viewer_joined"
-	TypeViewerLeft   = "viewer_left"
-	TypeError        = "error"
+	TypeViewerJoined  = "viewer_joined"
+	TypeViewerLeft    = "viewer_left"
+	TypeRejectViewer  = "reject_viewer" // agent → server: refuse a specific viewer
+	TypeError         = "error"
 
 	// E2EE key exchange (input events only)
 	TypeKeyOffer  = "key_offer"
@@ -125,17 +126,18 @@ type AgentConfig struct {
 	Bitrate  int     `yaml:"bitrate"`
 	Scale    float64 `yaml:"scale"`
 	Retry    string  `yaml:"retry"`
-	Insecure bool    `yaml:"insecure"`
-	CACert   string  `yaml:"ca_cert"`
+	CACert        string  `yaml:"ca_cert"`
+	AllowControl  bool    `yaml:"allow_control"`
 }
 
 func defaultAgentConfig() AgentConfig {
 	return AgentConfig{
-		Server:  "http://localhost:8080",
-		FPS:     30,
-		Bitrate: 3_000_000,
-		Scale:   0.5,
-		Retry:   "5s",
+		Server:       "http://localhost:8080",
+		FPS:          30,
+		Bitrate:      3_000_000,
+		Scale:        0.5,
+		Retry:        "5s",
+		AllowControl: true,
 	}
 }
 
@@ -184,8 +186,8 @@ type Agent struct {
 	fps         int
 	bitrate     int
 	scale       float64
-	insecure    bool
-	caCert      string
+	caCert       string
+	allowControl bool
 
 	sessionPwd  string // random 6-digit numeric password, generated once per run
 
@@ -682,10 +684,6 @@ func (a *Agent) dial() error {
 }
 
 func (a *Agent) buildTLSConfig() (*tls.Config, error) {
-	if a.insecure {
-		log.Println("WARNING: TLS certificate verification disabled (--insecure)")
-		return &tls.Config{InsecureSkipVerify: true}, nil //nolint:gosec
-	}
 	if a.caCert == "" {
 		return &tls.Config{MinVersion: tls.VersionTLS12}, nil
 	}
@@ -828,6 +826,12 @@ func (a *Agent) readPump() {
 			var e ViewerEventPayload
 			json.Unmarshal(msg.Payload, &e)
 			a.viewerCount.Store(int32(e.ViewerCount))
+			if !a.allowControl {
+				log.Printf("viewer %s rejected (allow_control=false)", e.ViewerID)
+				payload, _ := json.Marshal(map[string]string{"viewer_id": e.ViewerID})
+				a.enqueue(Message{Type: TypeRejectViewer, Payload: payload})
+				break
+			}
 			log.Printf("viewer joined (%s), total=%d", e.ViewerID, e.ViewerCount)
 			go a.startRTC(e.ViewerID)
 
@@ -1118,8 +1122,8 @@ func main() {
 	bitrate := flag.Int("bitrate", cfg.Bitrate, "H.264 encode bitrate in bits/sec")
 	scale := flag.Float64("scale", cfg.Scale, "capture resolution scale (0.25-1.0)")
 	retryStr := flag.String("retry", cfg.Retry, "reconnect interval (e.g. 5s)")
-	insecure := flag.Bool("insecure", cfg.Insecure, "skip TLS certificate verification")
 	caCert := flag.String("ca-cert", cfg.CACert, "path to custom CA certificate")
+	noControl := flag.Bool("no-control", !cfg.AllowControl, "refuse all incoming remote-control connections")
 	flag.Parse()
 
 	retryDur, err := time.ParseDuration(*retryStr)
@@ -1158,9 +1162,9 @@ func main() {
 		fps:        *fps,
 		bitrate:    *bitrate,
 		scale:      *scale,
-		insecure:   *insecure,
-		caCert:     *caCert,
-		sessionPwd: sessionPwd,
+		caCert:       *caCert,
+		allowControl: !*noControl,
+		sessionPwd:   sessionPwd,
 		sessions:   make(map[string]*session.Session),
 		webrtcAPI:  api,
 		videoTrack: videoTrack,
