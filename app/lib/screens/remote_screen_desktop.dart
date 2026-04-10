@@ -34,6 +34,7 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
   final FocusNode _focusNode = FocusNode();
 
   // Panel toggle (click the icon to open/close)
+  bool _toolbarVisible = true;
   bool _panelOpen = false;
   bool _chatOpen = false;
 
@@ -369,18 +370,55 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
             ),
 
           // ── Floating toolbar (top-right, shifts left when chat open) ──
-          Positioned(
-            top: 8,
-            right: _chatOpen ? 316 : 8,
-            child: _buildToolbar(context),
-          ),
+          if (_toolbarVisible)
+            Positioned(
+              top: 8,
+              right: _chatOpen ? 316 : 8,
+              child: _buildToolbar(context),
+            ),
 
           // ── Control panel (expands below toolbar when open) ──
-          if (_panelOpen)
+          if (_toolbarVisible && _panelOpen)
             Positioned(
               top: 46,
               right: _chatOpen ? 316 : 8,
               child: _buildPanel(context),
+            ),
+
+          // ── Collapsed tab (shown when toolbar is hidden) ──
+          if (!_toolbarVisible)
+            Positioned(
+              top: 0,
+              right: _chatOpen ? 316 : 0,
+              child: GestureDetector(
+                onTap: () => setState(() => _toolbarVisible = true),
+                child: MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: Tooltip(
+                    message: '显示工具栏',
+                    child: Container(
+                      width: 24,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.50),
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(6),
+                          bottomRight: Radius.circular(6),
+                        ),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.12),
+                          width: 0.5,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 14,
+                        color: Colors.white54,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
         ],
       ),
@@ -399,6 +437,16 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Collapse toolbar
+          _ToolbarBtn(
+            icon: Icons.keyboard_arrow_up_rounded,
+            tooltip: '收起',
+            onTap: () => setState(() {
+              _toolbarVisible = false;
+              _panelOpen = false;
+            }),
+          ),
+          Container(width: 1, height: 16, color: Colors.white.withOpacity(0.15)),
           // Control panel toggle
           _ToolbarBtn(
             icon: _platformIcon(widget.remotePlatform),
