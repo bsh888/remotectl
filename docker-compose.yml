@@ -10,8 +10,8 @@ services:
       - "8080:8080"   # dev only, remove in prod
     command: --config /app/server.yaml
     volumes:
-      - ./certs:/certs:ro
-      - ./server.yaml:/app/server.yaml:ro
+      - ./deploy/certs:/certs:ro
+      - ./deploy/server.yaml:/app/server.yaml:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "--no-check-certificate", "https://localhost:8443/api/devices"]
@@ -22,13 +22,14 @@ services:
   coturn:
     image: coturn/coturn:latest
     network_mode: host   # required: TURN needs to bind directly to the public IP
+    # TURN credentials must match turn.user / turn.password in deploy/server.yaml
     command: >
       -n
       --listening-port=3478
       --tls-listening-port=5349
       --fingerprint
       --lt-cred-mech
-      --user=${TURN_USER:-remotectl}:${TURN_PASSWORD:-changeme}
+      --user=remotectl:changeme
       --realm=remotectl
       --log-file=stdout
       --no-cli

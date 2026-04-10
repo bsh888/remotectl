@@ -14,10 +14,10 @@ tidy:
 	cd agent  && go mod tidy
 	cd client && npm install
 
-# ── 前端 (输出到 server/static/) ──────────────
+# ── 前端 (输出到 deploy/static/) ──────────────
 client:
 	cd client && npm run build
-	@echo "✓ client built → server/static/"
+	@echo "✓ client built → deploy/static/"
 
 # ── 服务端 ────────────────────────────────────
 # 当前平台（用于 Docker 或本机运行）
@@ -144,7 +144,7 @@ app-linux: | bin
 #   make cert IP=1.2.3.4 DNS=my.host # IP + 域名
 cert:
 	go run scripts/gen-cert.go \
-		-out  ./certs \
+		-out  ./deploy/certs \
 		-ip   "127.0.0.1$(if $(IP),$(comma)$(IP),)" \
 		-dns  "localhost$(if $(DNS),$(comma)$(DNS),)"
 
@@ -155,7 +155,7 @@ trust-cert:
 	sudo security add-trusted-cert \
 		-d -r trustRoot \
 		-k /Library/Keychains/System.keychain \
-		./certs/server.crt
+		./deploy/certs/server.crt
 	@echo "Certificate trusted. Restart your browser."
 
 untrust-cert:
@@ -168,15 +168,15 @@ dev-server:
 	cd server && go run . \
 		--addr :8080 \
 		--password remotectl \
-		--static ./static
+		--static ../deploy/static
 
 dev-server-tls:
 	cd server && go run . \
 		--addr :8443 \
 		--password remotectl \
-		--static ./static \
-		--tls-cert ../certs/server.crt \
-		--tls-key  ../certs/server.key
+		--static ../deploy/static \
+		--tls-cert ../deploy/certs/server.crt \
+		--tls-key  ../deploy/certs/server.key
 
 dev-client:
 	cd client && npm run dev
@@ -190,4 +190,5 @@ docker-up:
 
 # ── 清理 ──────────────────────────────────────
 clean:
-	rm -rf bin server/static
+	rm -rf bin deploy/static/*
+	@touch deploy/static/.gitkeep

@@ -46,9 +46,12 @@ remotectl/
 ├── client/             # 控制端前端 (React + TypeScript)
 ├── app/                # 原生客户端 App (Flutter，全平台)
 ├── scripts/            # 证书生成工具
-├── certs/              # TLS 证书（本地生成，不提交）
-├── server.yaml.example # 服务端配置示例
-├── agent.yaml.example  # agent 配置示例
+├── deploy/             # 部署产物目录（不完全提交）
+│   ├── certs/          # TLS 证书（本地生成，不提交）
+│   ├── static/         # 前端构建产物（不提交）
+│   ├── bin/            # 编译产物（不提交）
+│   ├── server.yaml.example  # 服务端配置示例
+│   └── agent.yaml.example   # agent 配置示例
 └── Makefile
 ```
 
@@ -173,7 +176,7 @@ make cert IP="10.0.0.1,192.168.1.100"
 make cert IP="10.0.0.1" DNS=myserver.local
 ```
 
-证书生成在 `./certs/`，`server.crt` 需分发到所有被控端（`ca_cert` 配置项）。
+证书生成在 `./deploy/certs/`，`server.crt` 需分发到所有被控端（`ca_cert` 配置项）。
 
 macOS 将证书加入系统信任：
 ```bash
@@ -185,10 +188,10 @@ make trust-cert
 复制示例配置并编辑：
 
 ```bash
-cp server.yaml.example server.yaml
+cp deploy/server.yaml.example deploy/server.yaml
 ```
 
-`server.yaml` 内容说明：
+`deploy/server.yaml` 内容说明：
 
 ```yaml
 addr:     ":8443"
@@ -233,7 +236,7 @@ docker compose up -d
 
 **直接运行：**
 ```bash
-./bin/remotectl-server --config server.yaml
+./bin/remotectl-server --config deploy/server.yaml
 ```
 
 服务端所有参数均可通过配置文件或命令行 flag 指定，flag 优先级更高：
@@ -253,10 +256,10 @@ docker compose up -d
 ### 4. 配置并启动被控端
 
 ```bash
-cp agent.yaml.example agent.yaml
+cp deploy/agent.yaml.example deploy/agent.yaml
 ```
 
-`agent.yaml` 内容说明：
+`deploy/agent.yaml` 内容说明：
 
 ```yaml
 server:   "https://your-server:8443"
@@ -278,17 +281,17 @@ insecure: false
 
 **macOS：**
 ```bash
-./bin/remotectl-agent-mac-arm64 --config agent.yaml
+./bin/remotectl-agent-mac-arm64 --config deploy/agent.yaml
 ```
 
 **Windows（PowerShell）：**
 ```powershell
-.\remotectl-agent-windows-amd64.exe --config agent.yaml
+.\remotectl-agent-windows-amd64.exe --config deploy/agent.yaml
 ```
 
 **Linux：**
 ```bash
-./remotectl-agent-linux-amd64 --config agent.yaml
+./remotectl-agent-linux-amd64 --config deploy/agent.yaml
 ```
 
 命令行 flag 可覆盖配置文件中的任意值：

@@ -1,19 +1,25 @@
 # ── 配置文件（含敏感信息，仅提交 .example 版本）──────────────
-agent.yaml
 server.yaml
-.env
+agent.yaml
+deploy/server.yaml
+deploy/agent.yaml
 
 # ── TLS 证书与私钥 ───────────────────────────────────────────
-certs/
+deploy/certs/*
+!deploy/certs/.gitkeep
 *.crt
 *.key
 *.pem
 
 # ── 编译产物 ─────────────────────────────────────────────────
-bin/
+/bin/
 server/static/
 server/server
 server/remotectl-server*
+deploy/bin/*
+!deploy/bin/.gitkeep
+deploy/static/*
+!deploy/static/.gitkeep
 
 # ── Go ───────────────────────────────────────────────────────
 vendor/
