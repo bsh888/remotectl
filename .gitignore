@@ -10,6 +10,9 @@ deploy/certs/*
 *.pem
 
 # ── 编译产物 ─────────────────────────────────────────────────
+server/server
+server/remotectl-server*
+server/static/
 deploy/bin/*
 !deploy/bin/.gitkeep
 deploy/static/*
