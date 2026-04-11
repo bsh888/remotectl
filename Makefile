@@ -183,6 +183,15 @@ docker-build:
 docker-up:
 	docker compose up -d
 
+# ── systemd 部署（Linux 服务器）──────────────────────────────────────────────
+# 在目标服务器上运行，需 root：
+#   make server-linux        # 先在本机交叉编译
+#   scp -r deploy/ user@server:~/remotectl-deploy/
+#   sudo bash ~/remotectl-deploy/install.sh         # 安装 / 升级
+#   sudo bash ~/remotectl-deploy/install.sh remove  # 卸载
+install:
+	@bash deploy/install.sh install
+
 # ── 清理 ──────────────────────────────────────
 clean:
 	rm -rf deploy/bin/* deploy/static/*
