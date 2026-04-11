@@ -35,46 +35,45 @@ make all            # 全量构建
 
 ## 发布 Release
 
-源码不开源，只发布各平台二进制包到 GitHub Releases。
+源码不开源，只发布各平台二进制包到 GitHub Releases。分三步在不同平台执行：
 
-**在 macOS 上执行（构建 server 全平台 + agent mac/win/linux + Flutter macOS app）：**
+**第一步：macOS（主构建）**— server 全平台、agent mac+windows、Flutter macOS App
 
 ```bash
-# 正式发布
+# 前置依赖（一次性）：brew install gh mingw-w64 && gh auth login
 make release VERSION=v1.0.0
-
-# 先创建草稿，确认无误后在 GitHub 页面手动发布
-make release VERSION=v1.0.0 DRAFT=--draft
+# 草稿模式：make release VERSION=v1.0.0 DRAFT=--draft
 ```
 
-**在 Windows 构建 Flutter Windows app 后补传：**
+**第二步：Windows**— Flutter Windows App
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts\build-app-win.ps1
-bash scripts/upload-release.sh v1.0.0
+# 前置依赖：gh CLI (winget install GitHub.cli) && gh auth login
+powershell -ExecutionPolicy Bypass -File .\scripts\build-app-win.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\upload-release.ps1 v1.0.0
 ```
 
-**在 Linux 构建 Flutter Linux app 后补传：**
+**第三步：Linux**— Linux agent + Flutter Linux App
 
 ```bash
-./scripts/build-app-linux.sh
-./scripts/upload-release.sh v1.0.0
+# 前置依赖：gcc libx264-dev libx11-dev libxext-dev flutter gh && gh auth login
+./scripts/upload-release.sh v1.0.0 agent   # 编译并上传 Linux agent
+./scripts/build-app-linux.sh               # 构建 Flutter Linux App
+./scripts/upload-release.sh v1.0.0 app     # 上传 Flutter Linux App
 ```
 
-发布制品清单（存放于 `deploy/release/<version>/`，不提交到 git）：
+发布制品清单（macOS 本地存于 `deploy/release/<version>/`，不提交到 git）：
 
-| 文件 | 内容 |
-|------|------|
-| `remotectl-server-linux-amd64-vX.Y.Z.tar.gz` | 服务器 + systemd 部署脚本 |
-| `remotectl-server-linux-arm64-vX.Y.Z.tar.gz` | 服务器 ARM64 + 部署脚本 |
-| `remotectl-agent-mac-vX.Y.Z.tar.gz` | 被控端 macOS Universal |
-| `remotectl-agent-windows-amd64-vX.Y.Z.zip` | 被控端 Windows |
-| `remotectl-agent-linux-amd64-vX.Y.Z.tar.gz` | 被控端 Linux |
-| `remotectl-app-macos-vX.Y.Z.zip` | 控制端 Flutter macOS App |
-| `remotectl-app-windows-amd64-vX.Y.Z.zip` | 控制端 Flutter Windows App（Windows 构建补传）|
-| `remotectl-app-linux-amd64-vX.Y.Z.tar.gz` | 控制端 Flutter Linux App（Linux 构建补传）|
-
-前置依赖：`brew install gh mingw-w64 FiloSottile/musl-cross/musl-cross`，并执行 `gh auth login`。
+| 文件 | 构建平台 |
+|------|---------|
+| `remotectl-server-linux-amd64-vX.Y.Z.tar.gz` | macOS |
+| `remotectl-server-linux-arm64-vX.Y.Z.tar.gz` | macOS |
+| `remotectl-agent-mac-vX.Y.Z.tar.gz` | macOS |
+| `remotectl-agent-windows-amd64-vX.Y.Z.zip` | macOS（mingw 交叉编译） |
+| `remotectl-agent-linux-amd64-vX.Y.Z.tar.gz` | Linux |
+| `remotectl-app-macos-vX.Y.Z.zip` | macOS |
+| `remotectl-app-windows-amd64-vX.Y.Z.zip` | Windows |
+| `remotectl-app-linux-amd64-vX.Y.Z.tar.gz` | Linux |
 
 ## Linux 服务器部署（systemd）
 

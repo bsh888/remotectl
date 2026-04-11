@@ -502,7 +502,7 @@ make server          # 服务器
 make client          # 前端
 make agent-mac       # macOS agent 二进制（arm64 + amd64，输出到 bin/）
 make agent-win       # Windows agent（需要 mingw-w64）
-make agent-linux     # Linux agent（需要 musl-cross 或在 Linux 上直接构建）
+make agent-linux     # Linux agent（需在 Linux 上执行）
 
 # Flutter App 一体化打包（agent 自动注入到发布包）
 make app-mac         # macOS：universal agent + flutter build macos
@@ -513,56 +513,68 @@ make app-linux       # Linux：agent + flutter build linux
 make tidy
 ```
 
-Linux 交叉编译（macOS 宿主机）：
-```bash
-brew install FiloSottile/musl-cross/musl-cross
-make agent-linux
-```
-
 ---
 
 ## 发布 Release
 
-在 macOS 上一条命令构建所有平台制品并发布到 GitHub Releases：
+Release 分三步，分别在 macOS / Windows / Linux 上执行：
+
+### 第一步：macOS（主构建）
+
+构建 server 全平台、agent mac+windows、Flutter macOS App，创建 GitHub Release 并上传。
 
 ```bash
-# 前置依赖
-brew install gh mingw-w64 FiloSottile/musl-cross/musl-cross
+# 前置依赖（一次性）
+brew install gh mingw-w64
 gh auth login
 
 # 正式发布
 make release VERSION=v1.0.0
 
-# 先创建草稿，在 GitHub 页面确认无误后手动发布
+# 先创建草稿，在 GitHub 页面确认无误后再发布
 make release VERSION=v1.0.0 DRAFT=--draft
 ```
 
-Windows / Linux Flutter App 需在对应平台构建后补传：
+### 第二步：Windows（补传 Windows App）
 
 ```powershell
-# Windows
+# 前置依赖：Go(.msi)、MSYS2 MinGW-w64、Flutter、gh CLI
+# gh CLI 安装：winget install GitHub.cli  然后  gh auth login
+
+# 构建
 powershell -ExecutionPolicy Bypass -File .\scripts\build-app-win.ps1
-bash scripts/upload-release.sh v1.0.0
+
+# 上传到 Release
+powershell -ExecutionPolicy Bypass -File .\scripts\upload-release.ps1 v1.0.0
 ```
+
+### 第三步：Linux（补传 Linux agent 和 Linux App）
 
 ```bash
-# Linux
+# 前置依赖：gcc libx264-dev libx11-dev libxext-dev flutter gh
+# sudo apt install gcc libx264-dev libx11-dev libxext-dev
+# gh auth login
+
+# 上传 Linux agent（在已有 Go 环境的 Linux 机器上执行）
+./scripts/upload-release.sh v1.0.0 agent
+
+# 上传 Linux Flutter App（需要 Flutter）
 ./scripts/build-app-linux.sh
-./scripts/upload-release.sh v1.0.0
+./scripts/upload-release.sh v1.0.0 app
 ```
 
-**每次 Release 包含的制品：**
+### Release 制品清单
 
-| 文件 | 说明 |
-|------|------|
-| `remotectl-server-linux-amd64-vX.Y.Z.tar.gz` | 信令服务器 x86\_64（含 systemd 部署脚本） |
-| `remotectl-server-linux-arm64-vX.Y.Z.tar.gz` | 信令服务器 ARM64（含 systemd 部署脚本） |
-| `remotectl-agent-mac-vX.Y.Z.tar.gz` | 被控端 macOS Universal (arm64+amd64) |
-| `remotectl-agent-windows-amd64-vX.Y.Z.zip` | 被控端 Windows x64 |
-| `remotectl-agent-linux-amd64-vX.Y.Z.tar.gz` | 被控端 Linux x86\_64 |
-| `remotectl-app-macos-vX.Y.Z.zip` | 控制端 Flutter macOS App |
-| `remotectl-app-windows-amd64-vX.Y.Z.zip` | 控制端 Flutter Windows App（Windows 补传） |
-| `remotectl-app-linux-amd64-vX.Y.Z.tar.gz` | 控制端 Flutter Linux App（Linux 补传） |
+| 文件 | 构建平台 | 说明 |
+|------|---------|------|
+| `remotectl-server-linux-amd64-vX.Y.Z.tar.gz` | macOS | 信令服务器 x86\_64（含 systemd 部署脚本） |
+| `remotectl-server-linux-arm64-vX.Y.Z.tar.gz` | macOS | 信令服务器 ARM64（含 systemd 部署脚本） |
+| `remotectl-agent-mac-vX.Y.Z.tar.gz` | macOS | 被控端 macOS Universal (arm64+amd64) |
+| `remotectl-agent-windows-amd64-vX.Y.Z.zip` | macOS | 被控端 Windows x64（mingw 交叉编译） |
+| `remotectl-agent-linux-amd64-vX.Y.Z.tar.gz` | Linux | 被控端 Linux x86\_64 |
+| `remotectl-app-macos-vX.Y.Z.zip` | macOS | 控制端 Flutter macOS App |
+| `remotectl-app-windows-amd64-vX.Y.Z.zip` | Windows | 控制端 Flutter Windows App |
+| `remotectl-app-linux-amd64-vX.Y.Z.tar.gz` | Linux | 控制端 Flutter Linux App |
 
 ---
 
