@@ -176,6 +176,18 @@ git tag -a "$VERSION" -m "Release $VERSION"
 git push origin "$VERSION"
 ok "Tag pushed"
 
+# ── Ensure releases repo has at least one commit ──────────────────────────────
+# gh release create fails with "Repository is empty" on a brand-new repo.
+if ! gh api repos/bsh888/remotectl-releases/git/refs/heads -q '.[0].ref' &>/dev/null; then
+  log "Initializing bsh888/remotectl-releases with initial commit"
+  gh api repos/bsh888/remotectl-releases/contents/README.md \
+    --method PUT \
+    -f message="Initialize releases repository" \
+    -f content="$(printf '# RemoteCtl Releases\n\nBinary releases for [RemoteCtl](https://github.com/bsh888/remotectl).\n' | base64)" \
+    --silent
+  ok "Initial commit created"
+fi
+
 # ── GitHub Release ────────────────────────────────────────────────────────────
 
 log "Creating GitHub Release $VERSION"
