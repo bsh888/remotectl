@@ -66,13 +66,12 @@ agent-win: | deploy/bin
 		-o ../deploy/bin/remotectl-agent-windows-amd64.exe .
 	@echo "✓ agent → deploy/bin/remotectl-agent-windows-amd64.exe"
 
-# Linux agent uses Docker for cross-compilation (X11/x264 headers not available in musl-cross).
-# On Linux host, run scripts/build-app-linux.sh directly instead.
+# Linux agent must be built on a Linux host (requires X11/x264 native libs).
+# On Linux: apt install gcc libx264-dev libx11-dev libxext-dev
 agent-linux: | deploy/bin
-	docker build --platform linux/amd64 \
-		-f Dockerfile.agent-linux \
-		-o type=local,dest=deploy/bin \
-		.
+	cd agent && CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+		go build -ldflags="-s -w" \
+		-o ../deploy/bin/remotectl-agent-linux-amd64 .
 	@echo "✓ agent → deploy/bin/remotectl-agent-linux-amd64"
 
 deploy/bin:

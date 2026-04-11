@@ -46,8 +46,6 @@ command -v gh      &>/dev/null || die "gh not found. brew install gh && gh auth 
 command -v flutter &>/dev/null || die "flutter not found."
 command -v x86_64-w64-mingw32-gcc &>/dev/null \
   || die "mingw-w64 not found. brew install mingw-w64"
-command -v docker &>/dev/null \
-  || die "docker not found. Install Docker Desktop: https://www.docker.com/products/docker-desktop/"
 
 # Ensure working tree is clean
 if [[ -n "$(git status --porcelain)" ]]; then
@@ -145,16 +143,12 @@ log "Building agent (windows-amd64)"
   -o "$OUT/tmp/remotectl-agent-windows-amd64.exe" .)
 pack_agent "$OUT/tmp/remotectl-agent-windows-amd64.exe" "windows-amd64" zip
 
-# ── 4. Agent — Linux amd64 (Docker) ──────────────────────────────────────────
-# musl-cross doesn't include X11/x264 headers; use a Linux Docker container.
-
-log "Building agent (linux-amd64) via Docker"
-docker build \
-  --platform linux/amd64 \
-  -f "$ROOT/Dockerfile.agent-linux" \
-  -o type=local,dest="$OUT/tmp" \
-  "$ROOT"
-pack_agent "$OUT/tmp/remotectl-agent-linux-amd64" "linux-amd64" tar
+# ── 4. Agent — Linux amd64 ───────────────────────────────────────────────────
+# X11 headers are not available on macOS; build on a Linux machine and upload
+# via scripts/upload-release.sh after this script completes.
+log "Skipping agent (linux-amd64) — build on Linux and upload separately"
+echo "  → On Linux: cd agent && CGO_ENABLED=1 go build -ldflags='-s -w' -o remotectl-agent-linux-amd64 ."
+echo "  → Then run: scripts/upload-release.sh $VERSION"
 
 # ── 5. Flutter — macOS app ───────────────────────────────────────────────────
 
@@ -195,10 +189,10 @@ NOTES="## $VERSION
 | \`remotectl-server-linux-arm64-${VERSION}.tar.gz\` | 信令服务器 Linux ARM64 |
 | \`remotectl-agent-mac-${VERSION}.tar.gz\` | 被控端 macOS Universal (arm64+amd64) |
 | \`remotectl-agent-windows-amd64-${VERSION}.zip\` | 被控端 Windows x64 |
-| \`remotectl-agent-linux-amd64-${VERSION}.tar.gz\` | 被控端 Linux x86_64 |
+| \`remotectl-agent-linux-amd64-${VERSION}.tar.gz\` | 被控端 Linux x86_64（Linux 上补传） |
 | \`remotectl-app-macos-${VERSION}.zip\` | 控制端 Flutter macOS App |
 
-> Windows / Linux Flutter App 包在各平台编译后通过 \`scripts/upload-release.sh $VERSION\` 追加上传。
+> Linux agent、Windows / Linux Flutter App 在各平台编译后通过 \`scripts/upload-release.sh $VERSION\` 追加上传。
 
 ### 快速部署（服务器）
 
@@ -221,6 +215,10 @@ gh release create "$VERSION" \
 log "Done"
 echo ""
 echo "  Release: $(gh release view "$VERSION" --json url -q .url)"
+echo ""
+echo "  Linux agent: on Linux server:"
+echo "               cd agent && CGO_ENABLED=1 go build -ldflags='-s -w' -o remotectl-agent-linux-amd64 ."
+echo "               scripts/upload-release.sh $VERSION"
 echo ""
 echo "  Windows App: run  scripts/build-app-win.ps1  on Windows, then"
 echo "               run  scripts/upload-release.sh $VERSION  to upload."
