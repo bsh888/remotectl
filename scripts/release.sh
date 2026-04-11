@@ -206,6 +206,7 @@ sudo bash install.sh
 "
 
 gh release create "$VERSION" \
+  --repo bsh888/remotectl-releases \
   $DRAFT_FLAG \
   --title "RemoteCtl $VERSION" \
   --notes "$NOTES" \
@@ -214,7 +215,7 @@ gh release create "$VERSION" \
 
 log "Done"
 echo ""
-echo "  Release: $(gh release view "$VERSION" --json url -q .url)"
+echo "  Release: $(gh release view "$VERSION" --repo bsh888/remotectl-releases --json url -q .url)"
 echo ""
 echo "  Linux agent: on Linux server:"
 echo "               cd agent && CGO_ENABLED=1 go build -ldflags='-s -w' -o remotectl-agent-linux-amd64 ."

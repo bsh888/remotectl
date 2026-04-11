@@ -47,7 +47,7 @@ $uploadAs = "remotectl-app-windows-amd64-${VERSION}.zip"
 # ── Upload ────────────────────────────────────────────────────────────────────
 
 Write-Host "Uploading $uploadAs to release $VERSION..." -ForegroundColor Cyan
-gh release upload $VERSION "${artifact}#${uploadAs}" --clobber
+gh release upload $VERSION "${artifact}#${uploadAs}" --repo bsh888/remotectl-releases --clobber
 
-$url = gh release view $VERSION --json url -q .url
+$url = gh release view $VERSION --repo bsh888/remotectl-releases --json url -q .url
 Write-Host "Done: $url" -ForegroundColor Green
