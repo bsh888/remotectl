@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
-# setup-x264-win.sh — Download Windows x264 static library for cross-compilation.
+# setup-x264-win.sh — Cross-compile x264 for Windows (macOS host).
 #
-# Fetches the mingw-w64-x86_64-x264 package from the MSYS2 mirror and
-# extracts x264.h + libx264.a into agent/pipeline/x264/.
+# Uses the mingw-w64 cross-compiler to build a Windows static library and
+# places x264.h + libx264.a into agent/pipeline/x264/.
 #
 # Called automatically by release.sh when the files are missing.
 # Can also be run manually: ./scripts/setup-x264-win.sh
+#
+# Requirements (installed automatically if missing):
+#   brew install nasm mingw-w64
 
 set -euo pipefail
 
@@ -17,38 +20,50 @@ if [[ -f "$DEST/x264.h" && -f "$DEST/libx264.a" ]]; then
   exit 0
 fi
 
-echo "Setting up x264 Windows cross-compile libs..."
+echo "Building x264 for Windows (cross-compile with mingw-w64)..."
 
-# ── Ensure zstd is available (needed to unpack .pkg.tar.zst) ─────────────────
-if ! command -v zstd &>/dev/null; then
-  echo "Installing zstd via Homebrew..."
-  brew install zstd
-fi
+# ── Ensure tools ──────────────────────────────────────────────────────────────
+for tool in nasm x86_64-w64-mingw32-gcc git make; do
+  if ! command -v "$tool" &>/dev/null; then
+    case "$tool" in
+      nasm)                  brew install nasm ;;
+      x86_64-w64-mingw32-gcc) brew install mingw-w64 ;;
+      git|make)              xcode-select --install 2>/dev/null || true ;;
+    esac
+  fi
+done
 
-# ── Find latest package URL from MSYS2 mingw64 ───────────────────────────────
-BASE="https://repo.msys2.org/mingw/mingw64"
-echo "Querying MSYS2 package list..."
-PKG=$(curl -fsSL "$BASE/" \
-  | grep -o 'mingw-w64-x86_64-x264-[0-9][^"]*\.pkg\.tar\.zst' \
-  | sort -V | tail -1)
-
-[[ -n "$PKG" ]] || { echo "ERROR: Could not find x264 package on MSYS2 mirror." >&2; exit 1; }
-echo "Found: $PKG"
-
-# ── Download ──────────────────────────────────────────────────────────────────
+# ── Clone x264 ────────────────────────────────────────────────────────────────
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
-echo "Downloading..."
-curl -fL "$BASE/$PKG" -o "$TMP/x264.pkg.tar.zst"
+echo "Cloning x264..."
+git clone --depth 1 https://code.videolan.org/videolan/x264.git "$TMP/x264"
 
-# ── Extract ───────────────────────────────────────────────────────────────────
-echo "Extracting..."
-zstd -d --quiet "$TMP/x264.pkg.tar.zst" -o "$TMP/x264.pkg.tar"
-tar xf "$TMP/x264.pkg.tar" -C "$TMP"
+# ── Configure ─────────────────────────────────────────────────────────────────
+PREFIX="$TMP/install"
+mkdir -p "$PREFIX"
 
-# ── Copy header and static library ───────────────────────────────────────────
-cp "$TMP/mingw64/include/x264.h" "$DEST/"
-cp "$TMP/mingw64/lib/libx264.a"  "$DEST/"
+echo "Configuring..."
+cd "$TMP/x264"
+CC=x86_64-w64-mingw32-gcc \
+./configure \
+  --host=x86_64-w64-mingw32 \
+  --cross-prefix=x86_64-w64-mingw32- \
+  --prefix="$PREFIX" \
+  --enable-static \
+  --disable-shared \
+  --disable-opencl \
+  --disable-cli
+
+# ── Build ─────────────────────────────────────────────────────────────────────
+echo "Building (this may take a minute)..."
+make -j"$(sysctl -n hw.logicalcpu)"
+make install
+
+# ── Copy artifacts ────────────────────────────────────────────────────────────
+cp "$PREFIX/include/x264.h"        "$DEST/"
+cp "$PREFIX/include/x264_config.h" "$DEST/" 2>/dev/null || true
+cp "$PREFIX/lib/libx264.a"         "$DEST/"
 
 echo "Done: $DEST/x264.h  $DEST/libx264.a"
