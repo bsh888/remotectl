@@ -50,8 +50,11 @@ remotectl/
 │   ├── certs/          # TLS 证书（本地生成，不提交）
 │   ├── static/         # 前端构建产物（不提交）
 │   ├── bin/            # 编译产物（不提交）
-│   ├── server.yaml.example  # 服务端配置示例
-│   └── agent.yaml.example   # agent 配置示例
+│   ├── release/        # Release 制品（本地打包，不提交）
+│   ├── server.yaml.example        # 服务端配置示例
+│   ├── agent.yaml.example         # agent 配置示例
+│   ├── remotectl-server.service   # systemd unit 文件
+│   └── install.sh                 # Linux 服务器一键安装脚本
 └── Makefile
 ```
 
@@ -218,9 +221,37 @@ turn:
 
 ### 3. 启动服务器
 
-**Docker 部署（推荐）：**
+**Docker 部署：**
 ```bash
 docker compose up -d
+```
+
+**systemd 部署（Linux 生产环境，推荐）：**
+
+以 `ubuntu` 用户运行，通过 `AmbientCapabilities=CAP_NET_BIND_SERVICE` 绑定 443 端口，无需 root。
+
+```bash
+# 1. 交叉编译 Linux 二进制（在 macOS/任意平台执行）
+make server-linux
+
+# 2. 上传 deploy/ 目录到服务器
+scp -r deploy/ ubuntu@server:~/remotectl-deploy/
+
+# 3. 服务器上安装（需 sudo）
+sudo bash ~/remotectl-deploy/install.sh
+
+# 4. 修改配置（addr 改为 :443，填入 tokens / TURN 等）
+sudo vim /opt/remotectl/server.yaml
+sudo systemctl restart remotectl-server
+
+# 查看日志
+journalctl -u remotectl-server -f
+
+# 升级（重新上传后再次执行 install.sh）
+sudo bash ~/remotectl-deploy/install.sh
+
+# 卸载（保留 /opt/remotectl/ 中的配置和证书）
+sudo bash ~/remotectl-deploy/install.sh remove
 ```
 
 **直接运行：**
@@ -487,6 +518,51 @@ Linux 交叉编译（macOS 宿主机）：
 brew install FiloSottile/musl-cross/musl-cross
 make agent-linux
 ```
+
+---
+
+## 发布 Release
+
+在 macOS 上一条命令构建所有平台制品并发布到 GitHub Releases：
+
+```bash
+# 前置依赖
+brew install gh mingw-w64 FiloSottile/musl-cross/musl-cross
+gh auth login
+
+# 正式发布
+make release VERSION=v1.0.0
+
+# 先创建草稿，在 GitHub 页面确认无误后手动发布
+make release VERSION=v1.0.0 DRAFT=--draft
+```
+
+Windows / Linux Flutter App 需在对应平台构建后补传：
+
+```powershell
+# Windows
+powershell -ExecutionPolicy Bypass -File .\scripts\build-app-win.ps1
+bash scripts/upload-release.sh v1.0.0
+```
+
+```bash
+# Linux
+./scripts/build-app-linux.sh
+./scripts/upload-release.sh v1.0.0
+```
+
+**每次 Release 包含的制品：**
+
+| 文件 | 说明 |
+|------|------|
+| `remotectl-server-linux-amd64-vX.Y.Z.tar.gz` | 信令服务器 x86\_64（含 systemd 部署脚本） |
+| `remotectl-server-linux-arm64-vX.Y.Z.tar.gz` | 信令服务器 ARM64（含 systemd 部署脚本） |
+| `remotectl-agent-mac-vX.Y.Z.tar.gz` | 被控端 macOS Universal (arm64+amd64) |
+| `remotectl-agent-windows-amd64-vX.Y.Z.zip` | 被控端 Windows x64 |
+| `remotectl-agent-linux-amd64-vX.Y.Z.tar.gz` | 被控端 Linux x86\_64 |
+| `remotectl-app-macos-vX.Y.Z.zip` | 控制端 Flutter macOS App |
+| `remotectl-app-windows-amd64-vX.Y.Z.zip` | 控制端 Flutter Windows App（Windows 补传） |
+| `remotectl-app-linux-amd64-vX.Y.Z.tar.gz` | 控制端 Flutter Linux App（Linux 补传） |
 
 ---
 
