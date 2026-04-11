@@ -77,15 +77,32 @@ powershell -ExecutionPolicy Bypass -File .\scripts\upload-release.ps1 v1.0.0
 
 服务以 `ubuntu` 用户运行，通过 `AmbientCapabilities=CAP_NET_BIND_SERVICE` 绑定 443 端口，无需 root。
 
+发布包（`remotectl-server-linux-*-vX.Y.Z.tar.gz`）已内置所有部署脚本，解压后即可使用：
+
+```
+remotectl-server-linux-amd64-vX.Y.Z/
+├── remotectl-server          # 服务器二进制
+├── install.sh                # 安装/升级/卸载脚本
+├── remotectl-server.service  # systemd unit
+├── server.yaml.example       # 配置模板
+└── gen-cert.sh               # 自签名 TLS 证书生成（需要 openssl）
+```
+
 ```bash
-# 1. 交叉编译 Linux 二进制
-make server-linux
+# 1. 解压发布包
+tar xzf remotectl-server-linux-amd64-vX.Y.Z.tar.gz
+cd remotectl-server-linux-amd64-vX.Y.Z
 
-# 2. 上传 deploy/ 目录到服务器
-scp -r deploy/ ubuntu@server:~/remotectl-deploy/
+# 2.（可选）生成自签名 TLS 证书
+#    如已有域名证书（Let's Encrypt 等），跳过此步，直接在 server.yaml 中配置路径
+bash gen-cert.sh ./certs 1.2.3.4        # 1.2.3.4 替换为服务器公网 IP
+#    或同时绑定域名：
+bash gen-cert.sh ./certs 1.2.3.4 my.domain.com
+#    证书生成到 ./certs/server.crt 和 ./certs/server.key
+#    install.sh 会自动将 certs/ 复制到 /opt/remotectl/certs/
 
-# 3. 服务器上执行安装（需 sudo）
-sudo bash ~/remotectl-deploy/install.sh
+# 3. 安装（需 sudo）
+sudo bash install.sh
 
 # 4. 修改配置（addr 改为 :443，填入 tokens / TLS 路径 / TURN 等）
 sudo vim /opt/remotectl/server.yaml
@@ -94,16 +111,17 @@ sudo systemctl restart remotectl-server
 # 查看日志
 journalctl -u remotectl-server -f
 
-# 升级（重新上传后再执行一次 install）
-sudo bash ~/remotectl-deploy/install.sh
+# 升级（重新解压新版本包，再执行一次 install）
+sudo bash install.sh
 
 # 卸载（保留 /opt/remotectl/ 中的配置和证书）
-sudo bash ~/remotectl-deploy/install.sh remove
+sudo bash install.sh remove
 ```
 
 相关文件：
 - `deploy/remotectl-server.service` — systemd unit（User=ubuntu，含安全加固选项）
 - `deploy/install.sh` — 安装/升级/卸载脚本，部署到 `/opt/remotectl/`
+- `scripts/gen-cert.sh` — openssl 自签名证书（打包进发布包）
 
 ## 关键技术细节
 

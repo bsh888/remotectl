@@ -26,8 +26,7 @@ detect_binary() {
   local arch
   arch=$(uname -m)
   case "$arch" in
-    x86_64)  echo "remotectl-server-linux-amd64" ;;
-    aarch64) echo "remotectl-server-linux-arm64" ;;
+    x86_64|aarch64) echo "remotectl-server" ;;
     *)       die "Unsupported architecture: $arch" ;;
   esac
 }
@@ -57,9 +56,9 @@ do_install() {
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   local bin_name
   bin_name=$(detect_binary)
-  local bin_src="${script_dir}/bin/${bin_name}"
+  local bin_src="${script_dir}/${bin_name}"
 
-  [[ -f "$bin_src" ]] || die "Binary not found: ${bin_src}\nRun: make server-linux"
+  [[ -f "$bin_src" ]] || die "Binary not found: ${bin_src}"
 
   # ── Verify user exists ──────────────────────────────────────────────────────
   id -u "${USER}" &>/dev/null || die "User '${USER}' does not exist on this system."
@@ -69,7 +68,7 @@ do_install() {
   mkdir -p "${INSTALL_DIR}/certs" "${INSTALL_DIR}/static"
 
   # ── Copy binary ─────────────────────────────────────────────────────────────
-  log "Installing ${bin_name} → ${INSTALL_DIR}/remotectl-server"
+  log "Installing remotectl-server → ${INSTALL_DIR}/remotectl-server"
   install -m 0755 "${bin_src}" "${INSTALL_DIR}/remotectl-server"
 
   # ── Copy static files ───────────────────────────────────────────────────────

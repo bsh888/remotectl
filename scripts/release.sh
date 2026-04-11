@@ -79,8 +79,9 @@ pack_server() {
   cp deploy/install.sh                  "$dir/"
   cp deploy/remotectl-server.service    "$dir/"
   cp deploy/server.yaml.example         "$dir/"
-  chmod +x "$dir/remotectl-server" "$dir/install.sh"
-  tar -czf "$OUT/${name}.tar.gz" -C "$OUT/tmp" "$name"
+  cp scripts/gen-cert.sh                "$dir/"
+  chmod +x "$dir/remotectl-server" "$dir/install.sh" "$dir/gen-cert.sh"
+  COPYFILE_DISABLE=1 tar -czf "$OUT/${name}.tar.gz" -C "$OUT/tmp" "$name"
   rm -rf "$dir"
   ok "${name}.tar.gz"
 }
@@ -249,9 +250,15 @@ vim agent.yaml   # 填入 server 地址和 token
 ```bash
 tar xzf remotectl-server-linux-amd64-vX.Y.Z.tar.gz
 cd remotectl-server-linux-amd64-vX.Y.Z
-cp server.yaml.example server.yaml
-vim server.yaml          # 填入 tokens、TLS 证书路径、TURN 配置
+
+# （可选）生成自签名 TLS 证书，如已有域名证书可跳过此步
+bash gen-cert.sh ./certs 1.2.3.4          # 替换为服务器公网 IP
+# 或同时绑定域名：
+# bash gen-cert.sh ./certs 1.2.3.4 my.domain.com
+
 sudo bash install.sh     # 安装到 /opt/remotectl，绑定 443 端口，无需 root
+sudo vim /opt/remotectl/server.yaml   # 填入 tokens、TLS 证书路径、TURN 配置
+sudo systemctl restart remotectl-server
 ```
 
 ## 平台支持
