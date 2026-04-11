@@ -132,6 +132,12 @@ pack_agent "$OUT/tmp/remotectl-agent-mac-universal" "mac" tar
 
 # ── 3. Agent — Windows amd64 ─────────────────────────────────────────────────
 
+# Ensure Windows x264 cross-compile libs are present.
+if [[ ! -f "agent/pipeline/x264/x264.h" || ! -f "agent/pipeline/x264/libx264.a" ]]; then
+  log "Fetching Windows x264 cross-compile libs"
+  bash "$ROOT/scripts/setup-x264-win.sh"
+fi
+
 log "Building agent (windows-amd64)"
 (cd agent && CGO_ENABLED=1 GOOS=windows GOARCH=amd64 \
   CC=x86_64-w64-mingw32-gcc \

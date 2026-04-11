@@ -164,6 +164,12 @@ untrust-cert:
 		/Library/Keychains/System.keychain 2>/dev/null || true
 	@echo "Certificate removed from trust store."
 
+# ── Windows 交叉编译依赖 ───────────────────────
+# 从 MSYS2 下载 Windows 版 x264 头文件和静态库，放到 agent/pipeline/x264/
+# make release 会自动调用，也可手动执行：
+setup-x264-win:
+	@bash scripts/setup-x264-win.sh
+
 # ── 开发模式 ──────────────────────────────────
 # 需先：make cert && cp deploy/server.yaml.example deploy/server.yaml
 dev-server:
