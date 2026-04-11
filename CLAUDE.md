@@ -33,6 +33,49 @@ make client         # 前端 (React)
 make all            # 全量构建
 ```
 
+## 发布 Release
+
+源码不开源，只发布各平台二进制包到 GitHub Releases。
+
+**在 macOS 上执行（构建 server 全平台 + agent mac/win/linux + Flutter macOS app）：**
+
+```bash
+# 正式发布
+make release VERSION=v1.0.0
+
+# 先创建草稿，确认无误后在 GitHub 页面手动发布
+make release VERSION=v1.0.0 DRAFT=--draft
+```
+
+**在 Windows 构建 Flutter Windows app 后补传：**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\build-app-win.ps1
+bash scripts/upload-release.sh v1.0.0
+```
+
+**在 Linux 构建 Flutter Linux app 后补传：**
+
+```bash
+./scripts/build-app-linux.sh
+./scripts/upload-release.sh v1.0.0
+```
+
+发布制品清单（存放于 `deploy/release/<version>/`，不提交到 git）：
+
+| 文件 | 内容 |
+|------|------|
+| `remotectl-server-linux-amd64-vX.Y.Z.tar.gz` | 服务器 + systemd 部署脚本 |
+| `remotectl-server-linux-arm64-vX.Y.Z.tar.gz` | 服务器 ARM64 + 部署脚本 |
+| `remotectl-agent-mac-vX.Y.Z.tar.gz` | 被控端 macOS Universal |
+| `remotectl-agent-windows-amd64-vX.Y.Z.zip` | 被控端 Windows |
+| `remotectl-agent-linux-amd64-vX.Y.Z.tar.gz` | 被控端 Linux |
+| `remotectl-app-macos-vX.Y.Z.zip` | 控制端 Flutter macOS App |
+| `remotectl-app-windows-amd64-vX.Y.Z.zip` | 控制端 Flutter Windows App（Windows 构建补传）|
+| `remotectl-app-linux-amd64-vX.Y.Z.tar.gz` | 控制端 Flutter Linux App（Linux 构建补传）|
+
+前置依赖：`brew install gh mingw-w64 FiloSottile/musl-cross/musl-cross`，并执行 `gh auth login`。
+
 ## Linux 服务器部署（systemd）
 
 服务以 `ubuntu` 用户运行，通过 `AmbientCapabilities=CAP_NET_BIND_SERVICE` 绑定 443 端口，无需 root。

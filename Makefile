@@ -192,6 +192,21 @@ docker-up:
 install:
 	@bash deploy/install.sh install
 
+# ── 发布 Release ──────────────────────────────
+# 在 macOS 上执行，构建所有能交叉编译的平台产物并发布到 GitHub Releases。
+# 需要: gh, flutter, mingw-w64, musl-cross
+#
+# 正式发布:
+#   make release VERSION=v1.0.0
+# 草稿（先预览再发布）:
+#   make release VERSION=v1.0.0 DRAFT=--draft
+#
+# Windows / Linux Flutter App 在对应平台构建后追加上传:
+#   scripts/upload-release.sh v1.0.0
+release:
+	@[[ -n "$(VERSION)" ]] || { echo "Usage: make release VERSION=v1.0.0"; exit 1; }
+	@bash scripts/release.sh $(VERSION) $(DRAFT)
+
 # ── 清理 ──────────────────────────────────────
 clean:
 	rm -rf deploy/bin/* deploy/static/*
