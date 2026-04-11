@@ -66,16 +66,13 @@ agent-win: | deploy/bin
 		-o ../deploy/bin/remotectl-agent-windows-amd64.exe .
 	@echo "✓ agent → deploy/bin/remotectl-agent-windows-amd64.exe"
 
-# Linux cross-compile requires a Linux CGO toolchain.
-# On macOS host: brew install FiloSottile/musl-cross/musl-cross
-#   (provides x86_64-linux-musl-gcc, links statically — no glibc dep)
-# On Linux host: apt install gcc libx264-dev libx11-dev libxext-dev
+# Linux agent uses Docker for cross-compilation (X11/x264 headers not available in musl-cross).
+# On Linux host, run scripts/build-app-linux.sh directly instead.
 agent-linux: | deploy/bin
-	cd agent && CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
-		CC=x86_64-linux-musl-gcc \
-		CGO_LDFLAGS="-lx264 -lX11 -lXext -static" \
-		go build -ldflags="-s -w" \
-		-o ../deploy/bin/remotectl-agent-linux-amd64 .
+	docker build --platform linux/amd64 \
+		-f Dockerfile.agent-linux \
+		-o type=local,dest=deploy/bin \
+		.
 	@echo "✓ agent → deploy/bin/remotectl-agent-linux-amd64"
 
 deploy/bin:

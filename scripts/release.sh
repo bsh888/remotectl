@@ -46,8 +46,8 @@ command -v gh      &>/dev/null || die "gh not found. brew install gh && gh auth 
 command -v flutter &>/dev/null || die "flutter not found."
 command -v x86_64-w64-mingw32-gcc &>/dev/null \
   || die "mingw-w64 not found. brew install mingw-w64"
-command -v x86_64-linux-musl-gcc &>/dev/null \
-  || die "musl-cross not found. brew install FiloSottile/musl-cross/musl-cross"
+command -v docker &>/dev/null \
+  || die "docker not found. Install Docker Desktop: https://www.docker.com/products/docker-desktop/"
 
 # Ensure working tree is clean
 if [[ -n "$(git status --porcelain)" ]]; then
@@ -145,14 +145,15 @@ log "Building agent (windows-amd64)"
   -o "$OUT/tmp/remotectl-agent-windows-amd64.exe" .)
 pack_agent "$OUT/tmp/remotectl-agent-windows-amd64.exe" "windows-amd64" zip
 
-# ── 4. Agent — Linux amd64 ───────────────────────────────────────────────────
+# ── 4. Agent — Linux amd64 (Docker) ──────────────────────────────────────────
+# musl-cross doesn't include X11/x264 headers; use a Linux Docker container.
 
-log "Building agent (linux-amd64)"
-(cd agent && CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
-  CC=x86_64-linux-musl-gcc \
-  CGO_LDFLAGS="-lx264 -lX11 -lXext -static" \
-  go build -ldflags="-s -w" \
-  -o "$OUT/tmp/remotectl-agent-linux-amd64" .)
+log "Building agent (linux-amd64) via Docker"
+docker build \
+  --platform linux/amd64 \
+  -f "$ROOT/Dockerfile.agent-linux" \
+  -o type=local,dest="$OUT/tmp" \
+  "$ROOT"
 pack_agent "$OUT/tmp/remotectl-agent-linux-amd64" "linux-amd64" tar
 
 # ── 5. Flutter — macOS app ───────────────────────────────────────────────────

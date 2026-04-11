@@ -1,0 +1,16 @@
+FROM golang:1.24-bookworm
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      gcc \
+      libx264-dev \
+      libx11-dev \
+      libxext-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+COPY agent/ ./agent/
+COPY go.mod go.sum ./
+
+RUN cd agent && \
+    CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-s -w" -o /out/remotectl-agent-linux-amd64 .
