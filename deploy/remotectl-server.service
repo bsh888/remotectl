@@ -6,8 +6,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=remotectl
-Group=remotectl
+User=ubuntu
+Group=ubuntu
 WorkingDirectory=/opt/remotectl
 
 ExecStart=/opt/remotectl/remotectl-server \

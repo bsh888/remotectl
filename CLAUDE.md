@@ -33,6 +33,38 @@ make client         # 前端 (React)
 make all            # 全量构建
 ```
 
+## Linux 服务器部署（systemd）
+
+服务以 `ubuntu` 用户运行，通过 `AmbientCapabilities=CAP_NET_BIND_SERVICE` 绑定 443 端口，无需 root。
+
+```bash
+# 1. 交叉编译 Linux 二进制
+make server-linux
+
+# 2. 上传 deploy/ 目录到服务器
+scp -r deploy/ ubuntu@server:~/remotectl-deploy/
+
+# 3. 服务器上执行安装（需 sudo）
+sudo bash ~/remotectl-deploy/install.sh
+
+# 4. 修改配置（addr 改为 :443，填入 tokens / TLS 路径 / TURN 等）
+sudo vim /opt/remotectl/server.yaml
+sudo systemctl restart remotectl-server
+
+# 查看日志
+journalctl -u remotectl-server -f
+
+# 升级（重新上传后再执行一次 install）
+sudo bash ~/remotectl-deploy/install.sh
+
+# 卸载（保留 /opt/remotectl/ 中的配置和证书）
+sudo bash ~/remotectl-deploy/install.sh remove
+```
+
+相关文件：
+- `deploy/remotectl-server.service` — systemd unit（User=ubuntu，含安全加固选项）
+- `deploy/install.sh` — 安装/升级/卸载脚本，部署到 `/opt/remotectl/`
+
 ## 关键技术细节
 
 ### agent — macOS 视频编码 (pipeline_darwin.m)

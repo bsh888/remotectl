@@ -9,7 +9,7 @@ set -euo pipefail
 SERVICE=remotectl-server
 INSTALL_DIR=/opt/remotectl
 UNIT_FILE=/etc/systemd/system/${SERVICE}.service
-USER=remotectl
+USER=ubuntu
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -61,11 +61,8 @@ do_install() {
 
   [[ -f "$bin_src" ]] || die "Binary not found: ${bin_src}\nRun: make server-linux"
 
-  # ── Create user ─────────────────────────────────────────────────────────────
-  if ! id -u "${USER}" &>/dev/null; then
-    log "Creating system user '${USER}'..."
-    useradd --system --no-create-home --shell /usr/sbin/nologin "${USER}"
-  fi
+  # ── Verify user exists ──────────────────────────────────────────────────────
+  id -u "${USER}" &>/dev/null || die "User '${USER}' does not exist on this system."
 
   # ── Create install dir ──────────────────────────────────────────────────────
   log "Creating ${INSTALL_DIR}..."
