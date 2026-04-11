@@ -184,13 +184,15 @@ git tag -a "$VERSION" -m "Release $VERSION"
 git push origin "$VERSION"
 ok "Tag pushed"
 
-# ── Ensure releases repo has at least one commit ──────────────────────────────
-# gh release create fails with "Repository is empty" on a brand-new repo.
-if ! gh api repos/bsh888/remotectl-releases/contents/README.md --jq '.sha' &>/dev/null 2>&1; then
-  log "Initializing bsh888/remotectl-releases with initial commit"
-  gh api repos/bsh888/remotectl-releases/contents/README.md \
+# ── Sync README to releases repo (create on first run, update thereafter) ─────
+log "Syncing README to bsh888/remotectl-releases"
+README_SHA=$(gh api repos/bsh888/remotectl-releases/contents/README.md --jq '.sha' 2>/dev/null || true)
+README_ARGS=()
+[[ -n "$README_SHA" ]] && README_ARGS=(-f "sha=$README_SHA")
+gh api repos/bsh888/remotectl-releases/contents/README.md \
     --method PUT \
-    -f message="Initialize releases repository" \
+    "${README_ARGS[@]}" \
+    -f message="Update README for $VERSION" \
     -f content="$(printf '%s' '# RemoteCtl
 
 跨平台远程桌面工具，支持 macOS / Windows / Linux 被控端，浏览器或原生 App 作为控制端。
@@ -265,8 +267,7 @@ sudo bash install.sh
 | Android | ✅ | ❌ |
 ' | base64)" \
     --silent
-  ok "Initial commit created"
-fi
+ok "README synced"
 
 # ── GitHub Release ────────────────────────────────────────────────────────────
 
