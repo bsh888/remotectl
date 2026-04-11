@@ -52,9 +52,17 @@ if [[ -n "$(git status --porcelain)" ]]; then
   die "Working tree is dirty. Commit or stash changes before releasing."
 fi
 
-# Ensure tag doesn't already exist
+# ── Clean up any previous failed release attempt ──────────────────────────────
 if git rev-parse "$VERSION" &>/dev/null; then
-  die "Tag $VERSION already exists."
+  log "Removing existing tag $VERSION (re-release)"
+  git tag -d "$VERSION"
+  git push origin ":refs/tags/$VERSION" 2>/dev/null || true
+  ok "Local + remote tag removed"
+fi
+if gh release view "$VERSION" --repo bsh888/remotectl-releases &>/dev/null 2>&1; then
+  gh release delete "$VERSION" --repo bsh888/remotectl-releases --yes 2>/dev/null || true
+  gh api "repos/bsh888/remotectl-releases/git/refs/tags/$VERSION" --method DELETE 2>/dev/null || true
+  ok "Release repo tag + release removed"
 fi
 
 log "Building release $VERSION"
