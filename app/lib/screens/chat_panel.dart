@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:open_file/open_file.dart';
 
 import '../services/chat_service.dart';
 
@@ -98,14 +99,16 @@ class _ChatPanelState extends State<ChatPanel> {
     final path = msg.localPath!;
     try {
       if (Platform.isMacOS) {
-        Process.run('open', [path]);
+        await Process.run('open', [path]);
       } else if (Platform.isWindows) {
         // `explorer.exe path` is unreliable with spaces; use cmd start instead.
-        Process.run('cmd', ['/c', 'start', '', path]);
+        await Process.run('cmd', ['/c', 'start', '', path]);
       } else if (Platform.isLinux) {
-        Process.run('xdg-open', [path]);
+        await Process.run('xdg-open', [path]);
+      } else {
+        // iOS / Android: use open_file to launch the file in the associated app.
+        await OpenFile.open(path);
       }
-      // iOS / Android: handled separately (no file manager API here)
     } catch (_) {}
   }
 
