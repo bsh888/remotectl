@@ -569,12 +569,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\upload-release.ps1 v1.0.0
 |------|---------|------|
 | `remotectl-server-linux-amd64-vX.Y.Z.tar.gz` | macOS | 信令服务器 x86\_64（含 systemd 部署脚本） |
 | `remotectl-server-linux-arm64-vX.Y.Z.tar.gz` | macOS | 信令服务器 ARM64（含 systemd 部署脚本） |
-| `remotectl-agent-mac-vX.Y.Z.tar.gz` | macOS | 被控端 macOS Universal (arm64+amd64) |
-| `remotectl-agent-windows-amd64-vX.Y.Z.zip` | macOS | 被控端 Windows x64（mingw 交叉编译） |
-| `remotectl-agent-linux-amd64-vX.Y.Z.tar.gz` | Linux | 被控端 Linux x86\_64 |
-| `remotectl-app-macos-vX.Y.Z.zip` | macOS | 控制端 Flutter macOS App |
-| `remotectl-app-windows-amd64-vX.Y.Z.zip` | Windows | 控制端 Flutter Windows App |
-| `remotectl-app-linux-amd64-vX.Y.Z.tar.gz` | Linux | 控制端 Flutter Linux App |
+| `remotectl-agent-linux-amd64-vX.Y.Z.tar.gz` | Linux | 被控端 Linux x86\_64（无 GUI / headless 服务器） |
+| `remotectl-app-macos-vX.Y.Z.zip` | macOS | 控制端+被控端 Flutter macOS App |
+| `remotectl-app-windows-amd64-vX.Y.Z.zip` | Windows | 控制端+被控端 Flutter Windows App |
+| `remotectl-app-linux-amd64-vX.Y.Z.tar.gz` | Linux | 控制端+被控端 Flutter Linux App |
 
 ---
 

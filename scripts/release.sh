@@ -134,7 +134,7 @@ lipo -create \
   "$OUT/tmp/remotectl-agent-mac-arm64" \
   "$OUT/tmp/remotectl-agent-mac-amd64" \
   -output "$OUT/tmp/remotectl-agent-mac-universal"
-pack_agent "$OUT/tmp/remotectl-agent-mac-universal" "mac" tar
+# macOS agent is bundled inside remotectl-app-macos; no standalone package needed.
 
 # ── 3. Agent — Windows amd64 ─────────────────────────────────────────────────
 
@@ -149,7 +149,7 @@ log "Building agent (windows-amd64)"
   CC=x86_64-w64-mingw32-gcc \
   go build -ldflags="-s -w -H windowsgui" \
   -o "$OUT/tmp/remotectl-agent-windows-amd64.exe" .)
-pack_agent "$OUT/tmp/remotectl-agent-windows-amd64.exe" "windows-amd64" zip
+# Windows agent is bundled inside remotectl-app-windows; no standalone package needed.
 
 # ── 4. Agent — Linux amd64 ───────────────────────────────────────────────────
 # X11 headers are not available on macOS; build on a Linux machine and upload
@@ -280,10 +280,10 @@ NOTES="## $VERSION
 |------|------|
 | \`remotectl-server-linux-amd64-${VERSION}.tar.gz\` | 信令服务器 Linux x86_64（含 systemd 部署脚本） |
 | \`remotectl-server-linux-arm64-${VERSION}.tar.gz\` | 信令服务器 Linux ARM64 |
-| \`remotectl-agent-mac-${VERSION}.tar.gz\` | 被控端 macOS Universal (arm64+amd64) |
-| \`remotectl-agent-windows-amd64-${VERSION}.zip\` | 被控端 Windows x64 |
-| \`remotectl-agent-linux-amd64-${VERSION}.tar.gz\` | 被控端 Linux x86_64（Linux 上补传） |
-| \`remotectl-app-macos-${VERSION}.zip\` | 控制端 Flutter macOS App |
+| \`remotectl-agent-linux-amd64-${VERSION}.tar.gz\` | 被控端 Linux x86_64（命令行 / 无 GUI 服务器，Linux 上补传） |
+| \`remotectl-app-macos-${VERSION}.zip\` | 控制端+被控端 Flutter macOS App |
+| \`remotectl-app-windows-amd64-${VERSION}.zip\` | 控制端+被控端 Flutter Windows App（Windows 补传） |
+| \`remotectl-app-linux-amd64-${VERSION}.tar.gz\` | 控制端+被控端 Flutter Linux App（Linux 补传） |
 
 > Linux agent、Windows / Linux Flutter App 在各平台编译后通过 \`scripts/upload-release.sh $VERSION\` 追加上传。
 

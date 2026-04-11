@@ -68,12 +68,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\upload-release.ps1 v1.0.0
 |------|---------|
 | `remotectl-server-linux-amd64-vX.Y.Z.tar.gz` | macOS |
 | `remotectl-server-linux-arm64-vX.Y.Z.tar.gz` | macOS |
-| `remotectl-agent-mac-vX.Y.Z.tar.gz` | macOS |
-| `remotectl-agent-windows-amd64-vX.Y.Z.zip` | macOS（mingw 交叉编译） |
-| `remotectl-agent-linux-amd64-vX.Y.Z.tar.gz` | Linux |
-| `remotectl-app-macos-vX.Y.Z.zip` | macOS |
-| `remotectl-app-windows-amd64-vX.Y.Z.zip` | Windows |
-| `remotectl-app-linux-amd64-vX.Y.Z.tar.gz` | Linux |
+| `remotectl-agent-linux-amd64-vX.Y.Z.tar.gz` | Linux（无 GUI / headless 服务器用） |
+| `remotectl-app-macos-vX.Y.Z.zip` | macOS（含控制端+被控端） |
+| `remotectl-app-windows-amd64-vX.Y.Z.zip` | Windows（含控制端+被控端） |
+| `remotectl-app-linux-amd64-vX.Y.Z.tar.gz` | Linux（含控制端+被控端） |
 
 ## Linux 服务器部署（systemd）
 
