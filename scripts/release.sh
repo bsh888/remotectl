@@ -183,7 +183,79 @@ if ! gh api repos/bsh888/remotectl-releases/git/refs/heads -q '.[0].ref' &>/dev/
   gh api repos/bsh888/remotectl-releases/contents/README.md \
     --method PUT \
     -f message="Initialize releases repository" \
-    -f content="$(printf '# RemoteCtl Releases\n\nBinary releases for [RemoteCtl](https://github.com/bsh888/remotectl).\n' | base64)" \
+    -f content="$(printf '%s' '# RemoteCtl
+
+跨平台远程桌面工具，支持 macOS / Windows / Linux 被控端，浏览器或原生 App 作为控制端。
+
+## 功能特性
+
+- **H.264 硬件编码**：macOS 使用 VideoToolbox，Windows/Linux 使用 x264
+- **WebRTC 传输**：视频流点对点直连，服务器不经手视频数据
+- **TURN 中继**：自动为移动网络 / 对称型 NAT 提供中继
+- **E2EE 输入加密**：ECDH P-256 + AES-256-GCM 端对端加密输入事件
+- **低延迟鼠标**：本地光标叠加层即时反馈，输入走 P2P DataChannel
+- **跨平台剪贴板**：控制端粘贴文本到远程，支持中文 / Emoji
+- **会话内聊天**：控制端与被控端实时文字消息 + 文件互传
+- **会话密码认证**：每次启动随机生成 8 位数字密码，简单安全
+- **一体化桌面 App**：macOS/Windows/Linux 原生 App 同时内置"远程控制"和"共享本机"两种模式
+
+## 下载
+
+前往 [Releases](https://github.com/bsh888/remotectl-releases/releases) 页面下载对应平台的安装包。
+
+| 文件 | 说明 |
+|------|------|
+| `remotectl-agent-mac-vX.Y.Z.tar.gz` | 被控端 macOS Universal (arm64+amd64) |
+| `remotectl-agent-windows-amd64-vX.Y.Z.zip` | 被控端 Windows x64 |
+| `remotectl-agent-linux-amd64-vX.Y.Z.tar.gz` | 被控端 Linux x86_64 |
+| `remotectl-app-macos-vX.Y.Z.zip` | 控制端 Flutter macOS App |
+| `remotectl-app-windows-amd64-vX.Y.Z.zip` | 控制端 Flutter Windows App |
+| `remotectl-app-linux-amd64-vX.Y.Z.tar.gz` | 控制端 Flutter Linux App |
+| `remotectl-server-linux-amd64-vX.Y.Z.tar.gz` | 信令服务器 Linux x86_64（含 systemd 部署脚本） |
+| `remotectl-server-linux-arm64-vX.Y.Z.tar.gz` | 信令服务器 Linux ARM64 |
+
+## 快速开始
+
+### 被控端（共享本机屏幕）
+
+解压对应平台的 agent 包，配置 `agent.yaml` 后运行：
+
+```bash
+# macOS / Linux
+./remotectl-agent --config agent.yaml
+
+# Windows
+remotectl-agent.exe --config agent.yaml
+```
+
+### 控制端（远程控制）
+
+- **桌面 App**：下载对应平台的 `remotectl-app-*` 包，解压直接运行
+- **浏览器**：访问自建信令服务器地址，输入设备 ID 和会话密码即可连接
+
+### 信令服务器（自建）
+
+下载 `remotectl-server-linux-*` 包，解压后：
+
+```bash
+# 编辑配置
+cp server.yaml.example server.yaml
+vim server.yaml
+
+# 一键安装为 systemd 服务（443 端口，无需 root）
+sudo bash install.sh
+```
+
+## 平台支持
+
+| 平台 | 控制端 | 被控端 |
+|------|--------|--------|
+| macOS | ✅ | ✅ |
+| Windows | ✅ | ✅ |
+| Linux | ✅ | ✅ |
+| iOS | ✅ | ❌ |
+| Android | ✅ | ❌ |
+' | base64)" \
     --silent
   ok "Initial commit created"
 fi
