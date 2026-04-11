@@ -215,56 +215,54 @@ gh api repos/bsh888/remotectl-releases/contents/README.md \
 
 | 文件 | 说明 |
 |------|------|
-| `remotectl-agent-mac-vX.Y.Z.tar.gz` | 被控端 macOS Universal (arm64+amd64) |
-| `remotectl-agent-windows-amd64-vX.Y.Z.zip` | 被控端 Windows x64 |
-| `remotectl-agent-linux-amd64-vX.Y.Z.tar.gz` | 被控端 Linux x86_64 |
-| `remotectl-app-macos-vX.Y.Z.zip` | 控制端 Flutter macOS App |
-| `remotectl-app-windows-amd64-vX.Y.Z.zip` | 控制端 Flutter Windows App |
-| `remotectl-app-linux-amd64-vX.Y.Z.tar.gz` | 控制端 Flutter Linux App |
+| `remotectl-app-macos-vX.Y.Z.zip` | macOS App（控制端 + 被控端二合一） |
+| `remotectl-app-windows-amd64-vX.Y.Z.zip` | Windows App（控制端 + 被控端二合一） |
+| `remotectl-app-linux-amd64-vX.Y.Z.tar.gz` | Linux App（控制端 + 被控端二合一） |
+| `remotectl-agent-linux-amd64-vX.Y.Z.tar.gz` | Linux 被控端（无 GUI / headless 服务器） |
 | `remotectl-server-linux-amd64-vX.Y.Z.tar.gz` | 信令服务器 Linux x86_64（含 systemd 部署脚本） |
-| `remotectl-server-linux-arm64-vX.Y.Z.tar.gz` | 信令服务器 Linux ARM64 |
+| `remotectl-server-linux-arm64-vX.Y.Z.tar.gz` | 信令服务器 Linux ARM64（含 systemd 部署脚本） |
 
 ## 快速开始
 
-### 被控端（共享本机屏幕）
+### 桌面 App（控制端 + 被控端）
 
-解压对应平台的 agent 包，配置 `agent.yaml` 后运行：
+下载对应平台的 `remotectl-app-*` 包，解压直接运行。App 内置两种模式：
+- **远程控制**：输入设备 ID + 会话密码，连接并控制远程机器
+- **共享本机**：将本机屏幕共享给控制端
+
+### Linux 无 GUI 被控端
+
+适用于无桌面环境的 Linux 服务器，下载 `remotectl-agent-linux-amd64-*` 包：
 
 ```bash
-# macOS / Linux
+tar xzf remotectl-agent-linux-amd64-vX.Y.Z.tar.gz
+cd remotectl-agent-linux-amd64-vX.Y.Z
+cp agent.yaml.example agent.yaml
+vim agent.yaml   # 填入 server 地址和 token
 ./remotectl-agent --config agent.yaml
-
-# Windows
-remotectl-agent.exe --config agent.yaml
 ```
-
-### 控制端（远程控制）
-
-- **桌面 App**：下载对应平台的 `remotectl-app-*` 包，解压直接运行
-- **浏览器**：访问自建信令服务器地址，输入设备 ID 和会话密码即可连接
 
 ### 信令服务器（自建）
 
-下载 `remotectl-server-linux-*` 包，解压后：
+下载 `remotectl-server-linux-*` 包，解压后一键部署为 systemd 服务：
 
 ```bash
-# 编辑配置
+tar xzf remotectl-server-linux-amd64-vX.Y.Z.tar.gz
+cd remotectl-server-linux-amd64-vX.Y.Z
 cp server.yaml.example server.yaml
-vim server.yaml
-
-# 一键安装为 systemd 服务（443 端口，无需 root）
-sudo bash install.sh
+vim server.yaml          # 填入 tokens、TLS 证书路径、TURN 配置
+sudo bash install.sh     # 安装到 /opt/remotectl，绑定 443 端口，无需 root
 ```
 
 ## 平台支持
 
 | 平台 | 控制端 | 被控端 |
 |------|--------|--------|
-| macOS | ✅ | ✅ |
-| Windows | ✅ | ✅ |
-| Linux | ✅ | ✅ |
-| iOS | ✅ | ❌ |
-| Android | ✅ | ❌ |
+| macOS | ✅ App | ✅ App 内置 |
+| Windows | ✅ App | ✅ App 内置 |
+| Linux | ✅ App | ✅ App 内置 / 独立 agent |
+| iOS | ✅ App | ❌ |
+| Android | ✅ App | ❌ |
 ' | base64)" \
     --silent
 ok "README synced"
