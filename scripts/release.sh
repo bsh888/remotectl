@@ -298,13 +298,18 @@ sudo bash install.sh
 \`\`\`
 "
 
-gh release create "$VERSION" \
+NOTES_FILE=$(mktemp)
+printf '%s' "$NOTES" > "$NOTES_FILE"
+
+GH_EDITOR=true gh release create "$VERSION" \
   --repo bsh888/remotectl-releases \
   $DRAFT_FLAG \
   --title "RemoteCtl $VERSION" \
-  --notes "$NOTES" \
+  --notes-file "$NOTES_FILE" \
   "$OUT"/*.tar.gz \
   "$OUT"/*.zip
+
+rm -f "$NOTES_FILE"
 
 log "Done"
 echo ""
