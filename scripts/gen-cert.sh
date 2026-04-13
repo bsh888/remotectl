@@ -4,10 +4,12 @@
 # Usage:
 #   bash scripts/gen-cert.sh [output-dir] [ip-or-domain ...]
 #
+# Each extra argument can be a single value or comma-separated list.
 # Examples:
-#   bash scripts/gen-cert.sh ./certs                          # localhost only
-#   bash scripts/gen-cert.sh ./certs 10.200.10.1              # + LAN IP
-#   bash scripts/gen-cert.sh ./certs 10.200.10.1 example.com  # + IP + domain
+#   bash scripts/gen-cert.sh ./certs                                    # localhost only
+#   bash scripts/gen-cert.sh ./certs 1.2.3.4                            # + IP
+#   bash scripts/gen-cert.sh ./certs 1.2.3.4 example.com               # + IP + domain
+#   bash scripts/gen-cert.sh ./certs 1.2.3.4,10.0.0.1 a.com,b.com      # comma-separated
 set -euo pipefail
 
 OUT=${1:-./certs}
@@ -23,15 +25,20 @@ IP_IDX=2
 ALT_NAMES="DNS.1 = localhost\nIP.1  = 127.0.0.1\n"
 
 for arg in "$@"; do
-  # Detect IPv4 / IPv6 vs hostname
-  if [[ "$arg" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || \
-     [[ "$arg" =~ ^[0-9a-fA-F:]+$ && "$arg" == *:* ]]; then
-    ALT_NAMES+="IP.${IP_IDX}  = ${arg}\n"
-    (( IP_IDX++ ))
-  else
-    ALT_NAMES+="DNS.${DNS_IDX} = ${arg}\n"
-    (( DNS_IDX++ ))
-  fi
+  # Split on commas to allow "1.2.3.4,5.6.7.8" or "a.com,b.com"
+  IFS=',' read -ra tokens <<< "$arg"
+  for token in "${tokens[@]}"; do
+    [[ -z "$token" ]] && continue
+    # Detect IPv4 / IPv6 vs hostname
+    if [[ "$token" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || \
+       [[ "$token" =~ ^[0-9a-fA-F:]+$ && "$token" == *:* ]]; then
+      ALT_NAMES+="IP.${IP_IDX}  = ${token}\n"
+      (( IP_IDX++ ))
+    else
+      ALT_NAMES+="DNS.${DNS_IDX} = ${token}\n"
+      (( DNS_IDX++ ))
+    fi
+  done
 done
 
 cat > "$OPENSSL_CNF" <<EOF
