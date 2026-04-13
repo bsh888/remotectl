@@ -866,8 +866,8 @@ func (h *Hub) handleAdminTokensList(w http.ResponseWriter, r *http.Request) {
 	result := make([]TokenInfo, 0, len(h.tokens))
 	for id, secret := range h.tokens {
 		masked := secret
-		if len(secret) > 8 {
-			masked = secret[:4] + "..." + secret[len(secret)-4:]
+		if runes := []rune(secret); len(runes) > 8 {
+			masked = string(runes[:4]) + "..." + string(runes[len(runes)-4:])
 		}
 		result = append(result, TokenInfo{DeviceID: id, Secret: masked})
 	}
