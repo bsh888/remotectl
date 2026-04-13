@@ -110,6 +110,7 @@ type AuthPayload struct {
 	Platform   string `json:"platform"`
 	Name       string `json:"name"`
 	SessionPwd string `json:"session_pwd"` // ephemeral per-session password from agent
+	HostInfo   string `json:"host_info"`   // username@hostname · OS version (read-only, from OS)
 }
 
 type ConnectPayload struct {
@@ -277,6 +278,7 @@ type Agent struct {
 	id         string
 	name       string
 	platform   string
+	hostInfo   string // username@hostname · OS version, read-only from agent OS
 	sessionPwd string // ephemeral password set by agent at registration
 	conn       *websocket.Conn
 	send       chan []byte
@@ -640,6 +642,7 @@ func (h *Hub) handleAgent(w http.ResponseWriter, r *http.Request) {
 		id:         auth.DeviceID,
 		name:       auth.Name,
 		platform:   auth.Platform,
+		hostInfo:   auth.HostInfo,
 		sessionPwd: auth.SessionPwd,
 		conn:       conn,
 		send:       make(chan []byte, 256),
@@ -834,6 +837,7 @@ func (h *Hub) handleAdminAgents(w http.ResponseWriter, r *http.Request) {
 		ID          string `json:"id"`
 		Name        string `json:"name"`
 		Platform    string `json:"platform"`
+		HostInfo    string `json:"host_info"`
 		ViewerCount int    `json:"viewer_count"`
 	}
 	h.mu.RLock()
@@ -843,6 +847,7 @@ func (h *Hub) handleAdminAgents(w http.ResponseWriter, r *http.Request) {
 			ID:          a.id,
 			Name:        a.name,
 			Platform:    a.platform,
+			HostInfo:    a.hostInfo,
 			ViewerCount: a.viewerCount(),
 		})
 	}

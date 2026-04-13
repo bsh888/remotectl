@@ -18,7 +18,9 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"os/user"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -73,6 +75,7 @@ type AuthPayload struct {
 	Platform   string `json:"platform"`
 	Name       string `json:"name"`
 	SessionPwd string `json:"session_pwd"` // ephemeral per-session numeric password
+	HostInfo   string `json:"host_info"`   // username@hostname · OS version (read-only, from OS)
 }
 
 type ViewerEventPayload struct {
@@ -236,6 +239,36 @@ type chatFileReceiver struct {
 // The agent sends one ACK per window; Flutter pauses after each window waiting
 // for that ACK before sending the next batch.
 const chatFileAckWindow = 8
+
+// collectHostInfo returns a read-only string describing this machine,
+// e.g. "hua@shenghuadeMacBook-Pro · macOS 15.3"
+func collectHostInfo() string {
+	hostname, _ := os.Hostname()
+	who := hostname
+
+	if u, err := user.Current(); err == nil && u.Username != "" {
+		username := u.Username
+		// Windows returns "DOMAIN\user" — strip the domain part
+		if idx := strings.LastIndex(username, "\\"); idx >= 0 {
+			username = username[idx+1:]
+		}
+		if hostname != "" {
+			who = username + "@" + hostname
+		} else {
+			who = username
+		}
+	}
+
+	ver := osVersion()
+	arch := runtime.GOARCH
+	if arch == "amd64" {
+		arch = "x86_64"
+	}
+	if ver != "" {
+		return who + " · " + ver + " " + arch
+	}
+	return who
+}
 
 // generateSessionPwd returns a random 8-digit numeric string used as the
 // ephemeral session password viewers must provide to connect.
@@ -863,7 +896,7 @@ func (a *Agent) authenticate() error {
 	macHex := hex.EncodeToString(mac.Sum(nil))
 	payload, _ := json.Marshal(AuthPayload{
 		DeviceID: a.deviceID, HMAC: macHex, Platform: a.platform, Name: a.name,
-		SessionPwd: a.sessionPwd,
+		SessionPwd: a.sessionPwd, HostInfo: collectHostInfo(),
 	})
 	authMsg, _ := json.Marshal(Message{Type: TypeAuth, Payload: payload})
 	a.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))

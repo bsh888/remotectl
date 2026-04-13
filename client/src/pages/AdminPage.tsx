@@ -4,6 +4,7 @@ interface AgentInfo {
   id: string
   name: string
   platform: string
+  host_info: string
   viewer_count: number
 }
 
@@ -356,8 +357,16 @@ export default function AdminPage() {
                                 width:7, height:7, borderRadius:'50%',
                                 background:'#4ade80', display:'inline-block', flexShrink:0,
                               }}/>
-                              <span style={{color:'#e2e8f0', fontSize:13, fontWeight:500}}>{online.name || online.id}</span>
-                              <span style={{color:'#64748b', fontSize:12}}>{online.platform}</span>
+                              <div>
+                                <div style={{color:'#e2e8f0', fontSize:13, fontWeight:500}}>
+                                  {online.host_info ? online.host_info.split(' · ')[0] : (online.name || online.id)}
+                                </div>
+                                {online.host_info && online.host_info.includes(' · ') && (
+                                  <div style={{color:'#64748b', fontSize:12, marginTop:1}}>
+                                    {online.host_info.split(' · ').slice(1).join(' · ')}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           ) : (
                             <span style={{color:'#334155', fontSize:13}}>离线</span>
@@ -428,21 +437,32 @@ function AgentsTable({ agents }: { agents: AgentInfo[] }) {
       <table style={{width:'100%', borderCollapse:'collapse'}}>
         <thead>
           <tr style={{borderBottom:`1px solid ${border}`}}>
-            {['设备 ID', '名称', '平台', '控制端数'].map(h => (
+            {['设备 ID', '设备信息', '控制端数'].map(h => (
               <th key={h} style={{padding:'14px 20px', textAlign:'left', color:textMuted, fontSize:13, fontWeight:600}}>{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {agents.length === 0 && (
-            <tr><td colSpan={4} style={{padding:40, textAlign:'center', color:textMuted}}>暂无在线设备</td></tr>
+            <tr><td colSpan={3} style={{padding:40, textAlign:'center', color:textMuted}}>暂无在线设备</td></tr>
           )}
           {agents.map(a => (
             <tr key={a.id} style={{borderBottom:`1px solid rgba(255,255,255,0.03)`}}>
               <td style={{padding:'14px 20px', fontFamily:'monospace', color:'#a5b4fc'}}>{a.id}</td>
-              <td style={{padding:'14px 20px', color:'#e2e8f0'}}>{a.name || '-'}</td>
-              <td style={{padding:'14px 20px', color:'#94a3b8'}}>
-                {platformIcon(a.platform)}{a.platform}
+              <td style={{padding:'14px 20px'}}>
+                <div style={{display:'flex', alignItems:'center', gap:8}}>
+                  {platformIcon(a.platform)}
+                  <div>
+                    <div style={{color:'#e2e8f0', fontSize:13, fontWeight:500}}>
+                      {a.host_info ? a.host_info.split(' · ')[0] : (a.name || a.id)}
+                    </div>
+                    {a.host_info && a.host_info.includes(' · ') && (
+                      <div style={{color:'#64748b', fontSize:12, marginTop:2}}>
+                        {a.host_info.split(' · ').slice(1).join(' · ')}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </td>
               <td style={{padding:'14px 20px'}}>
                 <span style={{
