@@ -44,6 +44,9 @@ export default function AdminPage() {
   const [editId, setEditId] = useState<string | null>(null)
   const [editSecret, setEditSecret] = useState('')
 
+  // Delete confirmation modal
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+
   const logout = () => {
     sessionStorage.removeItem('admin_token')
     setToken('')
@@ -131,7 +134,6 @@ export default function AdminPage() {
   }
 
   const handleDeleteToken = async (deviceId: string) => {
-    if (!confirm(`确认删除设备 ${deviceId} 的 token？`)) return
     try {
       const r = await apiFetch(`/api/admin/tokens/${deviceId}`, token, { method: 'DELETE' })
       if (r.ok) fetchTokens()
@@ -203,6 +205,33 @@ export default function AdminPage() {
       fontFamily:'-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       color:'#e2e8f0', display:'flex', flexDirection:'column',
     }}>
+      {/* Delete confirmation modal */}
+      {deleteTarget && (
+        <div style={{
+          position:'fixed', inset:0, background:'rgba(0,0,0,0.6)',
+          display:'flex', alignItems:'center', justifyContent:'center',
+          zIndex:1000,
+        }} onClick={() => setDeleteTarget(null)}>
+          <div style={{
+            background:'#0f1629', border:'1px solid rgba(255,255,255,0.1)',
+            borderRadius:16, padding:28, width:360,
+            boxShadow:'0 24px 48px rgba(0,0,0,0.5)',
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{fontSize:18, fontWeight:700, marginBottom:8}}>删除 Token</div>
+            <div style={{color:'#94a3b8', fontSize:14, marginBottom:24, lineHeight:1.6}}>
+              确认删除设备 <span style={{color:'#a5b4fc', fontFamily:'monospace'}}>{deleteTarget}</span> 的 Token？此操作不可恢复。
+            </div>
+            <div style={{display:'flex', gap:10, justifyContent:'flex-end'}}>
+              <button onClick={() => setDeleteTarget(null)} style={btnSmallGray}>取消</button>
+              <button onClick={() => { handleDeleteToken(deleteTarget); setDeleteTarget(null) }} style={{
+                background:'rgba(248,113,113,0.15)', border:'1px solid rgba(248,113,113,0.3)',
+                color:'#f87171', borderRadius:6, padding:'8px 18px', fontSize:13,
+                cursor:'pointer', fontWeight:600,
+              }}>确认删除</button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Top bar */}
       <div style={{
         height:60, background:surface, borderBottom:`1px solid ${border}`,
@@ -392,7 +421,7 @@ export default function AdminPage() {
                             ) : (
                               <>
                                 <button onClick={() => { setEditId(t.device_id); setEditSecret('') }} style={btnSmallBlue}>修改</button>
-                                <button onClick={() => handleDeleteToken(t.device_id)} style={btnSmallRed}>删除</button>
+                                <button onClick={() => setDeleteTarget(t.device_id)} style={btnSmallRed}>删除</button>
                               </>
                             )}
                           </div>
