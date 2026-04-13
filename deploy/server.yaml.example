@@ -29,16 +29,15 @@ tokens:
 # 987654321: "another-device-secret"
 
 # ── TURN 中继 ─────────────────────────────────────────────────────────────────
-# 移动网络 / 对称型 NAT 必须配置，否则会出现 "WebRTC connection failed"。
+# 移动网络（4G/5G）/ 对称型 NAT 必须配置，否则会出现 "WebRTC connection failed"。
 # 局域网内使用可留空。
 #
-# 使用 docker-compose 时，coturn 已内置，将下方 url 改为服务器公网 IP 即可。
-# turn.user / turn.password 须与 docker-compose.yml 中 coturn 的 --user 参数一致。
+# 推荐在服务器上安装 coturn：sudo apt install coturn
+# /etc/turnserver.conf 配置：lt-cred-mech + user=remotectl:changeme
+# 防火墙需放行：UDP/TCP 3478、UDP 49152-65535
 #
-# OCI 用户注意：需同时在 OCI 安全列表 AND 实例 iptables 中放行：
-#   UDP/TCP 3478  (TURN/STUN)
-#   UDP 49152-65535  (TURN 中继数据)
+# OCI 用户注意：需同时在 OCI 安全列表 AND 实例 iptables 中放行上述端口。
 turn:
-  url:      ""                  # e.g. turn:1.2.3.4:3478（填服务器公网 IP）
-  user:     "remotectl"         # 须与 docker-compose.yml coturn --user 一致
-  password: "changeme"          # 须与 docker-compose.yml coturn --user 的密码一致
+  url:      ""            # e.g. turn:1.2.3.4:3478（填服务器公网 IP）
+  user:     "remotectl"   # 与 coturn /etc/turnserver.conf 中 user= 用户名一致
+  password: "changeme"    # 与 coturn /etc/turnserver.conf 中 user= 密码一致

@@ -134,13 +134,6 @@ sudo apt update && sudo apt install -y coturn
 sudo sed -i 's/#TURNSERVER_ENABLED/TURNSERVER_ENABLED/' /etc/default/coturn
 ```
 
-### 生成 HMAC 密钥
-
-```bash
-openssl rand -hex 32
-# 记下输出，填入下方 static-auth-secret 及 server.yaml turn.secret
-```
-
 ### 配置 `/etc/turnserver.conf`
 
 ```
@@ -150,10 +143,11 @@ tls-listening-port=5349
 external-ip=<公网IP>
 realm=<域名或IP>
 
-use-auth-secret
-static-auth-secret=<上面生成的hex密钥>
+# 静态用户名/密码认证
+lt-cred-mech
+user=remotectl:changeme        # 与 server.yaml turn.user / turn.password 一致
 
-# 复用 remotectl 的 TLS 证书
+# 复用 remotectl 的 TLS 证书（可选，用于 turns:）
 cert=/opt/remotectl/certs/server.crt
 pkey=/opt/remotectl/certs/server.key
 
@@ -189,11 +183,9 @@ sudo journalctl -u coturn -f
 
 ```yaml
 turn:
-  urls:
-    - "turn:<域名或IP>:3478"
-    - "turns:<域名或IP>:5349"
-  secret: "<与 static-auth-secret 一致>"
-  ttl: 86400
+  url:      "turn:<公网IP或域名>:3478"
+  user:     "remotectl"    # 与 coturn user= 用户名一致
+  password: "changeme"     # 与 coturn user= 密码一致
 ```
 
 ## 关键技术细节

@@ -213,13 +213,14 @@ gh api repos/bsh888/remotectl-releases/contents/README.md \
 
 - **H.264 硬件编码**：macOS 使用 VideoToolbox，Windows/Linux 使用 x264
 - **WebRTC 传输**：视频流点对点直连，服务器不经手视频数据
-- **TURN 中继**：自动为移动网络 / 对称型 NAT 提供中继
+- **TURN 中继**：自动为移动网络（4G/5G）/ 对称型 NAT 提供中继
 - **E2EE 输入加密**：ECDH P-256 + AES-256-GCM 端对端加密输入事件
 - **低延迟鼠标**：本地光标叠加层即时反馈，输入走 P2P DataChannel
 - **跨平台剪贴板**：控制端粘贴文本到远程，支持中文 / Emoji
 - **会话内聊天**：控制端与被控端实时文字消息 + 文件互传
 - **会话密码认证**：每次启动随机生成 8 位数字密码，简单安全
 - **一体化桌面 App**：macOS/Windows/Linux 原生 App 同时内置"远程控制"和"共享本机"两种模式
+- **systemd 部署**：发布包内置 install.sh，一键部署为系统服务，无需 root 绑定 443 端口
 
 ## 下载
 
@@ -264,13 +265,48 @@ cd remotectl-server-linux-amd64-vX.Y.Z
 
 # （可选）生成自签名 TLS 证书，如已有域名证书可跳过此步
 bash gen-cert.sh ./certs 1.2.3.4          # 替换为服务器公网 IP
-# 或同时绑定域名：
-# bash gen-cert.sh ./certs 1.2.3.4 my.domain.com
+# bash gen-cert.sh ./certs 1.2.3.4 my.domain.com   # 同时绑定域名
 
-sudo bash install.sh     # 安装到 /opt/remotectl，绑定 443 端口，无需 root
+sudo bash install.sh    # 安装到 /opt/remotectl，自动添加 iptables 443 规则
 sudo vim /opt/remotectl/server.yaml   # 填入 tokens、TLS 证书路径、TURN 配置
 sudo systemctl restart remotectl-server
 ```
+
+### TURN 中继（移动网络必配）
+
+手机 4G/5G、运营商 NAT 环境下需要 TURN 中继，在同一台服务器上安装 coturn：
+
+```bash
+sudo apt install -y coturn
+sudo sed -i '"'"'s/#TURNSERVER_ENABLED/TURNSERVER_ENABLED/'"'"' /etc/default/coturn
+```
+
+`/etc/turnserver.conf` 关键配置：
+
+```
+listening-port=3478
+external-ip=<服务器公网IP>
+realm=<域名或IP>
+lt-cred-mech
+user=remotectl:changeme
+no-loopback-peers
+no-multicast-peers
+```
+
+```bash
+sudo systemctl enable --now coturn
+```
+
+在 `server.yaml` 填入 TURN 配置：
+
+```yaml
+turn:
+  url:      "turn:1.2.3.4:3478"
+  user:     "remotectl"
+  password: "changeme"
+```
+
+防火墙需放行 UDP/TCP 3478 和 UDP 49152-65535。
 
 ## 平台支持
 
@@ -281,6 +317,7 @@ sudo systemctl restart remotectl-server
 | Linux | ✅ App | ✅ App 内置 / 独立 agent |
 | iOS | ✅ App | ❌ |
 | Android | ✅ App | ❌ |
+| 浏览器 | ✅ Web | ❌ |
 ' | base64)" \
     --silent
 ok "README synced"

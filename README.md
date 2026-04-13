@@ -17,7 +17,7 @@
 - **会话密码认证**：被控端每次启动随机生成 8 位数字会话密码，控制端凭设备 ID + 会话密码连接，简单安全
 - **自动设备 ID**：被控端首次运行自动生成 9 位随机数字 ID 并持久化，无需手动配置
 - **YAML 配置文件**：服务端和 agent 均支持配置文件，无需记忆命令行参数
-- **Docker 部署**：服务器一键容器化部署
+- **systemd 部署**：发布包内置 install.sh，一键部署为 systemd 服务，无需 root 绑定 443 端口
 
 ## 架构
 
@@ -221,42 +221,39 @@ turn:
 
 ### 3. 启动服务器
 
-**Docker 部署：**
-```bash
-docker compose up -d
-```
-
 **systemd 部署（Linux 生产环境，推荐）：**
 
-以 `ubuntu` 用户运行，通过 `AmbientCapabilities=CAP_NET_BIND_SERVICE` 绑定 443 端口，无需 root。
+服务以 `ubuntu` 用户运行，通过 `AmbientCapabilities=CAP_NET_BIND_SERVICE` 绑定 443 端口，无需 root。
+
+下载 [Releases](https://github.com/bsh888/remotectl-releases/releases) 页面的 `remotectl-server-linux-*` 包，解压后一键安装：
 
 ```bash
-# 1. 交叉编译 Linux 二进制（在 macOS/任意平台执行）
-make server-linux
+tar xzf remotectl-server-linux-amd64-vX.Y.Z.tar.gz
+cd remotectl-server-linux-amd64-vX.Y.Z
 
-# 2. 上传 deploy/ 目录到服务器
-scp -r deploy/ ubuntu@server:~/remotectl-deploy/
+# （可选）生成自签名 TLS 证书
+bash gen-cert.sh ./certs 1.2.3.4          # 替换为服务器公网 IP
+# bash gen-cert.sh ./certs 1.2.3.4 my.domain.com   # 同时绑定域名
 
-# 3. 服务器上安装（需 sudo）
-sudo bash ~/remotectl-deploy/install.sh
+sudo bash install.sh    # 安装到 /opt/remotectl，自动添加 iptables 443 规则
 
-# 4. 修改配置（addr 改为 :443，填入 tokens / TURN 等）
+# 修改配置（填入 tokens / TLS 路径 / TURN 等）
 sudo vim /opt/remotectl/server.yaml
 sudo systemctl restart remotectl-server
 
 # 查看日志
 journalctl -u remotectl-server -f
 
-# 升级（重新上传后再次执行 install.sh）
-sudo bash ~/remotectl-deploy/install.sh
+# 升级（解压新版本包后再次执行）
+sudo bash install.sh
 
 # 卸载（保留 /opt/remotectl/ 中的配置和证书）
-sudo bash ~/remotectl-deploy/install.sh remove
+sudo bash install.sh remove
 ```
 
 **直接运行：**
 ```bash
-./deploy/bin/remotectl-server --config deploy/server.yaml
+./remotectl-server --config server.yaml
 ```
 
 服务端所有参数均可通过配置文件或命令行 flag 指定，flag 优先级更高：
@@ -267,7 +264,7 @@ sudo bash ~/remotectl-deploy/install.sh remove
 | `tls_cert` | `--tls-cert` | TLS 证书路径 | — |
 | `tls_key` | `--tls-key` | TLS 私钥路径 | — |
 | `static` | `--static` | 前端静态文件目录 | `./static` |
-| `turn.url` | `--turn-url` | TURN 服务器地址 | — |
+| `turn.url` | `--turn-url` | TURN 服务器地址（e.g. `turn:1.2.3.4:3478`） | — |
 | `turn.user` | `--turn-user` | TURN 用户名 | — |
 | `turn.password` | `--turn-credential` | TURN 密码 | — |
 | `tokens` | — | 按设备 ID 配置 token（必填，仅配置文件） | — |
@@ -448,14 +445,39 @@ ID 显示在"共享本机"页面顶部，点击复制图标可复制。如需固
 
 ### 部署 coturn
 
-docker-compose.yml 中已内置 coturn 服务，部署时只需在 `server.yaml` 填入 ECS 公网 IP：
+推荐在同一台 Ubuntu 服务器上安装 coturn：
+
+```bash
+sudo apt update && sudo apt install -y coturn
+sudo sed -i 's/#TURNSERVER_ENABLED/TURNSERVER_ENABLED/' /etc/default/coturn
+```
+
+`/etc/turnserver.conf` 关键配置：
+
+```
+listening-port=3478
+external-ip=<服务器公网IP>
+realm=<域名或IP>
+lt-cred-mech
+user=remotectl:changeme      # 自定义强密码
+no-loopback-peers
+no-multicast-peers
+```
+
+```bash
+sudo systemctl enable --now coturn
+```
+
+然后在 `server.yaml` 中填入 TURN 配置（与 coturn `user=` 保持一致）：
 
 ```yaml
 turn:
-  url:      "turn:你的ECS公网IP:3478"
+  url:      "turn:1.2.3.4:3478"   # 服务器公网 IP
   user:     "remotectl"
-  password: "自定义强密码"
+  password: "changeme"
 ```
+
+TURN 配置只需在服务端设置一次，服务端会在信令握手时自动下发给所有 agent 和控制端。
 
 安全组 / 防火墙需放行：
 
@@ -464,18 +486,14 @@ turn:
 | 3478 | UDP + TCP | TURN/STUN |
 | 49152–65535 | UDP | TURN 中继数据 |
 
-> **OCI（Oracle Cloud）特别说明**：OCI 有两层防火墙——安全列表（Security List）和实例 OS 防火墙（iptables / firewalld）。两层都需要放行上述端口，否则 TURN 无法工作：
+> **OCI（Oracle Cloud）特别说明**：OCI 有两层防火墙——安全列表（Security List）和实例 OS 防火墙（iptables）。两层都需要放行上述端口：
 > ```bash
-> # Ubuntu/Debian（实例内部防火墙）
 > sudo iptables -I INPUT -p udp --dport 3478 -j ACCEPT
 > sudo iptables -I INPUT -p tcp --dport 3478 -j ACCEPT
 > sudo iptables -I INPUT -p udp --dport 49152:65535 -j ACCEPT
-> # 保存规则（Ubuntu）
 > sudo netfilter-persistent save
 > ```
 > OCI 控制台 → 网络 → 虚拟云网络 → 安全列表，同样添加这些入站规则。
-
-TURN 配置只需在服务端设置一次，服务端会在信令握手时自动下发给所有 agent 和控制端。
 
 ### 带宽费用估算
 
