@@ -116,6 +116,7 @@ mkdir -p "$OUT/tmp"
 
 log "Building web client"
 (cd client && npm run build)
+touch deploy/static/.gitkeep
 ok "deploy/static/"
 
 # ── 1. Server — linux amd64 / arm64 ──────────────────────────────────────────
