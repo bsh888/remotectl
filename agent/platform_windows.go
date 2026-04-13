@@ -3,27 +3,29 @@
 package main
 
 import (
-	"os/exec"
 	"strings"
+
+	"golang.org/x/sys/windows/registry"
 )
 
 func detectPlatform() string {
 	return "windows"
 }
 
-// osVersion returns e.g. "Windows 11 Pro"
+// osVersion returns e.g. "Windows 11 专业版" by reading the registry,
+// which returns UTF-16LE strings and avoids the GBK encoding issue with wmic.
 func osVersion() string {
-	out, err := exec.Command("wmic", "os", "get", "Caption", "/value").Output()
+	k, err := registry.OpenKey(registry.LOCAL_MACHINE,
+		`SOFTWARE\Microsoft\Windows NT\CurrentVersion`,
+		registry.QUERY_VALUE)
 	if err != nil {
 		return "Windows"
 	}
-	for _, line := range strings.Split(string(out), "\n") {
-		line = strings.TrimSpace(line)
-		if strings.HasPrefix(line, "Caption=") {
-			v := strings.TrimPrefix(line, "Caption=")
-			v = strings.TrimPrefix(v, "Microsoft ")
-			return strings.TrimSpace(v)
-		}
+	defer k.Close()
+
+	productName, _, err := k.GetStringValue("ProductName")
+	if err != nil || productName == "" {
+		return "Windows"
 	}
-	return "Windows"
+	return strings.TrimPrefix(productName, "Microsoft ")
 }
