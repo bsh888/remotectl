@@ -151,7 +151,6 @@ user=remotectl:changeme        # 与 server.yaml turn.user / turn.password 一�
 cert=/opt/remotectl/certs/server.crt
 pkey=/opt/remotectl/certs/server.key
 
-no-loopback-peers
 no-multicast-peers
 denied-peer-ip=10.0.0.0-10.255.255.255
 denied-peer-ip=172.16.0.0-172.31.255.255

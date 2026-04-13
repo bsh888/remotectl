@@ -289,7 +289,6 @@ external-ip=<服务器公网IP>
 realm=<域名或IP>
 lt-cred-mech
 user=remotectl:changeme
-no-loopback-peers
 no-multicast-peers
 ```
 

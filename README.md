@@ -460,7 +460,6 @@ external-ip=<服务器公网IP>
 realm=<域名或IP>
 lt-cred-mech
 user=remotectl:changeme      # 自定义强密码
-no-loopback-peers
 no-multicast-peers
 ```
 
