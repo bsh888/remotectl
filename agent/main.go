@@ -215,6 +215,10 @@ type Agent struct {
 	rtcPeers   map[string]*webrtc.PeerConnection
 	rtcMu      sync.RWMutex
 
+	// ICE candidates that arrived before SetRemoteDescription; flushed after answer
+	pendingIce   map[string][]webrtc.ICECandidateInit
+	pendingIceMu sync.Mutex
+
 	// Chat DataChannels (one per connected viewer)
 	chatDCs  map[string]*webrtc.DataChannel
 	chatMu   sync.RWMutex
@@ -372,6 +376,15 @@ func (a *Agent) newPeerConnection() (*webrtc.PeerConnection, error) {
 	if len(cfgs) == 0 {
 		cfgs = []ICEServerConfig{{URLs: []string{"stun:stun.l.google.com:19302"}}}
 	}
+	hasTURN := false
+	for _, c := range cfgs {
+		for _, u := range c.URLs {
+			if len(u) >= 4 && u[:4] == "turn" {
+				hasTURN = true
+			}
+		}
+	}
+	log.Printf("newPeerConnection: %d ICE server(s), TURN=%v", len(cfgs), hasTURN)
 	servers := make([]webrtc.ICEServer, len(cfgs))
 	for i, c := range cfgs {
 		servers[i] = webrtc.ICEServer{
@@ -431,6 +444,7 @@ func (a *Agent) startRTC(viewerID string) {
 			return
 		}
 		ci := c.ToJSON()
+		log.Printf("ICE candidate (agent→viewer %s): %s", viewerID, ci.Candidate)
 		sdpMid := ""
 		if ci.SDPMid != nil {
 			sdpMid = *ci.SDPMid
@@ -916,6 +930,16 @@ func (a *Agent) authenticate() error {
 	}
 	switch resp.Type {
 	case TypeRegistered:
+		var reg struct {
+			ICEServers []ICEServerConfig `json:"ice_servers"`
+		}
+		if json.Unmarshal(resp.Payload, &reg) == nil && len(reg.ICEServers) > 0 {
+			a.iceServersMu.Lock()
+			a.iceServers = reg.ICEServers
+			a.iceServersMu.Unlock()
+			log.Printf("ICE servers: %d configured (TURN=%v)", len(reg.ICEServers), len(reg.ICEServers) > 1)
+		}
+		log.Printf("registered as %s", a.deviceID)
 		return nil
 	case TypeError:
 		return errAuthRejected
@@ -1097,6 +1121,17 @@ func (a *Agent) readPump() {
 			answer := webrtc.SessionDescription{Type: webrtc.SDPTypeAnswer, SDP: p.SDP}
 			if err := pc.SetRemoteDescription(answer); err != nil {
 				log.Printf("SetRemoteDescription for %s: %v", p.ViewerID, err)
+				continue
+			}
+			// Flush any ICE candidates that arrived before the answer
+			a.pendingIceMu.Lock()
+			buffered := a.pendingIce[p.ViewerID]
+			delete(a.pendingIce, p.ViewerID)
+			a.pendingIceMu.Unlock()
+			for _, init := range buffered {
+				if err := pc.AddICECandidate(init); err != nil {
+					log.Printf("AddICECandidate (buffered) for %s: %v", p.ViewerID, err)
+				}
 			}
 
 		// ICE candidate from viewer
@@ -1115,12 +1150,18 @@ func (a *Agent) readPump() {
 			if !ok {
 				continue
 			}
-			log.Printf("ICE candidate from viewer %s: %s", p.ViewerID, p.Candidate)
 			sdpMid := p.SDPMid
-			if err := pc.AddICECandidate(webrtc.ICECandidateInit{
-				Candidate: p.Candidate,
-				SDPMid:    &sdpMid,
-			}); err != nil {
+			init := webrtc.ICECandidateInit{Candidate: p.Candidate, SDPMid: &sdpMid}
+			// If remote description not yet set, buffer the candidate
+			if pc.RemoteDescription() == nil {
+				log.Printf("ICE candidate from viewer %s buffered (no remote desc yet): %s", p.ViewerID, p.Candidate)
+				a.pendingIceMu.Lock()
+				a.pendingIce[p.ViewerID] = append(a.pendingIce[p.ViewerID], init)
+				a.pendingIceMu.Unlock()
+				continue
+			}
+			log.Printf("ICE candidate from viewer %s: %s", p.ViewerID, p.Candidate)
+			if err := pc.AddICECandidate(init); err != nil {
 				log.Printf("AddICECandidate for %s: %v", p.ViewerID, err)
 			}
 
@@ -1333,6 +1374,7 @@ func main() {
 		webrtcAPI:  api,
 		videoTrack: videoTrack,
 		rtcPeers:   make(map[string]*webrtc.PeerConnection),
+		pendingIce: make(map[string][]webrtc.ICECandidateInit),
 		chatDCs:    make(map[string]*webrtc.DataChannel),
 		fileRx:     make(map[string]*chatFileReceiver),
 	}
@@ -1389,6 +1431,7 @@ func main() {
 		// Reset per-connection state before retry
 		agent.sessions = make(map[string]*session.Session)
 		agent.rtcPeers = make(map[string]*webrtc.PeerConnection)
+		agent.pendingIce = make(map[string][]webrtc.ICECandidateInit)
 		select {
 		case <-time.After(*retry):
 		case <-ctx.Done():
