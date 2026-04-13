@@ -335,18 +335,34 @@ export default function AdminPage() {
                 <table style={{width:'100%', borderCollapse:'collapse'}}>
                   <thead>
                     <tr style={{borderBottom:`1px solid ${border}`}}>
-                      {['设备 ID', 'Token（已脱敏）', '操作'].map(h => (
+                      {['设备 ID', '设备信息', 'Token（已脱敏）', '操作'].map(h => (
                         <th key={h} style={{padding:'14px 20px', textAlign:'left', color:textMuted, fontSize:13, fontWeight:600}}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {tokens.length === 0 && (
-                      <tr><td colSpan={3} style={{padding:40, textAlign:'center', color:textMuted}}>暂无 Token</td></tr>
+                      <tr><td colSpan={4} style={{padding:40, textAlign:'center', color:textMuted}}>暂无 Token</td></tr>
                     )}
-                    {tokens.map(t => (
+                    {tokens.map(t => {
+                      const online = agents.find(a => a.id === t.device_id)
+                      return (
                       <tr key={t.device_id} style={{borderBottom:`1px solid rgba(255,255,255,0.03)`}}>
                         <td style={{padding:'14px 20px', fontFamily:'monospace', color:'#a5b4fc'}}>{t.device_id}</td>
+                        <td style={{padding:'14px 20px'}}>
+                          {online ? (
+                            <div style={{display:'flex', alignItems:'center', gap:8}}>
+                              <span style={{
+                                width:7, height:7, borderRadius:'50%',
+                                background:'#4ade80', display:'inline-block', flexShrink:0,
+                              }}/>
+                              <span style={{color:'#e2e8f0', fontSize:13, fontWeight:500}}>{online.name || online.id}</span>
+                              <span style={{color:'#64748b', fontSize:12}}>{online.platform}</span>
+                            </div>
+                          ) : (
+                            <span style={{color:'#334155', fontSize:13}}>离线</span>
+                          )}
+                        </td>
                         <td style={{padding:'14px 20px', fontFamily:'monospace', color:'#94a3b8', fontSize:13}}>
                           {editId === t.device_id ? (
                             <input
@@ -373,7 +389,7 @@ export default function AdminPage() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
               </div>
