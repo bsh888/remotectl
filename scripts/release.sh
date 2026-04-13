@@ -305,7 +305,24 @@ turn:
   password: "changeme"
 ```
 
-防火墙需放行 UDP/TCP 3478 和 UDP 49152-65535。
+**OS 防火墙（iptables）：**
+
+```bash
+sudo iptables -I INPUT -p udp --dport 3478 -j ACCEPT
+sudo iptables -I INPUT -p tcp --dport 3478 -j ACCEPT
+sudo iptables -I INPUT -p udp --dport 49152:65535 -j ACCEPT
+sudo netfilter-persistent save
+```
+
+**OCI 安全列表（控制台）：** 网络 → 虚拟云网络 → 你的 VCN → 安全列表 → 默认安全列表 → 添加入站规则：
+
+| 源 CIDR | 协议 | 目标端口范围 |
+|---------|------|------------|
+| `0.0.0.0/0` | UDP | `3478` |
+| `0.0.0.0/0` | TCP | `3478` |
+| `0.0.0.0/0` | UDP | `49152-65535` |
+
+> OCI 有两层防火墙（安全列表 + 实例 iptables），两层都必须放行，缺一不可。
 
 ## 平台支持
 

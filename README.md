@@ -485,14 +485,28 @@ TURN 配置只需在服务端设置一次，服务端会在信令握手时自动
 | 3478 | UDP + TCP | TURN/STUN |
 | 49152–65535 | UDP | TURN 中继数据 |
 
-> **OCI（Oracle Cloud）特别说明**：OCI 有两层防火墙——安全列表（Security List）和实例 OS 防火墙（iptables）。两层都需要放行上述端口：
-> ```bash
-> sudo iptables -I INPUT -p udp --dport 3478 -j ACCEPT
-> sudo iptables -I INPUT -p tcp --dport 3478 -j ACCEPT
-> sudo iptables -I INPUT -p udp --dport 49152:65535 -j ACCEPT
-> sudo netfilter-persistent save
-> ```
-> OCI 控制台 → 网络 → 虚拟云网络 → 安全列表，同样添加这些入站规则。
+**OS 防火墙（iptables）：**
+
+```bash
+sudo iptables -I INPUT -p udp --dport 3478 -j ACCEPT
+sudo iptables -I INPUT -p tcp --dport 3478 -j ACCEPT
+sudo iptables -I INPUT -p udp --dport 49152:65535 -j ACCEPT
+sudo netfilter-persistent save
+```
+
+> **OCI（Oracle Cloud）特别说明**：OCI 有两层防火墙，**两层都必须放行**，缺一不可：
+>
+> **第一层：实例 OS iptables**（见上方命令）
+>
+> **第二层：OCI 安全列表**（控制台操作）
+> 1. 网络 → 虚拟云网络 → 你的 VCN → 安全列表 → 默认安全列表
+> 2. 点击"添加入站规则"，分三条添加：
+>
+> | 源 CIDR | 协议 | 目标端口范围 |
+> |---------|------|------------|
+> | `0.0.0.0/0` | UDP | `3478` |
+> | `0.0.0.0/0` | TCP | `3478` |
+> | `0.0.0.0/0` | UDP | `49152-65535` |
 
 ### 带宽费用估算
 
