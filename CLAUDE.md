@@ -123,6 +123,79 @@ sudo bash install.sh remove
 - `deploy/install.sh` — 安装/升级/卸载脚本，部署到 `/opt/remotectl/`
 - `scripts/gen-cert.sh` — openssl 自签名证书（打包进发布包）
 
+## TURN 服务器部署（coturn）
+
+移动端 5G / 运营商 NAT 环境下 STUN 无法直连，需要 TURN 中继。推荐与信令服务器部署在同一台 Ubuntu 机器。
+
+### 安装
+
+```bash
+sudo apt update && sudo apt install -y coturn
+sudo sed -i 's/#TURNSERVER_ENABLED/TURNSERVER_ENABLED/' /etc/default/coturn
+```
+
+### 生成 HMAC 密钥
+
+```bash
+openssl rand -hex 32
+# 记下输出，填入下方 static-auth-secret 及 server.yaml turn.secret
+```
+
+### 配置 `/etc/turnserver.conf`
+
+```
+listening-port=3478
+tls-listening-port=5349
+
+external-ip=<公网IP>
+realm=<域名或IP>
+
+use-auth-secret
+static-auth-secret=<上面生成的hex密钥>
+
+# 复用 remotectl 的 TLS 证书
+cert=/opt/remotectl/certs/server.crt
+pkey=/opt/remotectl/certs/server.key
+
+no-loopback-peers
+no-multicast-peers
+denied-peer-ip=10.0.0.0-10.255.255.255
+denied-peer-ip=172.16.0.0-172.31.255.255
+denied-peer-ip=192.168.0.0-192.168.255.255
+
+log-file=/var/log/coturn/turn.log
+simple-log
+```
+
+### 开放防火墙端口
+
+```bash
+sudo iptables -I INPUT -p udp --dport 3478 -j ACCEPT
+sudo iptables -I INPUT -p tcp --dport 3478 -j ACCEPT
+sudo iptables -I INPUT -p udp --dport 5349 -j ACCEPT
+sudo iptables -I INPUT -p tcp --dport 5349 -j ACCEPT
+sudo iptables -I INPUT -p udp --dport 49152:65535 -j ACCEPT   # relay 端口范围
+sudo netfilter-persistent save
+```
+
+### 启动
+
+```bash
+sudo systemctl enable --now coturn
+sudo journalctl -u coturn -f
+```
+
+### 配置 server.yaml
+
+```yaml
+turn:
+  urls:
+    - "turn:<域名或IP>:3478"
+    - "turns:<域名或IP>:5349"
+  secret: "<与 static-auth-secret 一致>"
+  ttl: 86400
+```
+
 ## 关键技术细节
 
 ### agent — macOS 视频编码 (pipeline_darwin.m)
