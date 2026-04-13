@@ -42,6 +42,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -183,12 +184,14 @@ type TURNConfig struct {
 }
 
 type ServerConfig struct {
-	Addr    string            `yaml:"addr"`
-	TLSCert string            `yaml:"tls_cert"`
-	TLSKey  string            `yaml:"tls_key"`
-	Static  string            `yaml:"static"`
-	Tokens  map[string]string `yaml:"tokens"` // per-device tokens: device_id → secret
-	TURN    TURNConfig        `yaml:"turn"`
+	Addr          string            `yaml:"addr"`
+	TLSCert       string            `yaml:"tls_cert"`
+	TLSKey        string            `yaml:"tls_key"`
+	Static        string            `yaml:"static"`
+	Tokens        map[string]string `yaml:"tokens"` // per-device tokens: device_id → secret
+	TURN          TURNConfig        `yaml:"turn"`
+	AdminPassword string            `yaml:"admin_password"` // required for admin API
+	Version       string            `yaml:"version"`        // e.g. "v1.0.1", used in download links
 }
 
 func defaultServerConfig() ServerConfig {
@@ -230,17 +233,26 @@ func findConfigFlag() string {
 // ── Hub ──────────────────────────────────────────────────────────────────────
 
 type Hub struct {
-	agents     map[string]*Agent
-	mu         sync.RWMutex
-	tokens     map[string]string // per-device tokens: device_id → secret
-	iceServers []ICEServerConfig
+	agents        map[string]*Agent
+	mu            sync.RWMutex
+	tokens        map[string]string // per-device tokens: device_id → secret
+	iceServers    []ICEServerConfig
+	adminPassword string
+	adminSessions map[string]time.Time // session token → expiry (24h)
+	adminMu       sync.Mutex
+	configPath    string
+	fullConfig    ServerConfig // for writing back to disk
 }
 
-func newHub(tokens map[string]string, iceServers []ICEServerConfig) *Hub {
+func newHub(tokens map[string]string, iceServers []ICEServerConfig, adminPassword, configPath string, fullConfig ServerConfig) *Hub {
 	return &Hub{
-		agents:     make(map[string]*Agent),
-		tokens:     tokens,
-		iceServers: iceServers,
+		agents:        make(map[string]*Agent),
+		tokens:        tokens,
+		iceServers:    iceServers,
+		adminPassword: adminPassword,
+		adminSessions: make(map[string]time.Time),
+		configPath:    configPath,
+		fullConfig:    fullConfig,
 	}
 }
 
@@ -752,6 +764,223 @@ func randomHex(n int) string {
 	return hex.EncodeToString(b)
 }
 
+// ── SPA handler ───────────────────────────────────────────────────────────────
+
+func spaHandler(staticDir string) http.Handler {
+	fs := http.FileServer(http.Dir(staticDir))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		fpath := filepath.Join(staticDir, filepath.Clean("/"+r.URL.Path))
+		if _, err := os.Stat(fpath); os.IsNotExist(err) {
+			http.ServeFile(w, r, filepath.Join(staticDir, "index.html"))
+			return
+		}
+		fs.ServeHTTP(w, r)
+	})
+}
+
+// ── Admin API ─────────────────────────────────────────────────────────────────
+
+func withCORS(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next(w, r)
+	}
+}
+
+func (h *Hub) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+		h.adminMu.Lock()
+		exp, ok := h.adminSessions[token]
+		h.adminMu.Unlock()
+		if !ok || time.Now().After(exp) {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+		next(w, r)
+	}
+}
+
+func (h *Hub) handleAdminLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "", http.StatusMethodNotAllowed)
+		return
+	}
+	var body struct {
+		Password string `json:"password"`
+	}
+	json.NewDecoder(r.Body).Decode(&body)
+	if h.adminPassword == "" || body.Password != h.adminPassword {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(`{"error":"invalid password"}`))
+		return
+	}
+	token := randomHex(32)
+	h.adminMu.Lock()
+	h.adminSessions[token] = time.Now().Add(24 * time.Hour)
+	h.adminMu.Unlock()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"token": token})
+}
+
+func (h *Hub) handleAdminAgents(w http.ResponseWriter, r *http.Request) {
+	type AgentInfo struct {
+		ID          string `json:"id"`
+		Name        string `json:"name"`
+		Platform    string `json:"platform"`
+		ViewerCount int    `json:"viewer_count"`
+	}
+	h.mu.RLock()
+	result := make([]AgentInfo, 0, len(h.agents))
+	for _, a := range h.agents {
+		result = append(result, AgentInfo{
+			ID:          a.id,
+			Name:        a.name,
+			Platform:    a.platform,
+			ViewerCount: a.viewerCount(),
+		})
+	}
+	h.mu.RUnlock()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+func (h *Hub) handleAdminTokensList(w http.ResponseWriter, r *http.Request) {
+	type TokenInfo struct {
+		DeviceID string `json:"device_id"`
+		Secret   string `json:"secret"`
+	}
+	h.mu.RLock()
+	result := make([]TokenInfo, 0, len(h.tokens))
+	for id, secret := range h.tokens {
+		masked := secret
+		if len(secret) > 8 {
+			masked = secret[:4] + "..." + secret[len(secret)-4:]
+		}
+		result = append(result, TokenInfo{DeviceID: id, Secret: masked})
+	}
+	h.mu.RUnlock()
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+func (h *Hub) saveTokens() error {
+	if h.configPath == "" {
+		return nil
+	}
+	h.mu.RLock()
+	h.fullConfig.Tokens = make(map[string]string, len(h.tokens))
+	for k, v := range h.tokens {
+		h.fullConfig.Tokens[k] = v
+	}
+	h.mu.RUnlock()
+	data, err := yaml.Marshal(h.fullConfig)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(h.configPath, data, 0644)
+}
+
+func (h *Hub) handleAdminTokensCreate(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		DeviceID string `json:"device_id"`
+		Secret   string `json:"secret"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.DeviceID == "" || body.Secret == "" {
+		http.Error(w, `{"error":"device_id and secret required"}`, http.StatusBadRequest)
+		return
+	}
+	h.mu.Lock()
+	h.tokens[body.DeviceID] = body.Secret
+	h.mu.Unlock()
+	h.saveTokens()
+	w.WriteHeader(http.StatusCreated)
+	w.Write([]byte(`{"ok":true}`))
+}
+
+func (h *Hub) handleAdminTokensUpdate(w http.ResponseWriter, r *http.Request, deviceID string) {
+	var body struct {
+		Secret string `json:"secret"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Secret == "" {
+		http.Error(w, `{"error":"secret required"}`, http.StatusBadRequest)
+		return
+	}
+	h.mu.Lock()
+	_, exists := h.tokens[deviceID]
+	if exists {
+		h.tokens[deviceID] = body.Secret
+	}
+	h.mu.Unlock()
+	if !exists {
+		http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
+		return
+	}
+	h.saveTokens()
+	w.Write([]byte(`{"ok":true}`))
+}
+
+func (h *Hub) handleAdminTokensDelete(w http.ResponseWriter, r *http.Request, deviceID string) {
+	h.mu.Lock()
+	_, exists := h.tokens[deviceID]
+	if exists {
+		delete(h.tokens, deviceID)
+	}
+	h.mu.Unlock()
+	if !exists {
+		http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
+		return
+	}
+	h.saveTokens()
+	w.Write([]byte(`{"ok":true}`))
+}
+
+func (h *Hub) handleAdminTokens(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	suffix := strings.TrimPrefix(r.URL.Path, "/api/admin/tokens")
+	suffix = strings.TrimPrefix(suffix, "/")
+
+	switch r.Method {
+	case http.MethodGet:
+		if suffix != "" {
+			http.Error(w, `{"error":"not found"}`, 404)
+			return
+		}
+		h.handleAdminTokensList(w, r)
+	case http.MethodPost:
+		if suffix != "" {
+			http.Error(w, `{"error":"not found"}`, 404)
+			return
+		}
+		h.handleAdminTokensCreate(w, r)
+	case http.MethodPut:
+		if suffix == "" {
+			http.Error(w, `{"error":"device_id required"}`, 400)
+			return
+		}
+		h.handleAdminTokensUpdate(w, r, suffix)
+	case http.MethodDelete:
+		if suffix == "" {
+			http.Error(w, `{"error":"device_id required"}`, 400)
+			return
+		}
+		h.handleAdminTokensDelete(w, r, suffix)
+	default:
+		http.Error(w, "", http.StatusMethodNotAllowed)
+	}
+}
+
+func (h *Hub) handleVersion(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"version": h.fullConfig.Version})
+}
+
 // ── main ──────────────────────────────────────────────────────────────────────
 
 func main() {
@@ -797,12 +1026,21 @@ func main() {
 		log.Printf("TURN enabled: %s (user=%s)", *turnURL, *turnUser)
 	}
 
-	hub := newHub(tokens, iceServers)
+	configPath := findConfigFlag()
+	if *configFile != "" {
+		configPath = *configFile
+	}
+	hub := newHub(tokens, iceServers, cfg.AdminPassword, configPath, cfg)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws/agent", hub.handleAgent)
 	mux.HandleFunc("/ws/viewer", hub.handleViewer)
-	mux.Handle("/", http.FileServer(http.Dir(*staticDir)))
+	mux.HandleFunc("/api/version", withCORS(hub.handleVersion))
+	mux.HandleFunc("/api/admin/login", withCORS(hub.handleAdminLogin))
+	mux.HandleFunc("/api/admin/agents", withCORS(hub.requireAdmin(hub.handleAdminAgents)))
+	mux.HandleFunc("/api/admin/tokens", withCORS(hub.requireAdmin(hub.handleAdminTokens)))
+	mux.HandleFunc("/api/admin/tokens/", withCORS(hub.requireAdmin(hub.handleAdminTokens)))
+	mux.Handle("/", spaHandler(*staticDir))
 
 	srv := &http.Server{Addr: *addr, Handler: mux}
 

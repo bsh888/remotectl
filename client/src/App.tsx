@@ -1,34 +1,14 @@
-import { useState } from 'react'
-import ConnectPanel from './components/ConnectPanel'
-import RemoteScreen from './components/RemoteScreen'
-import { useRemoteSession } from './hooks/useRemoteSession'
+import { Routes, Route } from 'react-router-dom'
+import LandingPage from './pages/LandingPage'
+import ControlPage from './pages/ControlPage'
+import AdminPage from './pages/AdminPage'
 
 export default function App() {
-  const session = useRemoteSession()
-  const [connectedDevice, setConnectedDevice] = useState('')
-
-  const handleConnect = (serverURL: string, deviceID: string, password: string) => {
-    setConnectedDevice(deviceID)
-    session.connect({ serverURL, deviceID, password })
-  }
-
-  if (session.state === 'connected') {
-    return (
-      <RemoteScreen
-        videoStream={session.videoStream}
-        onInput={session.sendInput}
-        onDisconnect={session.disconnect}
-        deviceName={connectedDevice}
-        remotePlatform=''
-      />
-    )
-  }
-
   return (
-    <ConnectPanel
-      onConnect={handleConnect}
-      error={session.error}
-      connecting={session.state === 'connecting'}
-    />
+    <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/control" element={<ControlPage />} />
+      <Route path="/admin/*" element={<AdminPage />} />
+    </Routes>
   )
 }
