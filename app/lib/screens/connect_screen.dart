@@ -482,7 +482,26 @@ class _HistoryRow extends StatelessWidget {
                 ),
               ),
               GestureDetector(
-                onTap: onRemove,
+                onTap: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('删除记录'),
+                      content: const Text('确认删除该连接记录？'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('取消'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text('删除'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed == true) onRemove();
+                },
                 child: Padding(
                   padding: const EdgeInsets.all(6),
                   child: Icon(
