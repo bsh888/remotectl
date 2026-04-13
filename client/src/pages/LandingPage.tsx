@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 interface VersionInfo {
@@ -68,9 +68,24 @@ const features = [
   },
 ]
 
-const platforms = [
-  { name: 'macOS', icon: '🍎', fileKey: 'macos', ext: 'zip', label: 'remotectl-app-macos' },
-  { name: 'Windows', icon: '🪟', fileKey: 'windows', ext: 'zip', label: 'remotectl-app-windows-amd64' },
+const AppleLogo = () => (
+  <svg viewBox="0 0 814 1000" fill="currentColor" style={{width:36,height:36}}>
+    <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-37.5-155.5-127.4C46 424.7 0 319.1 0 218.6 0 10 137.5-100.5 275-100.5c70 0 128.6 45.1 170 45.1 40 0 105.8-49.7 183.6-49.7 29.8 0 133.7 2.6 204.4 97.7zm-234-181.5c31.1-36.9 53.1-88.1 53.1-139.3 0-7.1-.6-14.3-1.9-20.1-50.6 1.9-110.8 33.7-147.1 75.8-28.5 32.4-55.1 83.6-55.1 135.5 0 7.8 1.3 15.6 1.9 18.1 3.2.6 8.4 1.3 13.6 1.3 45.4 0 102.5-30.4 135.5-71.3z"/>
+  </svg>
+)
+
+const WindowsLogo = () => (
+  <svg viewBox="0 0 24 24" style={{width:38,height:38}}>
+    <path fill="#F25022" d="M1 1h10v10H1z"/>
+    <path fill="#7FBA00" d="M13 1h10v10H13z"/>
+    <path fill="#00A4EF" d="M1 13h10v10H1z"/>
+    <path fill="#FFB900" d="M13 13h10v10H13z"/>
+  </svg>
+)
+
+const platforms: { name: string; icon: ReactNode; fileKey: string; ext: string; label: string }[] = [
+  { name: 'macOS', icon: <AppleLogo />, fileKey: 'macos', ext: 'zip', label: 'remotectl-app-macos' },
+  { name: 'Windows', icon: <WindowsLogo />, fileKey: 'windows', ext: 'zip', label: 'remotectl-app-windows-amd64' },
   { name: 'Linux App', icon: '🐧', fileKey: 'linux', ext: 'tar.gz', label: 'remotectl-app-linux-amd64' },
   { name: 'Linux Agent', icon: '⚙️', fileKey: 'agent', ext: 'tar.gz', label: 'remotectl-agent-linux-amd64' },
 ]
@@ -296,6 +311,10 @@ export default function LandingPage() {
     downloadIcon: {
       fontSize: 40,
       marginBottom: 12,
+      height: 48,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     downloadName: {
       fontSize: 16,
