@@ -43,6 +43,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -875,21 +876,77 @@ func (h *Hub) handleAdminTokensList(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(result)
 }
 
+// saveTokens rewrites only the `tokens:` block in the config file, preserving
+// all other content (comments, formatting, other fields) unchanged.
 func (h *Hub) saveTokens() error {
 	if h.configPath == "" {
 		return nil
 	}
+
 	h.mu.RLock()
-	h.fullConfig.Tokens = make(map[string]string, len(h.tokens))
+	tokens := make(map[string]string, len(h.tokens))
 	for k, v := range h.tokens {
-		h.fullConfig.Tokens[k] = v
+		tokens[k] = v
 	}
 	h.mu.RUnlock()
-	data, err := yaml.Marshal(h.fullConfig)
+
+	raw, err := os.ReadFile(h.configPath)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(h.configPath, data, 0644)
+
+	// Build replacement block: 2-space indent, keys sorted for stability.
+	keys := make([]string, 0, len(tokens))
+	for k := range tokens {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var newBlock strings.Builder
+	newBlock.WriteString("tokens:\n")
+	for _, k := range keys {
+		fmt.Fprintf(&newBlock, "  %s: %q\n", k, tokens[k])
+	}
+
+	// Locate the existing tokens: block.
+	// The block ends at the first blank line or non-indented line after it starts.
+	lines := strings.Split(string(raw), "\n")
+	start, end := -1, len(lines)
+	for i, line := range lines {
+		if start < 0 {
+			if strings.HasPrefix(line, "tokens:") {
+				start = i
+			}
+		} else {
+			if line == "" || (!strings.HasPrefix(line, " ") && !strings.HasPrefix(line, "\t")) {
+				end = i
+				break
+			}
+		}
+	}
+
+	var out strings.Builder
+	if start < 0 {
+		// No tokens: block found — append at end.
+		out.WriteString(strings.TrimRight(string(raw), "\n"))
+		out.WriteByte('\n')
+		out.WriteString(newBlock.String())
+	} else {
+		for i, line := range lines {
+			switch {
+			case i == start:
+				out.WriteString(newBlock.String())
+			case i > start && i < end:
+				// skip old tokens block lines
+			default:
+				out.WriteString(line)
+				if i < len(lines)-1 {
+					out.WriteByte('\n')
+				}
+			}
+		}
+	}
+
+	return os.WriteFile(h.configPath, []byte(out.String()), 0644)
 }
 
 func (h *Hub) handleAdminTokensCreate(w http.ResponseWriter, r *http.Request) {
