@@ -106,6 +106,22 @@ do_install() {
   chown -R "${USER}:${USER}" "${INSTALL_DIR}"
   chmod 0750 "${INSTALL_DIR}/certs"
 
+  # ── Open port 443 in iptables ────────────────────────────────────────────────
+  if command -v iptables &>/dev/null; then
+    if ! iptables -C INPUT -p tcp --dport 443 -j ACCEPT 2>/dev/null; then
+      log "Adding iptables rule: ACCEPT tcp:443"
+      iptables -I INPUT -p tcp --dport 443 -j ACCEPT
+    else
+      log "iptables rule for tcp:443 already exists"
+    fi
+    if command -v netfilter-persistent &>/dev/null; then
+      netfilter-persistent save
+    elif command -v iptables-save &>/dev/null; then
+      mkdir -p /etc/iptables
+      iptables-save > /etc/iptables/rules.v4
+    fi
+  fi
+
   # ── Install systemd unit ─────────────────────────────────────────────────────
   log "Installing unit file → ${UNIT_FILE}"
   install -m 0644 "${script_dir}/remotectl-server.service" "${UNIT_FILE}"
