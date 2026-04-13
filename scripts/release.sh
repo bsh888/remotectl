@@ -80,6 +80,9 @@ pack_server() {
   cp deploy/remotectl-server.service    "$dir/"
   cp deploy/server.yaml.example         "$dir/"
   cp scripts/gen-cert.sh                "$dir/"
+  # Copy static web UI (built below); exclude .gitkeep placeholder
+  mkdir -p "$dir/static"
+  rsync -a --exclude='.gitkeep' deploy/static/ "$dir/static/"
   chmod +x "$dir/remotectl-server" "$dir/install.sh" "$dir/gen-cert.sh"
   COPYFILE_DISABLE=1 tar -czf "$OUT/${name}.tar.gz" -C "$OUT/tmp" "$name"
   rm -rf "$dir"
@@ -108,6 +111,12 @@ pack_agent() {
 }
 
 mkdir -p "$OUT/tmp"
+
+# ── 0. Frontend (web UI) ──────────────────────────────────────────────────────
+
+log "Building web client"
+(cd client && npm run build)
+ok "deploy/static/"
 
 # ── 1. Server — linux amd64 / arm64 ──────────────────────────────────────────
 
