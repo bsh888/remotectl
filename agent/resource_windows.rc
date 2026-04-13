@@ -1,0 +1,3 @@
+#include <windows.h>
+// Embed application manifest (request administrator execution level)
+1 RT_MANIFEST "agent.manifest"

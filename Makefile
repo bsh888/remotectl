@@ -60,6 +60,7 @@ agent-mac: | deploy/bin
 # Windows cross-compile requires mingw-w64:
 #   brew install mingw-w64  (macOS host)
 agent-win: | deploy/bin
+	x86_64-w64-mingw32-windres agent/resource_windows.rc -O coff -o agent/rsrc_windows.syso
 	cd agent && CGO_ENABLED=1 GOOS=windows GOARCH=amd64 \
 		CC=x86_64-w64-mingw32-gcc \
 		go build -ldflags="-s -w -H windowsgui" \

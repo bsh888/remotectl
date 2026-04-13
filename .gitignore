@@ -25,6 +25,7 @@ vendor/
 agent/pipeline/x264/
 agent/*.exe
 agent/remotectl-agent*
+agent/rsrc_windows.syso
 
 # ── Node / 前端 ──────────────────────────────────────────────
 client/node_modules/
