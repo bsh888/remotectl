@@ -42,10 +42,17 @@ echo ""
 # -- 2. Build Flutter macOS app -----------------------------------------------
 echo "[2/4] Building Flutter macOS app..."
 APP="app/build/macos/Build/Products/Release/remotectl.app"
+# flutter clean resets internal build state so that Dart native assets
+# (e.g. objective_c from path_provider_foundation) are rebuilt correctly.
+# Skipping this step (e.g. by just deleting build/) causes xcode_backend.dart
+# to fail with "references objective_c, which was not found in native_assets/".
+cd app
+flutter clean
+flutter pub get
 # Remove previously injected agent so Xcode code-signing doesn't choke on an
 # unsigned binary left over from a prior build run.
 rm -f "$APP/Contents/MacOS/remotectl-agent"
-cd app && flutter build macos --release
+flutter build macos --release
 cd ..
 echo ""
 
