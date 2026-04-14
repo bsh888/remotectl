@@ -13,6 +13,7 @@ int  rc_linux_start(int fps, int bitrate);
 void rc_linux_stop(void);
 int  rc_linux_check(void);
 void rc_linux_get_diag(int *cap_frames, int *enc_frames, int *last_err);
+void rc_linux_request_keyframe(void);
 */
 import "C"
 
@@ -66,8 +67,10 @@ func Stop() {
 // Done returns a channel that never closes on Linux.
 func Done() <-chan struct{} { return make(chan struct{}) }
 
-// RequestKeyframe is a no-op on Linux (keyframe forcing not implemented for x264 path).
-func RequestKeyframe() {}
+// RequestKeyframe forces the next encoded frame to be an IDR keyframe.
+func RequestKeyframe() {
+	C.rc_linux_request_keyframe()
+}
 
 // LogDiag prints diagnostic counters.
 func LogDiag() {

@@ -24,9 +24,10 @@
 extern void goH264FrameLinux(void *data, int length, int isKeyframe);
 
 // ── diagnostics ──────────────────────────────────────────────────────────────
-static volatile int g_cap_frames = 0;
-static volatile int g_enc_frames = 0;
-static volatile int g_last_err   = 0;
+static volatile int g_cap_frames    = 0;
+static volatile int g_enc_frames    = 0;
+static volatile int g_last_err      = 0;
+static volatile int g_force_keyframe = 0;
 
 void rc_linux_get_diag(int *cap_frames, int *enc_frames, int *last_err) {
     if (cap_frames) *cap_frames = __atomic_load_n(&g_cap_frames, __ATOMIC_RELAXED);
@@ -44,6 +45,11 @@ static int              g_width   = 0;
 static int              g_height  = 0;
 static int              g_fps     = 15;
 static int              g_bitrate = 1000000;
+
+// ── rc_linux_request_keyframe ─────────────────────────────────────────────────
+void rc_linux_request_keyframe(void) {
+    __atomic_store_n(&g_force_keyframe, 1, __ATOMIC_RELAXED);
+}
 
 // ── check X11 display is available ───────────────────────────────────────────
 int rc_linux_check(void) {
@@ -145,6 +151,13 @@ static void *capture_thread_fn(void *arg) {
 
         static long pts = 0;
         g_pic_in.i_pts = pts++;
+
+        // Force IDR if a keyframe was requested (e.g. by a viewer PLI).
+        if (__atomic_exchange_n(&g_force_keyframe, 0, __ATOMIC_RELAXED)) {
+            g_pic_in.i_type = X264_TYPE_IDR;
+        } else {
+            g_pic_in.i_type = X264_TYPE_AUTO;
+        }
 
         x264_picture_t pic_out;
         x264_nal_t    *nals;
