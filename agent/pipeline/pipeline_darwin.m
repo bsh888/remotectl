@@ -199,8 +199,45 @@ int rc_pipeline_start(double scale, int fps, int bitrate) {
     }
 
     CGDirectDisplayID disp = CGMainDisplayID();
-    size_t physW = CGDisplayPixelsWide(disp);
-    size_t physH = CGDisplayPixelsHigh(disp);
+
+    // ── Resolve display via SCShareableContent first ──────────────────────────
+    // This must happen before VT session creation so we know the actual capture
+    // dimensions. If the preferred display is unavailable (e.g. external monitor
+    // disconnected or screen locked), fall back to any available display.
+    dispatch_semaphore_t sem = dispatch_semaphore_create(0);
+    __block SCContentFilter *filter = nil;
+    __block CGDirectDisplayID actualDisp = disp;
+    [SCShareableContent getShareableContentWithCompletionHandler:
+        ^(SCShareableContent *c, NSError *e) {
+            if (!e) {
+                for (SCDisplay *d in c.displays) {
+                    if (d.displayID == disp) {
+                        filter = [[SCContentFilter alloc] initWithDisplay:d excludingWindows:@[]];
+                        break;
+                    }
+                }
+                // Fallback: target display not found, use the first available display
+                if (!filter && c.displays.count > 0) {
+                    SCDisplay *fallback = c.displays.firstObject;
+                    NSLog(@"[remotectl/pipeline] display %u not found, falling back to display %u",
+                          disp, fallback.displayID);
+                    filter = [[SCContentFilter alloc] initWithDisplay:fallback excludingWindows:@[]];
+                    actualDisp = fallback.displayID;
+                }
+            }
+            dispatch_semaphore_signal(sem);
+        }];
+    dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, 5LL * NSEC_PER_SEC));
+
+    if (!filter) {
+        NSLog(@"[remotectl/pipeline] failed to get shareable content for display %u", disp);
+        pthread_mutex_unlock(&g_mu);
+        return 5;
+    }
+
+    // Compute capture dimensions from the actual display we will capture.
+    size_t physW = CGDisplayPixelsWide(actualDisp);
+    size_t physH = CGDisplayPixelsHigh(actualDisp);
     int w = (int)(physW * scale);
     int h = (int)(physH * scale);
     if (w <= 0 || h <= 0) {
@@ -277,29 +314,6 @@ int rc_pipeline_start(double scale, int fps, int bitrate) {
     VTCompressionSessionPrepareToEncodeFrames(vt);
 
     // ── SCStream ──────────────────────────────────────────────────────────────
-    dispatch_semaphore_t sem = dispatch_semaphore_create(0);
-    __block SCContentFilter *filter = nil;
-    [SCShareableContent getShareableContentWithCompletionHandler:
-        ^(SCShareableContent *c, NSError *e) {
-            if (!e) {
-                for (SCDisplay *d in c.displays) {
-                    if (d.displayID == disp) {
-                        filter = [[SCContentFilter alloc] initWithDisplay:d excludingWindows:@[]];
-                        break;
-                    }
-                }
-            }
-            dispatch_semaphore_signal(sem);
-        }];
-    dispatch_semaphore_wait(sem, dispatch_time(DISPATCH_TIME_NOW, 5LL * NSEC_PER_SEC));
-
-    if (!filter) {
-        NSLog(@"[remotectl/pipeline] failed to get shareable content for display %u", disp);
-        VTCompressionSessionInvalidate(vt); CFRelease(vt);
-        pthread_mutex_unlock(&g_mu);
-        return 5;
-    }
-
     SCStreamConfiguration *cfg = [[SCStreamConfiguration alloc] init];
     cfg.width         = (size_t)w;
     cfg.height        = (size_t)h;
