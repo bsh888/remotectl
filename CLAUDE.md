@@ -338,6 +338,64 @@ CHAT_SEND:{"action":"send_file","name":"photo.jpg","path":"/…/photo.jpg"}
 - `AdminPage`：顶栏及登录页均有语言切换，所有标签/按钮/弹窗文案已翻译
 - `ConnectPanel`、`RemoteScreen`：表单标签、按钮、提示文案已翻译
 
+### UI 设计系统 — SIGNAL DARK
+
+全端统一的精仪表盘风格黑色设计语言，橙色 accent。
+
+**设计 token（`client/index.html` `:root` CSS 变量）**
+
+| 变量 | 值 | 用途 |
+|------|----|------|
+| `--bg` | `#070A0F` | 最深背景 |
+| `--surface` / `--surface-2` / `--surface-3` | `#0D1117` / `#131B26` / `#1C2740` | 卡片/输入框层次 |
+| `--border` / `--border-2` / `--border-3` | 3 级透明度边框 | 分隔线 |
+| `--accent` | `#FF5033` | 主 accent（橙红） |
+| `--green` | `#1EE0A3` | 在线/成功状态 |
+| `--blue` | `#5BA8FF` | 辅助蓝 |
+| `--text-1/2/3` | 白→灰 3 级 | 文字层次 |
+| `--display` | `Syne` | 标题字体 |
+| `--sans` | `DM Sans` | 正文字体 |
+| `--mono` | `JetBrains Mono` | 代码/ID 字体 |
+
+**CSS 动画关键帧**（均定义在 `index.html`）：`rc-fade-up`、`rc-pulse-dot`、`rc-travel`、`rc-spin`、`rc-slide-r/l`、`rc-blink`
+
+**React Web 各页面/组件**
+
+- `LandingPage.tsx`：`ConnectionDiagram` SVG 动画、分栏 Hero、feature mosaic 网格、表格式下载区
+- `AdminPage.tsx`：登录页网格背景 + 橙色图标框、侧边栏 + 在线指示绿卡、stat 卡片嵌入 border 背景
+- `ConnectPanel.tsx`：分区式卡片、`FieldGroup` 上标签、JetBrains Mono 设备 ID 输入框、橙色连接按钮
+- `RemoteScreen.tsx`：工具栏用 `--surface`/`--border` 变量，断开按钮改橙色 dim，修饰键 active 态橙色
+
+**Flutter App**
+
+- `main.dart`：`ColorScheme.fromSeed(seedColor: Color(0xFFFF5033))`，底栏指示色橙色，背景 `#070A0F`
+- `connect_screen.dart`：光晕改橙/绿，logo 图标框橙色边框，连接按钮 `[#FF5033, #E03B22]`
+- `hosted_screen.dart`：光晕改绿/橙，停止按钮橙色，启动按钮绿色 `[#1EE0A3, #16B585]`，DeviceIdCard 深色卡片
+
+### 图标 — SIGNAL DARK
+
+**SVG 源文件**：`scripts/icon-source.svg`（1024×1024）
+
+设计：深色背景（`#070A0F` 径向渐变）+ 微网格 → 显示器轮廓（左上橙色转角 accent）→ 屏幕内两台设备（左绿点在线、右灰点目标）通过橙色虚线 + 行进圆点 + 箭头相连 → 底座橙色细线。
+
+**生成脚本**：`scripts/gen-icons.sh`（依赖 `rsvg-convert` + `magick`）
+
+```bash
+bash scripts/gen-icons.sh   # 修改 SVG 后重新生成所有平台图标
+```
+
+覆盖平台：
+
+| 平台 | 路径 | 尺寸 |
+|------|------|------|
+| Web favicon | `client/public/favicon-16/32.png` | 16、32px |
+| Web apple-touch | `client/public/apple-touch-icon.png` | 180px |
+| Flutter Web | `app/web/icons/Icon-192/512.png` + maskable | 192、512px |
+| macOS | `app/macos/…/AppIcon.appiconset/` | 16–1024px（7 档） |
+| iOS | `app/ios/…/AppIcon.appiconset/` | @1x/@2x/@3x 全套 |
+| Android | `app/android/…/res/mipmap-*/ic_launcher.png` | mdpi–xxxhdpi |
+| Windows | `app/windows/runner/resources/app_icon.ico` | 多层 ICO |
+
 ## 敏感文件（不提交）
 
 | 文件 | 原因 |
