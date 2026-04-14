@@ -317,6 +317,27 @@ CHAT_SEND:{"action":"send_file","name":"photo.jpg","path":"/…/photo.jpg"}
 
 - 双指→单指切换时重置 `prevCentroid` 和 `prevPinchDist`，修复手势残留
 
+### 多语言 i18n
+
+支持**简体中文 / English / 繁體中文**，语言偏好持久化存储。
+
+**Flutter App（`app/lib/l10n.dart`）**
+
+- `AppLocalizations` 类：内联三语翻译，无需 codegen，通过 `Localizations.of<AppLocalizations>` 注入
+- `localeNotifier = ValueNotifier<Locale>` — 全局响应式语言状态，`ValueListenableBuilder` 包裹 `MaterialApp`
+- `loadSavedLocale()` / `saveLocale()` — 用 `SharedPreferences` 持久化（key: `locale`，值: `zh`/`en`/`zh_TW`）
+- `main.dart` 右上角浮动地球按钮（`FloatingActionButton.small`）弹出 `SimpleDialog` 切换语言
+- `remote_session.dart` 中的连接错误改为错误码（`ERR_TIMEOUT`、`ERR_CLOSED`、`ERR_WRONG_PWD` 等），在 `connect_screen.dart` 通过 `l.sessionError(code)` 翻译显示
+- 涉及文件：`l10n.dart`、`main.dart`、`connect_screen.dart`、`hosted_screen.dart`、`chat_panel.dart`、`remote_screen.dart`、`remote_screen_desktop.dart`、`remote_session.dart`
+
+**React Web（`client/src/i18n.ts`）**
+
+- `zh` / `en` / `zh_TW` 三个字典，`I18nContext` + `useI18n()` hook，`localStorage` 持久化（key: `rc_lang`）
+- `App.tsx` 用 `I18nContext.Provider` 包裹所有路由
+- `LandingPage`：导航栏加语言下拉（🌐 按钮），所有文案通过 `t('key')` 读取
+- `AdminPage`：顶栏及登录页均有语言切换，所有标签/按钮/弹窗文案已翻译
+- `ConnectPanel`、`RemoteScreen`：表单标签、按钮、提示文案已翻译
+
 ## 敏感文件（不提交）
 
 | 文件 | 原因 |
