@@ -12,7 +12,7 @@ function detectBrowserLang(): Lang {
     if (t.startsWith('zh')) return 'zh'
     if (t.startsWith('en')) return 'en'
   }
-  return 'zh'
+  return 'en'
 }
 
 export function loadSavedLang(): Lang {

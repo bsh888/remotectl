@@ -19,7 +19,7 @@ Locale _detectSystemLocale() {
     return const Locale('zh');
   }
   if (lang == 'en') return const Locale('en');
-  return const Locale('zh'); // default fallback
+  return const Locale('en'); // default fallback
 }
 
 Future<void> loadSavedLocale() async {
