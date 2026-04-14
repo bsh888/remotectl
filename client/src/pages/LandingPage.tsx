@@ -1,5 +1,6 @@
 import { useState, useEffect, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useI18n, LANG_NAMES, type Lang } from '../i18n'
 
 interface VersionInfo {
   version: string
@@ -8,64 +9,40 @@ interface VersionInfo {
 const RELEASES_BASE = 'https://github.com/bsh888/remotectl-releases/releases/download'
 const RELEASES_PAGE = 'https://github.com/bsh888/remotectl-releases/releases'
 
-const features = [
-  {
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:32,height:32}}>
-        <path d="M15 10l4.553-2.069A1 1 0 0121 8.868V15.132a1 1 0 01-1.447.9L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
-      </svg>
-    ),
-    title: 'H.264 硬件编码',
-    desc: 'macOS 使用 VideoToolbox，Windows/Linux 使用 x264，低码率高画质',
-  },
-  {
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:32,height:32}}>
-        <circle cx="12" cy="12" r="3"/>
-        <path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>
-      </svg>
-    ),
-    title: 'WebRTC P2P',
-    desc: '视频流点对点直连，服务器不经手视频数据，超低延迟体验',
-  },
-  {
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:32,height:32}}>
-        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-        <path d="M7 11V7a5 5 0 0110 0v4"/>
-      </svg>
-    ),
-    title: 'E2EE 输入加密',
-    desc: 'ECDH P-256 + AES-256-GCM 端对端加密，服务器无法解密输入事件',
-  },
-  {
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:32,height:32}}>
-        <rect x="2" y="3" width="20" height="14" rx="2"/>
-        <path d="M8 21h8M12 17v4"/>
-      </svg>
-    ),
-    title: '跨平台支持',
-    desc: 'macOS / Windows / Linux 被控端，任意设备通过浏览器或 App 控制',
-  },
-  {
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:32,height:32}}>
-        <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
-      </svg>
-    ),
-    title: '低延迟鼠标',
-    desc: '本地光标叠加层即时反馈，输入事件走 P2P DataChannel',
-  },
-  {
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:32,height:32}}>
-        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-      </svg>
-    ),
-    title: '会话内聊天',
-    desc: '控制端与被控端实时文字消息和文件互传，支持系统通知',
-  },
+const featureKeys = [
+  { titleKey: 'feat_h264_title', descKey: 'feat_h264_desc', icon: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:32,height:32}}>
+      <path d="M15 10l4.553-2.069A1 1 0 0121 8.868V15.132a1 1 0 01-1.447.9L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
+    </svg>
+  )},
+  { titleKey: 'feat_webrtc_title', descKey: 'feat_webrtc_desc', icon: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:32,height:32}}>
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>
+    </svg>
+  )},
+  { titleKey: 'feat_e2ee_title', descKey: 'feat_e2ee_desc', icon: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:32,height:32}}>
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+      <path d="M7 11V7a5 5 0 0110 0v4"/>
+    </svg>
+  )},
+  { titleKey: 'feat_cross_title', descKey: 'feat_cross_desc', icon: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:32,height:32}}>
+      <rect x="2" y="3" width="20" height="14" rx="2"/>
+      <path d="M8 21h8M12 17v4"/>
+    </svg>
+  )},
+  { titleKey: 'feat_latency_title', descKey: 'feat_latency_desc', icon: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:32,height:32}}>
+      <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
+    </svg>
+  )},
+  { titleKey: 'feat_chat_title', descKey: 'feat_chat_desc', icon: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:32,height:32}}>
+      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+    </svg>
+  )},
 ]
 
 const AppleLogo = () => (
@@ -83,17 +60,19 @@ const WindowsLogo = () => (
   </svg>
 )
 
-const platforms: { name: string; icon: ReactNode; fileKey: string; ext: string; label: string }[] = [
-  { name: 'macOS', icon: <AppleLogo />, fileKey: 'macos', ext: 'zip', label: 'remotectl-app-macos' },
-  { name: 'Windows', icon: <WindowsLogo />, fileKey: 'windows', ext: 'zip', label: 'remotectl-app-windows-amd64' },
-  { name: 'Linux App', icon: '🐧', fileKey: 'linux', ext: 'tar.gz', label: 'remotectl-app-linux-amd64' },
-  { name: 'Linux Agent', icon: '⚙️', fileKey: 'agent', ext: 'tar.gz', label: 'remotectl-agent-linux-amd64' },
+const platforms: { nameKey: string; icon: ReactNode; fileKey: string; ext: string; label: string }[] = [
+  { nameKey: 'app_macos', icon: <AppleLogo />, fileKey: 'macos', ext: 'zip', label: 'remotectl-app-macos' },
+  { nameKey: 'app_windows', icon: <WindowsLogo />, fileKey: 'windows', ext: 'zip', label: 'remotectl-app-windows-amd64' },
+  { nameKey: 'app_linux', icon: '🐧', fileKey: 'linux', ext: 'tar.gz', label: 'remotectl-app-linux-amd64' },
+  { nameKey: 'agent_linux', icon: '⚙️', fileKey: 'agent', ext: 'tar.gz', label: 'remotectl-agent-linux-amd64' },
 ]
 
 export default function LandingPage() {
   const navigate = useNavigate()
+  const { t, lang, setLang } = useI18n()
   const [version, setVersion] = useState<string>('')
   const [scrolled, setScrolled] = useState(false)
+  const [showLang, setShowLang] = useState(false)
 
   useEffect(() => {
     fetch('/api/version')
@@ -154,6 +133,7 @@ export default function LandingPage() {
       listStyle: 'none',
       margin: 0,
       padding: 0,
+      alignItems: 'center',
     },
     navLink: {
       color: '#94a3b8',
@@ -345,6 +325,39 @@ export default function LandingPage() {
       color: '#334155',
       fontSize: 14,
     },
+    langBtn: {
+      background: 'transparent',
+      border: '1px solid rgba(148,163,184,0.2)',
+      borderRadius: 6,
+      color: '#94a3b8',
+      padding: '6px 12px',
+      fontSize: 13,
+      cursor: 'pointer',
+      position: 'relative' as const,
+    },
+    langDropdown: {
+      position: 'absolute' as const,
+      top: '100%',
+      right: 0,
+      marginTop: 4,
+      background: '#1e293b',
+      border: '1px solid rgba(255,255,255,0.1)',
+      borderRadius: 8,
+      overflow: 'hidden',
+      minWidth: 130,
+      zIndex: 200,
+    },
+    langOption: {
+      padding: '10px 16px',
+      fontSize: 14,
+      cursor: 'pointer',
+      color: '#e2e8f0',
+      background: 'transparent',
+      border: 'none',
+      width: '100%',
+      textAlign: 'left' as const,
+      transition: 'background 0.15s',
+    },
   }
 
   return (
@@ -354,15 +367,30 @@ export default function LandingPage() {
         <div style={s.navInner}>
           <span style={s.logo}>RemoteCtl</span>
           <ul style={s.navLinks}>
-            <li><a href="#features" style={s.navLink}>功能</a></li>
-            <li><a href="#download" style={s.navLink}>下载</a></li>
-            <li
-              style={s.navLink}
-              onClick={() => navigate('/admin')}
-            >管理后台</li>
+            <li><a href="#features" style={s.navLink}>{t('nav_features')}</a></li>
+            <li><a href="#download" style={s.navLink}>{t('nav_download')}</a></li>
+            <li style={s.navLink} onClick={() => navigate('/admin')}>{t('nav_admin')}</li>
+            <li style={{position:'relative'}}>
+              <button style={s.langBtn} onClick={() => setShowLang(v => !v)}>
+                🌐 {LANG_NAMES[lang]}
+              </button>
+              {showLang && (
+                <div style={s.langDropdown}>
+                  {(['zh','en','zh_TW'] as Lang[]).map(l => (
+                    <button
+                      key={l}
+                      style={{...s.langOption, fontWeight: l === lang ? 600 : 400, color: l === lang ? '#a5b4fc' : '#e2e8f0'}}
+                      onClick={() => { setLang(l); setShowLang(false) }}
+                    >
+                      {LANG_NAMES[l]}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </li>
           </ul>
           <button style={s.btnPrimary} onClick={() => navigate('/control')}>
-            开始远程控制
+            {t('nav_connect')}
           </button>
         </div>
       </nav>
@@ -370,18 +398,15 @@ export default function LandingPage() {
       {/* Hero */}
       <div style={s.hero}>
         <div style={s.heroGlow} />
-        <div style={s.heroBadge}>跨平台远程桌面系统</div>
+        <div style={s.heroBadge}>{t('hero_title')}</div>
         <h1 style={s.heroTitle}>RemoteCtl</h1>
-        <p style={s.heroSubtitle}>
-          H.264 硬件编码 · WebRTC P2P · 端对端加密<br/>
-          macOS / Windows / Linux 被控端，浏览器或 App 控制
-        </p>
+        <p style={s.heroSubtitle}>{t('hero_subtitle')}</p>
         <div style={s.heroCta}>
           <button style={s.btnLarge} onClick={() => navigate('/control')}>
-            开始远程控制 →
+            {t('hero_start')} →
           </button>
           <a href="#download" style={s.btnOutline}>
-            下载客户端
+            {t('hero_download')}
           </a>
         </div>
       </div>
@@ -389,14 +414,13 @@ export default function LandingPage() {
       {/* Features */}
       <div style={s.divider} />
       <div id="features" style={s.section}>
-        <h2 style={s.sectionTitle}>核心功能</h2>
-        <p style={s.sectionSub}>专为低延迟远程控制设计，安全可靠</p>
+        <h2 style={s.sectionTitle}>{t('nav_features')}</h2>
         <div style={s.featuresGrid}>
-          {features.map(f => (
-            <div key={f.title} style={s.featureCard}>
+          {featureKeys.map(f => (
+            <div key={f.titleKey} style={s.featureCard}>
               <div style={s.featureIcon}>{f.icon}</div>
-              <div style={s.featureTitle}>{f.title}</div>
-              <div style={s.featureDesc}>{f.desc}</div>
+              <div style={s.featureTitle}>{t(f.titleKey)}</div>
+              <div style={s.featureDesc}>{t(f.descKey)}</div>
             </div>
           ))}
         </div>
@@ -405,68 +429,31 @@ export default function LandingPage() {
       {/* Downloads */}
       <div style={s.divider} />
       <div id="download" style={s.section}>
-        <h2 style={s.sectionTitle}>下载</h2>
+        <h2 style={s.sectionTitle}>{t('dl_title')}</h2>
         <p style={s.sectionSub}>
-          {version ? `当前版本 ${version}` : '前往 Releases 页面下载最新版本'}
+          {version ? `${t('dl_latest')}: ${version}` : t('dl_subtitle')}
         </p>
         <div style={s.downloadsGrid}>
           {platforms.map(p => (
-            <div key={p.name} style={s.downloadCard}>
+            <div key={p.nameKey} style={s.downloadCard}>
               <div style={s.downloadIcon}>{p.icon}</div>
-              <div style={s.downloadName}>{p.name}</div>
+              <div style={s.downloadName}>{t(p.nameKey)}</div>
               <a href={downloadUrl(p)} style={s.downloadBtn} target="_blank" rel="noopener noreferrer">
-                {version ? `下载 ${version}` : '查看 Releases'}
+                {version ? `↓ ${version}` : t('dl_github')}
               </a>
             </div>
           ))}
         </div>
         <p style={{textAlign:'center', marginTop:32, color:'#334155', fontSize:14}}>
-          服务器包含 <code style={{color:'#6366f1'}}>remotectl-server-linux-*</code>，下载后解压运行 install.sh 一键部署。
-          <a href={RELEASES_PAGE} style={{color:'#6366f1', marginLeft:8}} target="_blank" rel="noopener noreferrer">
-            查看所有版本 →
+          <a href={RELEASES_PAGE} style={{color:'#6366f1'}} target="_blank" rel="noopener noreferrer">
+            {t('dl_github')} →
           </a>
         </p>
       </div>
 
-      {/* Platform Support */}
-      <div style={s.divider} />
-      <div style={s.section}>
-        <h2 style={s.sectionTitle}>平台支持</h2>
-        <div style={{overflowX:'auto', marginTop:40}}>
-          <table style={{
-            width:'100%', borderCollapse:'collapse',
-            background:'rgba(255,255,255,0.02)',
-            borderRadius:12, overflow:'hidden',
-          }}>
-            <thead>
-              <tr style={{borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
-                {['平台','控制端','被控端'].map(h => (
-                  <th key={h} style={{padding:'16px 24px', textAlign:'left', color:'#64748b', fontSize:14, fontWeight:600}}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                ['macOS', '✅ App + 浏览器', '✅ App 内置'],
-                ['Windows', '✅ App + 浏览器', '✅ App 内置'],
-                ['Linux', '✅ App + 浏览器', '✅ App 内置 / 独立 Agent'],
-                ['iOS', '✅ App', '❌'],
-                ['Android', '✅ App', '❌'],
-              ].map((row, i) => (
-                <tr key={i} style={{borderBottom:'1px solid rgba(255,255,255,0.04)'}}>
-                  {row.map((cell, j) => (
-                    <td key={j} style={{padding:'14px 24px', fontSize:14, color: j===0 ? '#e2e8f0' : '#94a3b8'}}>{cell}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
       <div style={s.divider} />
       <footer style={s.footer}>
-        <p>© 2025 RemoteCtl · WebRTC 跨平台远程桌面</p>
+        <p>© 2025 RemoteCtl · WebRTC</p>
       </footer>
     </div>
   )

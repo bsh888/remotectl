@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { InputEvent } from '../types'
+import { useI18n } from '../i18n'
 
 const isLocalMac = /Mac|iPhone|iPod|iPad/.test(navigator.platform)
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export default function RemoteScreen({ videoStream, onInput, onDisconnect, deviceName, remotePlatform }: Props) {
+  const { t } = useI18n()
   const videoRef    = useRef<HTMLVideoElement>(null)
   const cursorRef   = useRef<HTMLDivElement>(null)
   const kbInputRef  = useRef<HTMLInputElement>(null)
@@ -348,7 +350,7 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
       const text = await navigator.clipboard.readText()
       if (text) onInput({ event: 'paste_text', text } as any)
     } catch {
-      const text = window.prompt('粘贴内容到此处（Ctrl+V / ⌘V）：')
+      const text = window.prompt(t('paste_prompt'))
       if (text) onInput({ event: 'paste_text', text } as any)
     }
   }, [onInput])
@@ -364,20 +366,20 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
         <span style={styles.toolbarLabel}>🖥 {deviceName}</span>
         <div style={styles.toolbarRight}>
           {!isMobile && (
-            <label style={styles.swapLabel} title="勾选后 Ctrl+C/V/Z 等会转换为 Mac 的 Cmd+C/V/Z">
+            <label style={styles.swapLabel} title={t('ctrl_swap_title')}>
               <input type="checkbox" checked={swapCtrlCmd}
                 onChange={e => setSwapCtrlCmd(e.target.checked)} style={{ marginRight: 4 }} />
               <span style={{ fontSize: 12, color: swapCtrlCmd ? '#86efac' : '#94a3b8' }}>Ctrl ⇄ ⌘</span>
             </label>
           )}
           <button style={styles.toolBtn} onClick={sendClipboard}
-            title="将本地剪贴板文本发送到远程（也可在视频区域直接 Ctrl+V）">粘贴</button>
+            title={t('paste_title')}>{t('paste')}</button>
           {isMobile && (
             <button
               style={{ ...styles.toolBtn, color: showKb ? '#86efac' : '#e2e8f0' }}
-              onClick={toggleKeyboard} title="显示/隐藏键盘">⌨️</button>
+              onClick={toggleKeyboard}>{t('keyboard')}</button>
           )}
-          <button style={styles.disconnectBtn} onClick={onDisconnect}>断开</button>
+          <button style={styles.disconnectBtn} onClick={onDisconnect}>{t('disconnect')}</button>
         </div>
       </div>
 
@@ -441,7 +443,7 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
         />
         <div ref={cursorRef} style={styles.cursor} />
         {!videoStream && (
-          <div style={styles.waiting}><span>正在建立 WebRTC 连接…</span></div>
+          <div style={styles.waiting}><span>{t('connecting_webrtc')}</span></div>
         )}
       </div>
 
@@ -496,6 +498,7 @@ function ModKey({ label, active = false, onTap }: { label: string; active?: bool
 // ── One-time gesture hint ─────────────────────────────────────────────────────
 
 function MobileHint() {
+  const { t } = useI18n()
   const [visible, setVisible] = useState(() => !sessionStorage.getItem('rc_hint_seen'))
   useEffect(() => {
     if (!visible) return
@@ -506,8 +509,8 @@ function MobileHint() {
   return (
     <div style={styles.hint} onClick={() => setVisible(false)}>
       <div style={styles.hintBox}>
-        <div>单击 → 左键 &nbsp;|&nbsp; 长按 → 右键</div>
-        <div>双指滑动 → 滚轮 &nbsp;|&nbsp; ⌨️ → 键盘</div>
+        <div>{t('hint_click')} &nbsp;|&nbsp; {t('hint_longpress')}</div>
+        <div>{t('hint_scroll')} &nbsp;|&nbsp; {t('hint_keyboard')}</div>
       </div>
     </div>
   )

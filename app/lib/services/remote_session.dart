@@ -48,7 +48,7 @@ class RemoteSession extends ChangeNotifier {
     // Guard: if no response within 15 s, treat as timeout.
     _connectTimer = Timer(const Duration(seconds: 15), () {
       if (_state == SessionState.connecting) {
-        _setError('连接超时，请检查服务器地址是否正确');
+        _setError('ERR_TIMEOUT');
         disconnect();
       }
     });
@@ -77,7 +77,7 @@ class RemoteSession extends ChangeNotifier {
           // Only treat it as an error if no peer connection was ever created,
           // and only if a better error hasn't already been set (e.g. 'invalid password').
           if (_state == SessionState.connecting && _pc == null) {
-            _setError('连接被服务器关闭，请检查服务器地址和设备 ID');
+            _setError('ERR_CLOSED');
           }
         },
       );
@@ -307,13 +307,13 @@ class RemoteSession extends ChangeNotifier {
   static String _friendlyServerError(String raw) {
     switch (raw) {
       case 'invalid password':
-        return '会话密码错误，请重新输入';
+        return 'ERR_WRONG_PWD';
       case 'device not found or offline':
-        return '设备不在线，请确认设备 ID';
+        return 'ERR_DEVICE_OFFLINE';
       case 'authentication failed':
-        return '认证失败，请检查设备密钥';
+        return 'ERR_AUTH_FAILED';
       default:
-        return raw.isEmpty ? '服务器返回未知错误' : raw;
+        return raw.isEmpty ? 'ERR_UNKNOWN' : raw;
     }
   }
 

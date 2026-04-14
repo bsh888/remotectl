@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../l10n.dart';
 import '../services/agent_service.dart';
 import 'chat_panel.dart';
 
@@ -120,10 +121,11 @@ class _HostedScreenState extends State<HostedScreen> {
   }
 
   Future<void> _pickCaCert() async {
+    final l = AppLocalizations.of(context);
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['crt', 'pem', 'cer'],
-      dialogTitle: '选择 CA 证书文件',
+      dialogTitle: l.selectCaCert,
     );
     if (result != null && result.files.single.path != null) {
       setState(() => _caCertCtrl.text = result.files.single.path!);
@@ -135,9 +137,9 @@ class _HostedScreenState extends State<HostedScreen> {
     if (id.isEmpty) return;
     Clipboard.setData(ClipboardData(text: id));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('设备 ID 已复制'),
-        duration: Duration(seconds: 2),
+      SnackBar(
+        content: Text(AppLocalizations.of(context).deviceIdCopied),
+        duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -148,9 +150,9 @@ class _HostedScreenState extends State<HostedScreen> {
     if (pwd.isEmpty) return;
     Clipboard.setData(ClipboardData(text: pwd));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('会话密码已复制'),
-        duration: Duration(seconds: 2),
+      SnackBar(
+        content: Text(AppLocalizations.of(context).sessionPwdCopied),
+        duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -199,7 +201,7 @@ class _HostedScreenState extends State<HostedScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    '共享本机仅支持桌面平台',
+                    AppLocalizations.of(context).hostedUnsupported,
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.54),
                       fontSize: 18,
@@ -318,7 +320,7 @@ class _HostedScreenState extends State<HostedScreen> {
                                     children: [
                                       // Section label
                                       Text(
-                                        '连接配置',
+                                        AppLocalizations.of(context).connectionConfig,
                                         style: TextStyle(
                                           color: Colors.white
                                               .withValues(alpha: 0.60),
@@ -331,7 +333,7 @@ class _HostedScreenState extends State<HostedScreen> {
 
                                       _hostedLabeledField(
                                         context: context,
-                                        label: '服务器地址',
+                                        label: AppLocalizations.of(context).serverAddressLabel,
                                         controller: _serverCtrl,
                                         hint: 'https://192.168.1.100:8443',
                                         icon: Icons.cloud_outlined,
@@ -341,9 +343,9 @@ class _HostedScreenState extends State<HostedScreen> {
                                       const SizedBox(height: 12),
                                       _hostedLabeledField(
                                         context: context,
-                                        label: '设备密钥',
+                                        label: AppLocalizations.of(context).deviceToken,
                                         controller: _tokenCtrl,
-                                        hint: '用于验证身份的密钥（可选）',
+                                        hint: AppLocalizations.of(context).deviceTokenHint,
                                         icon: Icons.vpn_key_outlined,
                                         obscure: true,
                                         enabled: !running,
@@ -351,9 +353,9 @@ class _HostedScreenState extends State<HostedScreen> {
                                       const SizedBox(height: 12),
                                       _hostedLabeledField(
                                         context: context,
-                                        label: '显示名称',
+                                        label: AppLocalizations.of(context).displayName,
                                         controller: _nameCtrl,
-                                        hint: '（默认同设备 ID）',
+                                        hint: AppLocalizations.of(context).displayNameHint,
                                         icon: Icons.badge_outlined,
                                         enabled: !running,
                                       ),
@@ -371,8 +373,8 @@ class _HostedScreenState extends State<HostedScreen> {
                                         ),
                                         label: Text(
                                           _showAdvanced
-                                              ? '收起高级设置'
-                                              : '高级设置',
+                                              ? AppLocalizations.of(context).hideAdvanced
+                                              : AppLocalizations.of(context).advancedSettings,
                                         ),
                                         style: TextButton.styleFrom(
                                           foregroundColor: Colors.white
@@ -400,7 +402,7 @@ class _HostedScreenState extends State<HostedScreen> {
                                           Expanded(
                                             child: _hostedLabeledField(
                                               context: context,
-                                              label: '码率 (kbps)',
+                                              label: AppLocalizations.of(context).bitrate,
                                               controller: _bitrateCtrl,
                                               hint: '6000',
                                               icon: Icons
@@ -417,7 +419,7 @@ class _HostedScreenState extends State<HostedScreen> {
                                               CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              '分辨率缩放: ${(_scale * 100).round()}%',
+                                              '${AppLocalizations.of(context).resolutionScale}: ${(_scale * 100).round()}%',
                                               style: TextStyle(
                                                 color: Colors.white
                                                     .withValues(alpha: 0.54),
@@ -446,9 +448,9 @@ class _HostedScreenState extends State<HostedScreen> {
                                             Expanded(
                                               child: _hostedLabeledField(
                                                 context: context,
-                                                label: 'CA 证书路径',
+                                                label: AppLocalizations.of(context).caCertPath,
                                                 controller: _caCertCtrl,
-                                                hint: '/path/to/server.crt（可选）',
+                                                hint: AppLocalizations.of(context).caCertHint,
                                                 icon: Icons.verified_outlined,
                                                 enabled: !running,
                                               ),
@@ -478,7 +480,7 @@ class _HostedScreenState extends State<HostedScreen> {
                                                             10),
                                                   ),
                                                 ),
-                                                child: const Text('浏览'),
+                                                child: Text(AppLocalizations.of(context).browse),
                                               ),
                                             ),
                                           ],
@@ -505,7 +507,9 @@ class _HostedScreenState extends State<HostedScreen> {
                     children: [
                       Expanded(
                         child: _GradientButton(
-                          label: running ? '停止共享' : '开始共享',
+                          label: running
+                              ? AppLocalizations.of(context).stopSharing
+                              : AppLocalizations.of(context).startSharing,
                           icon: running
                               ? Icons.stop_circle_outlined
                               : Icons.play_circle_outlined,
@@ -569,7 +573,7 @@ class _HostedScreenState extends State<HostedScreen> {
                               ),
                               const SizedBox(width: 6),
                               Text(
-                                '日志',
+                                AppLocalizations.of(context).logTitle,
                                 style: TextStyle(
                                   color:
                                       Colors.white.withValues(alpha: 0.50),
@@ -612,8 +616,8 @@ class _HostedScreenState extends State<HostedScreen> {
                                         horizontal: 8, vertical: 4),
                                     minimumSize: Size.zero,
                                   ),
-                                  child: const Text('清空',
-                                      style: TextStyle(fontSize: 11)),
+                                  child: Text(AppLocalizations.of(context).logClear,
+                                      style: const TextStyle(fontSize: 11)),
                                 ),
                             ]),
                           ),

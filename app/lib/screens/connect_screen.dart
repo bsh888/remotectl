@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../l10n.dart';
 import '../services/remote_session.dart';
 import 'remote_screen.dart';
 import 'remote_screen_desktop.dart';
@@ -261,7 +262,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        '远程桌面控制',
+                        AppLocalizations.of(context).connectSubtitle,
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.54),
@@ -297,7 +298,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                               children: [
                                 _labeledField(
                                   context: context,
-                                  label: '服务器地址',
+                                  label: AppLocalizations.of(context).serverAddress,
                                   controller: _serverCtrl,
                                   hint: 'https://192.168.1.100:8443',
                                   icon: Icons.cloud_outlined,
@@ -306,24 +307,26 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                 const SizedBox(height: 16),
                                 _labeledField(
                                   context: context,
-                                  label: '设备 ID',
+                                  label: AppLocalizations.of(context).deviceId,
                                   controller: _deviceCtrl,
-                                  hint: '9位数字设备ID',
+                                  hint: AppLocalizations.of(context).deviceIdHint,
                                   icon: Icons.computer_outlined,
                                 ),
                                 const SizedBox(height: 16),
                                 _labeledField(
                                   context: context,
-                                  label: '会话密码',
+                                  label: AppLocalizations.of(context).sessionPassword,
                                   controller: _passCtrl,
-                                  hint: '被控端显示的8位数字',
+                                  hint: AppLocalizations.of(context).sessionPasswordHint,
                                   icon: Icons.lock_outline,
                                   obscure: true,
                                   focusNode: _passFocus,
                                 ),
                                 const SizedBox(height: 20),
                                 _GradientButton(
-                                  label: isConnecting ? '连接中…' : '连接',
+                                  label: isConnecting
+                                      ? AppLocalizations.of(context).connecting
+                                      : AppLocalizations.of(context).connect,
                                   icon: Icons.play_arrow_rounded,
                                   onPressed: isConnecting ? null : _connect,
                                   isLoading: isConnecting,
@@ -348,7 +351,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                         const SizedBox(width: 10),
                                         Expanded(
                                           child: Text(
-                                            _session.error,
+                                            AppLocalizations.of(context).sessionError(_session.error),
                                             style: const TextStyle(
                                               color: Colors.redAccent,
                                               fontSize: 13,
@@ -394,7 +397,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '最近连接',
+                AppLocalizations.of(context).recentConnections,
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.40),
                   fontSize: 11,
@@ -483,19 +486,20 @@ class _HistoryRow extends StatelessWidget {
               ),
               GestureDetector(
                 onTap: () async {
+                  final l = AppLocalizations.of(context);
                   final confirmed = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
-                      title: const Text('删除记录'),
-                      content: const Text('确认删除该连接记录？'),
+                      title: Text(l.deleteRecordTitle),
+                      content: Text(l.deleteRecordContent),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('取消'),
+                          child: Text(l.cancel),
                         ),
                         TextButton(
                           onPressed: () => Navigator.pop(ctx, true),
-                          child: const Text('删除'),
+                          child: Text(l.delete),
                         ),
                       ],
                     ),

@@ -1,12 +1,14 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'l10n.dart';
 import 'screens/connect_screen.dart';
 import 'screens/hosted_screen.dart';
 import 'services/agent_service.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await loadSavedLocale();
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.landscapeLeft,
@@ -20,38 +22,44 @@ class RemoteCtlApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'RemoteCtl',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF2563EB),
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(),
-          isDense: true,
-        ),
-        navigationBarTheme: NavigationBarThemeData(
-          labelTextStyle: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.selected)) {
-              return const TextStyle(
-                color: Colors.white,
+    return ValueListenableBuilder<Locale>(
+      valueListenable: localeNotifier,
+      builder: (context, locale, _) => MaterialApp(
+        title: 'RemoteCtl',
+        debugShowCheckedModeBanner: false,
+        locale: locale,
+        localizationsDelegates: localizationsDelegates,
+        supportedLocales: supportedLocales,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFF2563EB),
+            brightness: Brightness.dark,
+          ),
+          useMaterial3: true,
+          inputDecorationTheme: const InputDecorationTheme(
+            border: OutlineInputBorder(),
+            isDense: true,
+          ),
+          navigationBarTheme: NavigationBarThemeData(
+            labelTextStyle: WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.selected)) {
+                return const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.2,
+                );
+              }
+              return TextStyle(
+                color: Colors.white.withValues(alpha: 0.5),
                 fontSize: 12,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.2,
+                fontWeight: FontWeight.w400,
               );
-            }
-            return TextStyle(
-              color: Colors.white.withValues(alpha: 0.5),
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
-            );
-          }),
+            }),
+          ),
         ),
+        home: const HomeScreen(),
       ),
-      home: const HomeScreen(),
     );
   }
 }
@@ -77,8 +85,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  /// Called on desktop when the user clicks the window close button.
-  /// If the agent is running, ask for confirmation before allowing exit.
   Future<AppExitResponse> _onExitRequested() async {
     if (!_agentService.isRunning) return AppExitResponse.exit;
     if (!mounted) {
@@ -86,23 +92,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       return AppExitResponse.exit;
     }
 
+    final l = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Text('退出确认'),
-        content: const Text('当前正在共享屏幕，退出后远程连接将断开。'),
+        title: Text(l.exitConfirmTitle),
+        content: Text(l.exitConfirmContent),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
+            child: Text(l.exitCancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Colors.red.shade700,
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('停止共享并退出'),
+            child: Text(l.exitConfirm),
           ),
         ],
       ),
@@ -117,9 +124,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Fallback: ensure the agent is killed if the process is terminated
-    // externally (e.g. force-quit, SIGKILL) without going through
-    // onExitRequested. On Windows, dispose() may also not be called.
     if (state == AppLifecycleState.detached) {
       _agentService.stop();
     }
@@ -133,8 +137,44 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.dispose();
   }
 
+  void _showLangPicker() {
+    final current = localeNotifier.value;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        final items = [
+          (const Locale('zh'), '简体中文'),
+          (const Locale('en'), 'English'),
+          (const Locale('zh', 'TW'), '繁體中文'),
+        ];
+        return SimpleDialog(
+          title: const Text('Language / 语言'),
+          children: items.map((item) {
+            final selected = item.$1 == current;
+            return SimpleDialogOption(
+              onPressed: () {
+                Navigator.pop(ctx);
+                saveLocale(item.$1);
+              },
+              child: Row(
+                children: [
+                  Text(item.$2),
+                  if (selected) ...[
+                    const Spacer(),
+                    const Icon(Icons.check, size: 18),
+                  ],
+                ],
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
       body: IndexedStack(
         index: _index,
@@ -153,21 +193,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             indicatorColor: const Color(0xFF2563EB).withValues(alpha: 0.25),
             labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
             height: 64,
-            destinations: const [
+            destinations: [
               NavigationDestination(
-                icon: Icon(Icons.monitor_outlined),
-                selectedIcon: Icon(Icons.monitor),
-                label: '远程控制',
+                icon: const Icon(Icons.monitor_outlined),
+                selectedIcon: const Icon(Icons.monitor),
+                label: l.navRemote,
               ),
               NavigationDestination(
-                icon: Icon(Icons.screen_share_outlined),
-                selectedIcon: Icon(Icons.screen_share),
-                label: '共享本机',
+                icon: const Icon(Icons.screen_share_outlined),
+                selectedIcon: const Icon(Icons.screen_share),
+                label: l.navHosted,
               ),
             ],
           ),
         ),
       ),
+      floatingActionButton: FloatingActionButton.small(
+        onPressed: _showLangPicker,
+        backgroundColor: const Color(0xFF1E293B),
+        foregroundColor: Colors.white70,
+        elevation: 2,
+        tooltip: 'Language',
+        child: const Icon(Icons.language, size: 20),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endTop,
     );
   }
 }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useI18n } from '../i18n'
 
 export interface HistoryEntry {
   deviceID: string
@@ -36,6 +37,7 @@ interface Props {
 }
 
 export default function ConnectPanel({ onConnect, error, connecting, history, onRemoveHistory }: Props) {
+  const { t } = useI18n()
   const [serverURL, setServerURL] = useState(() => localStorage.getItem('rc_server') ?? 'http://localhost:8080')
   const [deviceID, setDeviceID] = useState(() => localStorage.getItem('rc_device') ?? '')
   const [password, setPassword] = useState('')
@@ -63,7 +65,7 @@ export default function ConnectPanel({ onConnect, error, connecting, history, on
 
         {history.length > 0 && (
           <div style={styles.historySection}>
-            <div style={styles.historyLabel}>最近连接</div>
+            <div style={styles.historyLabel}>{t('recent')}</div>
             <div style={styles.historyList}>
               {history.map(entry => (
                 <div
@@ -78,7 +80,7 @@ export default function ConnectPanel({ onConnect, error, connecting, history, on
                   <button
                     style={styles.historyRemoveBtn}
                     onClick={e => { e.stopPropagation(); onRemoveHistory(entry.deviceID, entry.serverURL) }}
-                    title="移除"
+                    title={t('remove')}
                   >
                     ×
                   </button>
@@ -90,7 +92,7 @@ export default function ConnectPanel({ onConnect, error, connecting, history, on
 
         <form onSubmit={handleConnect} style={styles.form}>
           <label style={styles.label}>
-            服务器地址
+            {t('server_url')}
             <input
               style={styles.input}
               value={serverURL}
@@ -101,25 +103,25 @@ export default function ConnectPanel({ onConnect, error, connecting, history, on
           </label>
 
           <label style={styles.label}>
-            设备 ID
+            {t('device_id')}
             <input
               style={styles.input}
               value={deviceID}
               onChange={e => setDeviceID(e.target.value)}
-              placeholder="9位数字设备ID"
+              placeholder={t('device_id_hint')}
               required
             />
           </label>
 
           <label style={styles.label}>
-            连接密码
+            {t('connect_pwd')}
             <input
               ref={passwordRef}
               style={styles.input}
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder="被控端显示的8位数字"
+              placeholder={t('connect_pwd_hint')}
               required
             />
           </label>
@@ -127,7 +129,7 @@ export default function ConnectPanel({ onConnect, error, connecting, history, on
           {error && <div style={styles.error}>{error}</div>}
 
           <button type="submit" style={styles.btnPrimary} disabled={connecting}>
-            {connecting ? '连接中…' : '连接'}
+            {connecting ? t('connecting') : t('connect')}
           </button>
         </form>
       </div>

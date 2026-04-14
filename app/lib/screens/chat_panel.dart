@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:open_file/open_file.dart';
 
+import '../l10n.dart';
 import '../services/chat_service.dart';
 
 // ── ChatPanel ─────────────────────────────────────────────────────────────────
@@ -158,9 +159,9 @@ class _ChatPanelState extends State<ChatPanel> {
         children: [
           const Icon(Icons.chat_bubble_rounded, size: 14, color: Color(0xFF2563EB)),
           const SizedBox(width: 7),
-          const Text(
-            '聊天',
-            style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+          Text(
+            AppLocalizations.of(context).chat,
+            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
           ),
           const SizedBox(width: 6),
           if (!widget.chat.isOpen)
@@ -170,9 +171,9 @@ class _ChatPanelState extends State<ChatPanel> {
                 color: Colors.orange.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: const Text(
-                '等待连接',
-                style: TextStyle(color: Colors.orange, fontSize: 9),
+              child: Text(
+                AppLocalizations.of(context).waitingForConnection,
+                style: const TextStyle(color: Colors.orange, fontSize: 9),
               ),
             ),
           const Spacer(),
@@ -191,13 +192,13 @@ class _ChatPanelState extends State<ChatPanel> {
   Widget _buildMessageList() {
     final msgs = widget.chat.messages;
     if (msgs.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.chat_bubble_outline, size: 36, color: Colors.white10),
-            SizedBox(height: 8),
-            Text('发消息给对方', style: TextStyle(color: Colors.white24, fontSize: 12)),
+            const Icon(Icons.chat_bubble_outline, size: 36, color: Colors.white10),
+            const SizedBox(height: 8),
+            Text(AppLocalizations.of(context).sendMessageHint, style: const TextStyle(color: Colors.white24, fontSize: 12)),
           ],
         ),
       );
@@ -269,9 +270,9 @@ class _ChatPanelState extends State<ChatPanel> {
   void _copyToClipboard(String text) {
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      const SnackBar(
-        content: Text('已复制'),
-        duration: Duration(seconds: 1),
+      SnackBar(
+        content: Text(AppLocalizations.of(context).copied),
+        duration: const Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -286,7 +287,7 @@ class _ChatPanelState extends State<ChatPanel> {
     final buttons = [
       ...editableTextState.contextMenuButtonItems,
       ContextMenuButtonItem(
-        label: '复制全部',
+        label: AppLocalizations.of(context).copyAll,
         onPressed: () {
           ContextMenuController.removeAny();
           _copyToClipboard(fullText);
@@ -333,7 +334,7 @@ class _ChatPanelState extends State<ChatPanel> {
               const SizedBox(width: 6),
               Flexible(
                 child: Text(
-                  msg.fileName ?? '文件',
+                  msg.fileName ?? AppLocalizations.of(context).file,
                   style: const TextStyle(color: Colors.white, fontSize: 12),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -369,12 +370,12 @@ class _ChatPanelState extends State<ChatPanel> {
               cursor: SystemMouseCursors.click,
               child: GestureDetector(
                 onTap: () => _openFile(msg),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.open_in_new, size: 11, color: Colors.white38),
-                    SizedBox(width: 3),
-                    Text('打开文件', style: TextStyle(color: Colors.white38, fontSize: 10)),
+                    const Icon(Icons.open_in_new, size: 11, color: Colors.white38),
+                    const SizedBox(width: 3),
+                    Text(AppLocalizations.of(context).openFile, style: const TextStyle(color: Colors.white38, fontSize: 10)),
                   ],
                 ),
               ),
@@ -382,7 +383,7 @@ class _ChatPanelState extends State<ChatPanel> {
           ],
           if (msg.hasError) ...[
             const SizedBox(height: 3),
-            const Text('传输失败', style: TextStyle(color: Colors.redAccent, fontSize: 10)),
+            Text(AppLocalizations.of(context).transferFailed, style: const TextStyle(color: Colors.redAccent, fontSize: 10)),
           ],
         ],
       ),
@@ -419,7 +420,7 @@ class _ChatPanelState extends State<ChatPanel> {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           // Attach file
-          _IconBtn(icon: Icons.attach_file_rounded, onTap: _pickFile, tooltip: '发送文件'),
+          _IconBtn(icon: Icons.attach_file_rounded, onTap: _pickFile, tooltip: AppLocalizations.of(context).sendFile),
           const SizedBox(width: 6),
           // Text input
           Expanded(
@@ -430,7 +431,9 @@ class _ChatPanelState extends State<ChatPanel> {
               maxLines: 4,
               minLines: 1,
               decoration: InputDecoration(
-                hintText: widget.chat.isOpen ? '发消息…' : '等待连接…',
+                hintText: widget.chat.isOpen
+                    ? AppLocalizations.of(context).messageInputHint
+                    : AppLocalizations.of(context).waitingConnection,
                 hintStyle: const TextStyle(color: Colors.white24, fontSize: 13),
                 filled: true,
                 fillColor: Colors.white.withOpacity(0.07),

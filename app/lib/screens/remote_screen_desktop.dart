@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import '../l10n.dart';
 import '../services/remote_session.dart';
 import '../utils/key_mapper.dart';
 import 'chat_panel.dart';
@@ -253,14 +254,14 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
           }
           if (widget.session.state != SessionState.connected ||
               widget.session.renderer == null) {
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  CircularProgressIndicator(color: Colors.white38),
-                  SizedBox(height: 16),
-                  Text('正在建立 WebRTC 连接…',
-                      style: TextStyle(color: Colors.white54)),
+                  const CircularProgressIndicator(color: Colors.white38),
+                  const SizedBox(height: 16),
+                  Text(AppLocalizations.of(context).connectingWebRTCDesktop,
+                      style: const TextStyle(color: Colors.white54)),
                 ],
               ),
             );
@@ -286,7 +287,7 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
             const SizedBox(height: 24),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('返回'),
+              child: Text(AppLocalizations.of(context).back),
             ),
           ],
         ),
@@ -395,7 +396,7 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
                 child: MouseRegion(
                   cursor: SystemMouseCursors.click,
                   child: Tooltip(
-                    message: '显示工具栏',
+                    message: AppLocalizations.of(context).showToolbar,
                     child: Container(
                       width: 24,
                       height: 20,
@@ -440,7 +441,7 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
           // Collapse toolbar
           _ToolbarBtn(
             icon: Icons.keyboard_arrow_up_rounded,
-            tooltip: '收起',
+            tooltip: AppLocalizations.of(context).collapse,
             onTap: () => setState(() {
               _toolbarVisible = false;
               _panelOpen = false;
@@ -451,7 +452,7 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
           _ToolbarBtn(
             icon: _platformIcon(widget.remotePlatform),
             active: _panelOpen,
-            tooltip: '控制面板',
+            tooltip: AppLocalizations.of(context).controlPanel,
             onTap: () {
               setState(() => _panelOpen = !_panelOpen);
               _focusNode.requestFocus();
@@ -463,7 +464,7 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
             icon: _chatOpen ? Icons.chat_bubble_rounded : Icons.chat_bubble_outline_rounded,
             active: _chatOpen,
             accentColor: const Color(0xFF2563EB),
-            tooltip: '聊天',
+            tooltip: AppLocalizations.of(context).chat,
             badge: unread > 0 ? (unread > 9 ? '9+' : '$unread') : null,
             onTap: () {
               setState(() {
@@ -480,7 +481,7 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
   }
 
   Widget _buildPanel(BuildContext context) {
-    final name = widget.deviceName.isNotEmpty ? widget.deviceName : '远程桌面';
+    final name = widget.deviceName.isNotEmpty ? widget.deviceName : AppLocalizations.of(context).remoteDesktop;
     return Container(
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.82),
@@ -511,7 +512,7 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
               // Paste
               _PanelBtn(
                 icon: Icons.content_paste,
-                tooltip: '粘贴',
+                tooltip: AppLocalizations.of(context).paste,
                 onTap: () { _pasteClipboard(); setState(() => _panelOpen = false); },
               ),
               // Win key (Windows only)
@@ -534,7 +535,7 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
               _PanelBtn(
                 icon: Icons.logout,
                 danger: true,
-                tooltip: '断开',
+                tooltip: AppLocalizations.of(context).disconnect,
                 onTap: () {
                   widget.session.disconnect();
                   Navigator.of(context).pop();

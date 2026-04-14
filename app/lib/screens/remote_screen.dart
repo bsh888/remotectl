@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import '../l10n.dart';
 import '../services/remote_session.dart';
 import 'chat_panel.dart';
 
@@ -457,11 +458,11 @@ class _RemoteScreenState extends State<RemoteScreen> {
   }
 
   Widget _buildConnecting() {
-    return const Center(
+    return Center(
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        CircularProgressIndicator(color: Colors.white38),
-        SizedBox(height: 16),
-        Text('正在建立连接…', style: TextStyle(color: Colors.white54)),
+        const CircularProgressIndicator(color: Colors.white38),
+        const SizedBox(height: 16),
+        Text(AppLocalizations.of(context).connectingWebRTC, style: const TextStyle(color: Colors.white54)),
       ]),
     );
   }
@@ -480,7 +481,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
           FilledButton.icon(
             onPressed: _disconnect,
             icon: const Icon(Icons.arrow_back),
-            label: const Text('返回'),
+            label: Text(AppLocalizations.of(context).back),
           ),
         ]),
       ),
@@ -660,7 +661,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
 
   Widget _buildToolbar() {
     final bottom = MediaQuery.of(context).padding.bottom;
-    final name = widget.deviceName.isNotEmpty ? widget.deviceName : '远程桌面';
+    final name = widget.deviceName.isNotEmpty ? widget.deviceName : AppLocalizations.of(context).remoteDesktop;
     return Container(
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.75),
@@ -681,21 +682,21 @@ class _RemoteScreenState extends State<RemoteScreen> {
         if (_videoScale != 1.0)
           _ToolbarBtn(
             icon: Icons.zoom_out_map_rounded,
-            label: '复原',
+            label: AppLocalizations.of(context).restore,
             active: true,
             onTap: () => setState(() { _videoScale = 1.0; _videoPan = Offset.zero; }),
           ),
         // Keyboard toggle
         _ToolbarBtn(
           icon: _kbVisible ? Icons.keyboard_hide_rounded : Icons.keyboard_rounded,
-          label: '键盘',
+          label: AppLocalizations.of(context).keyboard,
           active: _kbVisible,
           onTap: _toggleKeyboard,
         ),
         // Paste
         _ToolbarBtn(
           icon: Icons.content_paste_rounded,
-          label: '粘贴',
+          label: AppLocalizations.of(context).paste,
           onTap: _sendPaste,
         ),
         // Chat
@@ -706,7 +707,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
         // Hide toolbar
         _ToolbarBtn(
           icon: Icons.keyboard_arrow_down_rounded,
-          label: '隐藏',
+          label: AppLocalizations.of(context).hide,
           onTap: () {
             _hideTimer?.cancel();
             setState(() => _toolbarVisible = false);
@@ -715,7 +716,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
         // Disconnect
         _ToolbarBtn(
           icon: Icons.close_rounded,
-          label: '断开',
+          label: AppLocalizations.of(context).disconnect,
           danger: true,
           onTap: _disconnect,
         ),
@@ -775,12 +776,12 @@ class _ChatToolbarBtn extends StatelessWidget {
         InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
-          child: const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.chat_bubble_outline_rounded, color: Colors.white70, size: 22),
-              SizedBox(height: 2),
-              Text('聊天', style: TextStyle(color: Colors.white70, fontSize: 10)),
+              const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white70, size: 22),
+              const SizedBox(height: 2),
+              Text(AppLocalizations.of(context).chat, style: const TextStyle(color: Colors.white70, fontSize: 10)),
             ]),
           ),
         ),

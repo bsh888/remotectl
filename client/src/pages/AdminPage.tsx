@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useI18n, LANG_NAMES, type Lang } from '../i18n'
 
 interface AgentInfo {
   id: string
@@ -15,10 +16,8 @@ interface TokenInfo {
 
 type AdminView = 'dashboard' | 'agents' | 'tokens'
 
-const API = (path: string) => path
-
 function apiFetch(path: string, token: string, opts?: RequestInit) {
-  return fetch(API(path), {
+  return fetch(path, {
     ...opts,
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -29,6 +28,7 @@ function apiFetch(path: string, token: string, opts?: RequestInit) {
 }
 
 export default function AdminPage() {
+  const { t, lang, setLang } = useI18n()
   const [token, setToken] = useState(() => sessionStorage.getItem('admin_token') || '')
   const [loginPwd, setLoginPwd] = useState('')
   const [loginErr, setLoginErr] = useState('')
@@ -36,6 +36,7 @@ export default function AdminPage() {
   const [view, setView] = useState<AdminView>('dashboard')
   const [agents, setAgents] = useState<AgentInfo[]>([])
   const [tokens, setTokens] = useState<TokenInfo[]>([])
+  const [showLang, setShowLang] = useState(false)
 
   // Token form
   const [addDeviceId, setAddDeviceId] = useState('')
@@ -93,10 +94,10 @@ export default function AdminPage() {
         sessionStorage.setItem('admin_token', d.token)
         setToken(d.token)
       } else {
-        setLoginErr('密码错误')
+        setLoginErr(t('login_error'))
       }
     } catch {
-      setLoginErr('连接失败')
+      setLoginErr(t('login_error'))
     } finally {
       setLoginLoading(false)
     }
@@ -115,9 +116,9 @@ export default function AdminPage() {
         fetchTokens()
       } else {
         const d = await r.json()
-        setAddErr(d.error || '添加失败')
+        setAddErr(d.error || t('login_error'))
       }
-    } catch { setAddErr('请求失败') }
+    } catch { setAddErr(t('login_error')) }
   }
 
   const handleUpdateToken = async (deviceId: string) => {
@@ -163,14 +164,14 @@ export default function AdminPage() {
             fontSize:24, fontWeight:700, marginBottom:8,
             background:'linear-gradient(135deg, #6366f1, #8b5cf6)',
             WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent',
-          }}>RemoteCtl 管理后台</div>
-          <p style={{color:textMuted, fontSize:14, marginBottom:32}}>请输入管理员密码登录</p>
+          }}>RemoteCtl {t('admin_title')}</div>
+          <p style={{color:textMuted, fontSize:14, marginBottom:32}}>{t('admin_password')}</p>
           <form onSubmit={handleLogin}>
             <input
               type="password"
               value={loginPwd}
               onChange={e => setLoginPwd(e.target.value)}
-              placeholder="管理员密码"
+              placeholder={t('admin_password')}
               autoFocus
               style={{
                 width:'100%', boxSizing:'border-box' as const,
@@ -185,18 +186,30 @@ export default function AdminPage() {
               border:'none', borderRadius:10, padding:'14px',
               color:'white', fontWeight:600, fontSize:15, cursor:'pointer',
             }}>
-              {loginLoading ? '登录中...' : '登录'}
+              {loginLoading ? '…' : t('login')}
             </button>
           </form>
+          {/* Language switcher on login page */}
+          <div style={{marginTop:20, display:'flex', justifyContent:'center', gap:8}}>
+            {(['zh','en','zh_TW'] as Lang[]).map(l => (
+              <button key={l} onClick={() => setLang(l)} style={{
+                background: l === lang ? 'rgba(99,102,241,0.2)' : 'transparent',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius:6, padding:'4px 10px', fontSize:12,
+                color: l === lang ? '#a5b4fc' : '#64748b',
+                cursor:'pointer',
+              }}>{LANG_NAMES[l]}</button>
+            ))}
+          </div>
         </div>
       </div>
     )
   }
 
   const sideItems: {key: AdminView; label: string; icon: string}[] = [
-    { key: 'dashboard', label: '总览', icon: '📊' },
-    { key: 'agents', label: '在线设备', icon: '🖥️' },
-    { key: 'tokens', label: 'Token 管理', icon: '🔑' },
+    { key: 'dashboard', label: t('dashboard'), icon: '📊' },
+    { key: 'agents', label: t('agents'), icon: '🖥️' },
+    { key: 'tokens', label: t('tokens'), icon: '🔑' },
   ]
 
   return (
@@ -217,21 +230,22 @@ export default function AdminPage() {
             borderRadius:16, padding:28, width:360,
             boxShadow:'0 24px 48px rgba(0,0,0,0.5)',
           }} onClick={e => e.stopPropagation()}>
-            <div style={{fontSize:18, fontWeight:700, marginBottom:8}}>删除 Token</div>
+            <div style={{fontSize:18, fontWeight:700, marginBottom:8}}>{t('delete_token_title')}</div>
             <div style={{color:'#94a3b8', fontSize:14, marginBottom:24, lineHeight:1.6}}>
-              确认删除设备 <span style={{color:'#a5b4fc', fontFamily:'monospace'}}>{deleteTarget}</span> 的 Token？此操作不可恢复。
+              {t('delete_token_msg')} <span style={{color:'#a5b4fc', fontFamily:'monospace'}}>{deleteTarget}</span>
             </div>
             <div style={{display:'flex', gap:10, justifyContent:'flex-end'}}>
-              <button onClick={() => setDeleteTarget(null)} style={btnSmallGray}>取消</button>
+              <button onClick={() => setDeleteTarget(null)} style={btnSmallGray}>{t('cancel')}</button>
               <button onClick={() => { handleDeleteToken(deleteTarget); setDeleteTarget(null) }} style={{
                 background:'rgba(248,113,113,0.15)', border:'1px solid rgba(248,113,113,0.3)',
                 color:'#f87171', borderRadius:6, padding:'8px 18px', fontSize:13,
                 cursor:'pointer', fontWeight:600,
-              }}>确认删除</button>
+              }}>{t('confirm')}</button>
             </div>
           </div>
         </div>
       )}
+
       {/* Top bar */}
       <div style={{
         height:60, background:surface, borderBottom:`1px solid ${border}`,
@@ -242,12 +256,39 @@ export default function AdminPage() {
           fontSize:18, fontWeight:700,
           background:'linear-gradient(135deg, #6366f1, #8b5cf6)',
           WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent',
-        }}>RemoteCtl 管理后台</span>
-        <button onClick={logout} style={{
-          background:'rgba(248,113,113,0.1)', border:'1px solid rgba(248,113,113,0.2)',
-          color:'#f87171', borderRadius:8, padding:'8px 16px',
-          fontSize:13, cursor:'pointer',
-        }}>退出登录</button>
+        }}>RemoteCtl {t('admin_title')}</span>
+        <div style={{display:'flex', alignItems:'center', gap:12}}>
+          {/* Language switcher */}
+          <div style={{position:'relative'}}>
+            <button onClick={() => setShowLang(v => !v)} style={{
+              background:'transparent', border:'1px solid rgba(255,255,255,0.1)',
+              borderRadius:6, color:'#94a3b8', padding:'6px 12px', fontSize:13, cursor:'pointer',
+            }}>
+              🌐 {LANG_NAMES[lang]}
+            </button>
+            {showLang && (
+              <div style={{
+                position:'absolute', top:'100%', right:0, marginTop:4,
+                background:'#1e293b', border:'1px solid rgba(255,255,255,0.1)',
+                borderRadius:8, overflow:'hidden', minWidth:130, zIndex:200,
+              }}>
+                {(['zh','en','zh_TW'] as Lang[]).map(l => (
+                  <button key={l} onClick={() => { setLang(l); setShowLang(false) }} style={{
+                    padding:'10px 16px', fontSize:13, cursor:'pointer',
+                    color: l === lang ? '#a5b4fc' : '#e2e8f0',
+                    fontWeight: l === lang ? 600 : 400,
+                    background:'transparent', border:'none', width:'100%', textAlign:'left' as const,
+                  }}>{LANG_NAMES[l]}</button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button onClick={logout} style={{
+            background:'rgba(248,113,113,0.1)', border:'1px solid rgba(248,113,113,0.2)',
+            color:'#f87171', borderRadius:8, padding:'8px 16px',
+            fontSize:13, cursor:'pointer',
+          }}>{t('logout')}</button>
+        </div>
       </div>
 
       <div style={{display:'flex', flex:1, overflow:'hidden'}}>
@@ -261,7 +302,7 @@ export default function AdminPage() {
               onClick={() => { setView(item.key); if(item.key==='agents') fetchAgents(); if(item.key==='tokens') fetchTokens() }}
               style={{
                 padding:'12px 20px', cursor:'pointer', display:'flex',
-                alignItems:'center', gap:10, fontSize:14, borderRadius:0,
+                alignItems:'center', gap:10, fontSize:14,
                 background: view===item.key ? 'rgba(99,102,241,0.12)' : 'transparent',
                 color: view===item.key ? '#a5b4fc' : '#94a3b8',
                 borderLeft: view===item.key ? `3px solid ${accent}` : '3px solid transparent',
@@ -279,13 +320,12 @@ export default function AdminPage() {
           {/* Dashboard */}
           {view === 'dashboard' && (
             <div>
-              <h2 style={{margin:'0 0 8px', fontSize:24, fontWeight:700}}>总览</h2>
-              <p style={{color:textMuted, marginBottom:32, fontSize:14}}>系统运行状态一览</p>
-              <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px,1fr))', gap:20}}>
+              <h2 style={{margin:'0 0 8px', fontSize:24, fontWeight:700}}>{t('dashboard')}</h2>
+              <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(200px,1fr))', gap:20, marginBottom:32}}>
                 {[
-                  { label:'在线设备', value: agents.length, color:'#6366f1', icon:'🖥️' },
-                  { label:'Token 数量', value: tokens.length, color:'#8b5cf6', icon:'🔑' },
-                  { label:'活跃连接', value: agents.reduce((s,a) => s+a.viewer_count, 0), color:'#06b6d4', icon:'👁️' },
+                  { label: t('online_devices'), value: agents.length, color:'#6366f1', icon:'🖥️' },
+                  { label: t('configured_tokens'), value: tokens.length, color:'#8b5cf6', icon:'🔑' },
+                  { label: t('total_viewers'), value: agents.reduce((s,a) => s+a.viewer_count, 0), color:'#06b6d4', icon:'👁️' },
                 ].map(card => (
                   <div key={card.label} style={{
                     background:surface2, border:`1px solid ${border}`,
@@ -305,10 +345,9 @@ export default function AdminPage() {
                   </div>
                 ))}
               </div>
-
               {agents.length > 0 && (
-                <div style={{marginTop:32}}>
-                  <h3 style={{marginBottom:16, fontWeight:600}}>在线设备</h3>
+                <div>
+                  <h3 style={{marginBottom:16, fontWeight:600}}>{t('online_devices')}</h3>
                   <AgentsTable agents={agents} />
                 </div>
               )}
@@ -318,8 +357,7 @@ export default function AdminPage() {
           {/* Agents */}
           {view === 'agents' && (
             <div>
-              <h2 style={{margin:'0 0 8px', fontSize:24, fontWeight:700}}>在线设备</h2>
-              <p style={{color:textMuted, marginBottom:32, fontSize:14}}>每 5 秒自动刷新</p>
+              <h2 style={{margin:'0 0 24px', fontSize:24, fontWeight:700}}>{t('agents')}</h2>
               <AgentsTable agents={agents} />
             </div>
           )}
@@ -327,24 +365,24 @@ export default function AdminPage() {
           {/* Tokens */}
           {view === 'tokens' && (
             <div>
-              <h2 style={{margin:'0 0 8px', fontSize:24, fontWeight:700}}>Token 管理</h2>
-              <p style={{color:textMuted, marginBottom:32, fontSize:14}}>管理各设备的认证 Token，修改后立即生效并持久化到配置文件</p>
+              <h2 style={{margin:'0 0 8px', fontSize:24, fontWeight:700}}>{t('tokens')}</h2>
+              <p style={{color:textMuted, marginBottom:32, fontSize:14}}></p>
 
               {/* Add form */}
               <div style={{
                 background:surface2, border:`1px solid ${border}`,
                 borderRadius:16, padding:24, marginBottom:24,
               }}>
-                <h3 style={{margin:'0 0 16px', fontWeight:600, fontSize:16}}>添加设备 Token</h3>
+                <h3 style={{margin:'0 0 16px', fontWeight:600, fontSize:16}}>{t('add_token')}</h3>
                 <form onSubmit={handleAddToken} style={{display:'flex', gap:12, flexWrap:'wrap' as const}}>
                   <input
                     value={addDeviceId} onChange={e => setAddDeviceId(e.target.value)}
-                    placeholder="设备 ID（9位数字）"
+                    placeholder={t('device_id_label')}
                     style={inputStyle}
                   />
                   <input
                     value={addSecret} onChange={e => setAddSecret(e.target.value)}
-                    placeholder="Token 密钥"
+                    placeholder={t('secret_label')}
                     style={inputStyle}
                   />
                   <button type="submit" style={{
@@ -352,7 +390,7 @@ export default function AdminPage() {
                     border:'none', borderRadius:8, padding:'10px 20px',
                     color:'white', fontWeight:600, cursor:'pointer', fontSize:14,
                     whiteSpace:'nowrap' as const,
-                  }}>添加</button>
+                  }}>{t('add')}</button>
                 </form>
                 {addErr && <div style={{color:'#f87171', fontSize:13, marginTop:8}}>{addErr}</div>}
               </div>
@@ -365,20 +403,20 @@ export default function AdminPage() {
                 <table style={{width:'100%', borderCollapse:'collapse'}}>
                   <thead>
                     <tr style={{borderBottom:`1px solid ${border}`}}>
-                      {['设备 ID', '设备信息', 'Token（已脱敏）', '操作'].map(h => (
-                        <th key={h} style={{padding:'14px 20px', textAlign:'left', color:textMuted, fontSize:13, fontWeight:600}}>{h}</th>
+                      {[t('device_id_col'), t('host_info'), t('secret_label'), ''].map((h, i) => (
+                        <th key={i} style={{padding:'14px 20px', textAlign:'left', color:textMuted, fontSize:13, fontWeight:600}}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {tokens.length === 0 && (
-                      <tr><td colSpan={4} style={{padding:40, textAlign:'center', color:textMuted}}>暂无 Token</td></tr>
+                      <tr><td colSpan={4} style={{padding:40, textAlign:'center', color:textMuted}}>{t('no_tokens')}</td></tr>
                     )}
-                    {tokens.map(t => {
-                      const online = agents.find(a => a.id === t.device_id)
+                    {tokens.map(tk => {
+                      const online = agents.find(a => a.id === tk.device_id)
                       return (
-                      <tr key={t.device_id} style={{borderBottom:`1px solid rgba(255,255,255,0.03)`}}>
-                        <td style={{padding:'14px 20px', fontFamily:'monospace', color:'#a5b4fc'}}>{t.device_id}</td>
+                      <tr key={tk.device_id} style={{borderBottom:`1px solid rgba(255,255,255,0.03)`}}>
+                        <td style={{padding:'14px 20px', fontFamily:'monospace', color:'#a5b4fc'}}>{tk.device_id}</td>
                         <td style={{padding:'14px 20px'}}>
                           {online ? (
                             <div style={{display:'flex', alignItems:'center', gap:8}}>
@@ -398,30 +436,30 @@ export default function AdminPage() {
                               </div>
                             </div>
                           ) : (
-                            <span style={{color:'#334155', fontSize:13}}>离线</span>
+                            <span style={{color:'#334155', fontSize:13}}>—</span>
                           )}
                         </td>
                         <td style={{padding:'14px 20px', fontFamily:'monospace', color:'#94a3b8', fontSize:13}}>
-                          {editId === t.device_id ? (
+                          {editId === tk.device_id ? (
                             <input
                               value={editSecret} onChange={e => setEditSecret(e.target.value)}
-                              placeholder="新 Token 密钥"
+                              placeholder={t('secret_label')}
                               autoFocus
                               style={{...inputStyle, width:240}}
                             />
-                          ) : t.secret}
+                          ) : tk.secret}
                         </td>
                         <td style={{padding:'14px 20px'}}>
                           <div style={{display:'flex', gap:8}}>
-                            {editId === t.device_id ? (
+                            {editId === tk.device_id ? (
                               <>
-                                <button onClick={() => handleUpdateToken(t.device_id)} style={btnSmallGreen}>保存</button>
-                                <button onClick={() => setEditId(null)} style={btnSmallGray}>取消</button>
+                                <button onClick={() => handleUpdateToken(tk.device_id)} style={btnSmallGreen}>{t('save')}</button>
+                                <button onClick={() => setEditId(null)} style={btnSmallGray}>{t('cancel')}</button>
                               </>
                             ) : (
                               <>
-                                <button onClick={() => { setEditId(t.device_id); setEditSecret('') }} style={btnSmallBlue}>修改</button>
-                                <button onClick={() => setDeleteTarget(t.device_id)} style={btnSmallRed}>删除</button>
+                                <button onClick={() => { setEditId(tk.device_id); setEditSecret('') }} style={btnSmallBlue}>{t('edit')}</button>
+                                <button onClick={() => setDeleteTarget(tk.device_id)} style={btnSmallRed}>{t('delete')}</button>
                               </>
                             )}
                           </div>
@@ -440,6 +478,7 @@ export default function AdminPage() {
 }
 
 function AgentsTable({ agents }: { agents: AgentInfo[] }) {
+  const { t } = useI18n()
   const border = 'rgba(255,255,255,0.06)'
   const textMuted = '#64748b'
   const surface2 = '#141d35'
@@ -466,14 +505,14 @@ function AgentsTable({ agents }: { agents: AgentInfo[] }) {
       <table style={{width:'100%', borderCollapse:'collapse'}}>
         <thead>
           <tr style={{borderBottom:`1px solid ${border}`}}>
-            {['设备 ID', '设备信息', '控制端数'].map(h => (
+            {[t('device_id_col'), t('host_info'), t('viewers')].map(h => (
               <th key={h} style={{padding:'14px 20px', textAlign:'left', color:textMuted, fontSize:13, fontWeight:600}}>{h}</th>
             ))}
           </tr>
         </thead>
         <tbody>
           {agents.length === 0 && (
-            <tr><td colSpan={3} style={{padding:40, textAlign:'center', color:textMuted}}>暂无在线设备</td></tr>
+            <tr><td colSpan={3} style={{padding:40, textAlign:'center', color:textMuted}}>{t('no_agents')}</td></tr>
           )}
           {agents.map(a => (
             <tr key={a.id} style={{borderBottom:`1px solid rgba(255,255,255,0.03)`}}>
@@ -499,7 +538,7 @@ function AgentsTable({ agents }: { agents: AgentInfo[] }) {
                   color: a.viewer_count > 0 ? '#4ade80' : '#64748b',
                   borderRadius:100, padding:'4px 12px', fontSize:13, fontWeight:500,
                 }}>
-                  {a.viewer_count > 0 ? `${a.viewer_count} 个连接` : '空闲'}
+                  {a.viewer_count > 0 ? a.viewer_count : '—'}
                 </span>
               </td>
             </tr>
