@@ -36,8 +36,11 @@ echo ""
 # -- 2. Build Flutter Linux app -----------------------------------------------
 echo "[2/4] Building Flutter Linux app..."
 cd app
-flutter clean
-flutter pub get
+if [ ! -d "build/linux" ]; then
+  echo "      (build dir missing — running flutter clean)"
+  flutter clean
+  flutter pub get
+fi
 flutter build linux --release
 cd ..
 echo ""

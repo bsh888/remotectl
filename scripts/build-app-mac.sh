@@ -47,8 +47,14 @@ APP="app/build/macos/Build/Products/Release/remotectl.app"
 # Skipping this step (e.g. by just deleting build/) causes xcode_backend.dart
 # to fail with "references objective_c, which was not found in native_assets/".
 cd app
-flutter clean
-flutter pub get
+# flutter clean is only needed when native_assets/macos/ is missing
+# (e.g. after manually deleting build/). Skipping it on incremental builds
+# keeps build times fast.
+if [ ! -d "build/native_assets/macos" ]; then
+  echo "      (native assets missing — running flutter clean)"
+  flutter clean
+  flutter pub get
+fi
 # Remove previously injected agent so Xcode code-signing doesn't choke on an
 # unsigned binary left over from a prior build run.
 rm -f "$APP/Contents/MacOS/remotectl-agent"

@@ -50,13 +50,17 @@ Write-Host "[2/4] Building Flutter Windows app..." -ForegroundColor Yellow
 
 Push-Location "app"
 try {
-    # flutter clean resets CMake cache and internal build state.
-    # Without it, stale cmake_install.cmake or native-assets state can cause
-    # MSB3073 / cmake_install.cmake exit-1 errors on incremental builds.
-    flutter clean
-    if ($LASTEXITCODE -ne 0) { throw "flutter clean failed (exit $LASTEXITCODE)" }
-    flutter pub get
-    if ($LASTEXITCODE -ne 0) { throw "flutter pub get failed (exit $LASTEXITCODE)" }
+    # flutter clean is only needed when CMake cache is missing (e.g. after
+    # manually deleting build/). Skipping it on incremental builds keeps
+    # build times fast; stale cmake_install.cmake errors only appear on
+    # a cold/dirty state.
+    if (-not (Test-Path "build\windows\x64\CMakeCache.txt")) {
+        Write-Host "      (CMake cache missing - running flutter clean)" -ForegroundColor Gray
+        flutter clean
+        if ($LASTEXITCODE -ne 0) { throw "flutter clean failed (exit $LASTEXITCODE)" }
+        flutter pub get
+        if ($LASTEXITCODE -ne 0) { throw "flutter pub get failed (exit $LASTEXITCODE)" }
+    }
     flutter build windows --release
     if ($LASTEXITCODE -ne 0) { throw "flutter build failed (exit $LASTEXITCODE)" }
 } finally {
