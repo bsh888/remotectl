@@ -13,6 +13,7 @@ package pipeline
 int  rc_win_start(int width, int height, int fps, int bitrate);
 void rc_win_stop(void);
 void rc_win_get_diag(int *cap_frames, int *enc_frames, int *last_err);
+void rc_win_request_keyframe(void);
 */
 import "C"
 
@@ -79,8 +80,13 @@ func Stop() {
 // Done returns a channel that never closes on Windows (capture thread doesn't stop unexpectedly).
 func Done() <-chan struct{} { return make(chan struct{}) }
 
-// RequestKeyframe is a no-op on Windows (keyframe forcing not implemented for x264 path).
-func RequestKeyframe() {}
+// RequestKeyframe forces the next encoded frame to be an IDR keyframe.
+// Called when a viewer sends a PLI (Picture Loss Indication) so that new
+// viewers get a clean decode start immediately instead of waiting up to
+// i_keyint_max frames for the next scheduled keyframe.
+func RequestKeyframe() {
+	C.rc_win_request_keyframe()
+}
 
 // LogDiag prints diagnostic counters.
 func LogDiag() {

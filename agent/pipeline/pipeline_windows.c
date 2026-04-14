@@ -18,9 +18,10 @@
 extern void goH264FrameWin(void *data, int length, int isKeyframe);
 
 // ── diagnostics ──────────────────────────────────────────────────────────────
-static volatile int g_cap_frames  = 0;
-static volatile int g_enc_frames  = 0;
-static volatile int g_last_err    = 0;
+static volatile int g_cap_frames    = 0;
+static volatile int g_enc_frames    = 0;
+static volatile int g_last_err      = 0;
+static volatile int g_force_keyframe = 0;
 
 void rc_win_get_diag(int *cap_frames, int *enc_frames, int *last_err) {
     if (cap_frames) *cap_frames = g_cap_frames;
@@ -44,6 +45,11 @@ static int              g_bitrate   = 1000000;
 // ── rc_win_check: returns primary monitor width (>0 = display available) ─────
 int rc_win_check(void) {
     return GetSystemMetrics(SM_CXSCREEN);
+}
+
+// ── rc_win_request_keyframe ───────────────────────────────────────────────────
+void rc_win_request_keyframe(void) {
+    InterlockedExchange((LONG volatile *)&g_force_keyframe, 1);
 }
 
 // ── Annex-B helper ───────────────────────────────────────────────────────────
@@ -138,6 +144,13 @@ static DWORD WINAPI capture_thread(LPVOID param) {
         }
 
         g_pic_in.i_pts = pts++;
+
+        // Force IDR if a keyframe was requested (e.g. by a viewer PLI).
+        if (InterlockedExchange((LONG volatile *)&g_force_keyframe, 0)) {
+            g_pic_in.i_type = X264_TYPE_IDR;
+        } else {
+            g_pic_in.i_type = X264_TYPE_AUTO;
+        }
 
         x264_picture_t pic_out;
         x264_nal_t    *nals;
