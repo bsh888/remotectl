@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <radialGradient id="bgGrad" cx="42%" cy="36%" r="65%" gradientUnits="objectBoundingBox">
+      <stop offset="0%"   stop-color="#131B26"/>
+      <stop offset="100%" stop-color="#070A0F"/>
+    </radialGradient>
+    <linearGradient id="screenGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#1C2740"/>
+      <stop offset="100%" stop-color="#0D1117"/>
+    </linearGradient>
+    <linearGradient id="bezelGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%"   stop-color="#1C2740"/>
+      <stop offset="100%" stop-color="#131B26"/>
+    </linearGradient>
+    <filter id="dotGlow">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="lineGlow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="iconClip">
+      <rect width="1024" height="1024" rx="220" ry="220"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#iconClip)">
+
+    <!-- Background -->
+    <rect width="1024" height="1024" fill="url(#bgGrad)"/>
+
+    <!-- Subtle grid -->
+    <pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse">
+      <path d="M 64 0 L 0 0 0 64" fill="none" stroke="#EEF0F4" stroke-width="0.7" stroke-opacity="0.035"/>
+    </pattern>
+    <rect width="1024" height="1024" fill="url(#grid)"/>
+
+    <!-- ── Monitor outer bezel ── -->
+    <rect x="136" y="186" width="752" height="492" rx="36" ry="36"
+          fill="url(#bezelGrad)" stroke="#8A96AD" stroke-width="8" stroke-opacity="0.55"/>
+
+    <!-- Orange top-left corner accent -->
+    <path d="M 136 248 L 136 222 Q 136 186 172 186 L 198 186"
+          fill="none" stroke="#FF5033" stroke-width="6" stroke-linecap="round" opacity="0.9"/>
+
+    <!-- Screen face -->
+    <rect x="158" y="206" width="708" height="452" rx="18" ry="18"
+          fill="url(#screenGrad)"/>
+
+    <!-- Screen top glare -->
+    <rect x="158" y="206" width="708" height="3" rx="1.5" fill="#EEF0F4" fill-opacity="0.06"/>
+
+    <!-- ── Screen content ── -->
+
+    <!-- Left device node -->
+    <rect x="214" y="358" width="152" height="106" rx="12"
+          fill="#131B26" stroke="#2A3A52" stroke-width="3"/>
+    <rect x="228" y="370" width="124" height="66" rx="7"
+          fill="#070A0F"/>
+    <!-- Green "online" dot -->
+    <circle cx="290" cy="403" r="10" fill="#1EE0A3" filter="url(#dotGlow)" opacity="0.85"/>
+    <!-- Small screen lines -->
+    <rect x="244" y="376" width="72" height="3" rx="1.5" fill="#1EE0A3" fill-opacity="0.25"/>
+    <rect x="244" y="384" width="50" height="2" rx="1" fill="#EEF0F4" fill-opacity="0.08"/>
+    <rect x="244" y="390" width="60" height="2" rx="1" fill="#EEF0F4" fill-opacity="0.06"/>
+
+    <!-- Right device node -->
+    <rect x="658" y="358" width="152" height="106" rx="12"
+          fill="#131B26" stroke="#2A3A52" stroke-width="3"/>
+    <rect x="672" y="370" width="124" height="66" rx="7"
+          fill="#070A0F"/>
+    <!-- Grey "target" dot -->
+    <circle cx="734" cy="403" r="8" fill="#45526A" opacity="0.8"/>
+    <!-- Small screen lines -->
+    <rect x="688" y="376" width="72" height="3" rx="1.5" fill="#45526A" fill-opacity="0.5"/>
+    <rect x="688" y="384" width="50" height="2" rx="1" fill="#EEF0F4" fill-opacity="0.08"/>
+    <rect x="688" y="390" width="60" height="2" rx="1" fill="#EEF0F4" fill-opacity="0.06"/>
+
+    <!-- Connection line -->
+    <line x1="366" y1="411" x2="658" y2="411"
+          stroke="#FF5033" stroke-width="4"
+          stroke-dasharray="18 11"
+          stroke-linecap="round"
+          filter="url(#lineGlow)"
+          opacity="0.7"/>
+
+    <!-- Arrowhead -->
+    <path d="M 634 397 L 658 411 L 634 425"
+          fill="none" stroke="#FF5033" stroke-width="5"
+          stroke-linecap="round" stroke-linejoin="round"
+          filter="url(#lineGlow)"/>
+
+    <!-- Traveling dot (accent) -->
+    <circle cx="524" cy="411" r="13" fill="#FF5033" filter="url(#dotGlow)"/>
+    <circle cx="524" cy="411" r="22" fill="none" stroke="#FF5033" stroke-width="2.5" stroke-opacity="0.3"/>
+
+    <!-- ── Stand ── -->
+    <rect x="492" y="678" width="40" height="58" rx="8"
+          fill="url(#bezelGrad)" stroke="#2A3A52" stroke-width="3"/>
+    <!-- Base -->
+    <rect x="340" y="730" width="344" height="40" rx="20"
+          fill="url(#bezelGrad)" stroke="#2A3A52" stroke-width="3"/>
+
+    <!-- Orange accent line on base -->
+    <rect x="474" y="762" width="76" height="4" rx="2" fill="#FF5033" fill-opacity="0.7"/>
+
+  </g>
+</svg>
