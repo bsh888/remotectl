@@ -177,14 +177,14 @@ class _HostedScreenState extends State<HostedScreen> {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFF07091A), Color(0xFF0D1526)],
+              colors: [Color(0xFF070A0F), Color(0xFF0D1117)],
             ),
           ),
         ),
         const Positioned(
           top: -80,
           right: -60,
-          child: _GlowOrb(color: Color(0xFF2563EB), size: 300, opacity: 0.15),
+          child: _GlowOrb(color: Color(0xFF1EE0A3), size: 300, opacity: 0.08),
         ),
         Scaffold(
           backgroundColor: Colors.transparent,
@@ -249,7 +249,7 @@ class _HostedScreenState extends State<HostedScreen> {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Color(0xFF07091A), Color(0xFF0D1526)],
+                colors: [Color(0xFF070A0F), Color(0xFF0D1117)],
               ),
             ),
           ),
@@ -258,18 +258,18 @@ class _HostedScreenState extends State<HostedScreen> {
             top: -80,
             right: -60,
             child: _GlowOrb(
-              color: Color(0xFF2563EB),
+              color: Color(0xFF1EE0A3),
               size: 320,
-              opacity: 0.16,
+              opacity: 0.08,
             ),
           ),
           const Positioned(
             bottom: 100,
             left: -80,
             child: _GlowOrb(
-              color: Color(0xFF7C3AED),
+              color: Color(0xFFFF5033),
               size: 300,
-              opacity: 0.13,
+              opacity: 0.07,
             ),
           ),
           // ── Content ──
@@ -516,8 +516,8 @@ class _HostedScreenState extends State<HostedScreen> {
                           onPressed: _startStop,
                           isLoading: false,
                           colors: running
-                              ? const [Color(0xFFB91C1C), Color(0xFF7F1D1D)]
-                              : const [Color(0xFF2563EB), Color(0xFF7C3AED)],
+                              ? const [Color(0xFFFF5033), Color(0xFFE03B22)]
+                              : const [Color(0xFF1EE0A3), Color(0xFF16B585)],
                         ),
                       ),
                       if (widget.agentService.chat.isOpen) ...[
@@ -912,8 +912,8 @@ class _DeviceIdCard extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            const Color(0xFF1E3A8A).withValues(alpha: 0.60),
-            const Color(0xFF1E40AF).withValues(alpha: 0.30),
+            const Color(0xFF131B26).withValues(alpha: 0.95),
+            const Color(0xFF0D1117).withValues(alpha: 0.80),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -1140,7 +1140,7 @@ class _ChatIconButton extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: active
-                    ? const Color(0xFF2563EB).withValues(alpha: 0.6)
+                    ? const Color(0xFF1EE0A3).withValues(alpha: 0.6)
                     : Colors.white.withValues(alpha: 0.12),
               ),
             ),

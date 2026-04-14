@@ -32,7 +32,7 @@ class RemoteCtlApp extends StatelessWidget {
         supportedLocales: supportedLocales,
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFF2563EB),
+            seedColor: const Color(0xFFFF5033),
             brightness: Brightness.dark,
           ),
           useMaterial3: true,
@@ -189,8 +189,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           child: NavigationBar(
             selectedIndex: _index,
             onDestinationSelected: (i) => setState(() => _index = i),
-            backgroundColor: const Color(0xFF0A0F1E).withValues(alpha: 0.9),
-            indicatorColor: const Color(0xFF2563EB).withValues(alpha: 0.25),
+            backgroundColor: const Color(0xFF070A0F).withValues(alpha: 0.92),
+            indicatorColor: const Color(0xFFFF5033).withValues(alpha: 0.18),
             labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
             height: 64,
             destinations: [
@@ -210,8 +210,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ),
       floatingActionButton: FloatingActionButton.small(
         onPressed: _showLangPicker,
-        backgroundColor: const Color(0xFF1E293B),
-        foregroundColor: Colors.white70,
+        backgroundColor: const Color(0xFF131B26),
+        foregroundColor: Colors.white60,
         elevation: 2,
         tooltip: 'Language',
         child: const Icon(Icons.language, size: 20),

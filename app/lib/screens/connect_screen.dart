@@ -193,7 +193,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Color(0xFF07091A), Color(0xFF0D1526)],
+                colors: [Color(0xFF070A0F), Color(0xFF0D1117)],
               ),
             ),
           ),
@@ -201,12 +201,12 @@ class _ConnectScreenState extends State<ConnectScreen> {
           const Positioned(
             top: -80,
             right: -60,
-            child: _GlowOrb(color: Color(0xFF2563EB), size: 320, opacity: 0.18),
+            child: _GlowOrb(color: Color(0xFFFF5033), size: 320, opacity: 0.10),
           ),
           const Positioned(
             bottom: -100,
             left: -80,
-            child: _GlowOrb(color: Color(0xFF7C3AED), size: 360, opacity: 0.15),
+            child: _GlowOrb(color: Color(0xFF1EE0A3), size: 360, opacity: 0.07),
           ),
           // ── Content ──
           SafeArea(
@@ -225,27 +225,23 @@ class _ConnectScreenState extends State<ConnectScreen> {
                           width: 72,
                           height: 72,
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                const Color(0xFF2563EB).withValues(alpha: 0.9),
-                                const Color(0xFF7C3AED).withValues(alpha: 0.9),
-                              ],
-                            ),
+                            color: const Color(0xFF1C2740),
                             borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: const Color(0xFFFF5033).withValues(alpha: 0.28),
+                            ),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF2563EB).withValues(alpha: 0.4),
-                                blurRadius: 24,
-                                offset: const Offset(0, 8),
+                                color: const Color(0xFFFF5033).withValues(alpha: 0.18),
+                                blurRadius: 20,
+                                offset: const Offset(0, 6),
                               ),
                             ],
                           ),
                           child: const Icon(
                             Icons.desktop_windows_outlined,
                             size: 36,
-                            color: Colors.white,
+                            color: Color(0xFFFF5033),
                           ),
                         ),
                       ),
@@ -327,10 +323,10 @@ class _ConnectScreenState extends State<ConnectScreen> {
                                   label: isConnecting
                                       ? AppLocalizations.of(context).connecting
                                       : AppLocalizations.of(context).connect,
-                                  icon: Icons.play_arrow_rounded,
+                                  icon: Icons.arrow_forward_rounded,
                                   onPressed: isConnecting ? null : _connect,
                                   isLoading: isConnecting,
-                                  colors: const [Color(0xFF2563EB), Color(0xFF4F46E5)],
+                                  colors: const [Color(0xFFFF5033), Color(0xFFE03B22)],
                                 ),
                                 if (_session.state == SessionState.error) ...[
                                   const SizedBox(height: 14),
@@ -448,12 +444,12 @@ class _HistoryRow extends StatelessWidget {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF2563EB).withValues(alpha: 0.15),
+                  color: const Color(0xFFFF5033).withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(
                   Icons.computer_outlined,
-                  color: Color(0xFF60A5FA),
+                  color: Color(0xFFFF5033),
                   size: 18,
                 ),
               ),

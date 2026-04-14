@@ -1,459 +1,565 @@
-import { useState, useEffect, type ReactNode } from 'react'
+import { useState, useEffect, useRef, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useI18n, LANG_NAMES, type Lang } from '../i18n'
 
-interface VersionInfo {
-  version: string
-}
+interface VersionInfo { version: string }
 
 const RELEASES_BASE = 'https://github.com/bsh888/remotectl-releases/releases/download'
-const RELEASES_PAGE = 'https://github.com/bsh888/remotectl-releases/releases'
+const RELEASES_PAGE  = 'https://github.com/bsh888/remotectl-releases/releases'
 
-const featureKeys = [
-  { titleKey: 'feat_h264_title', descKey: 'feat_h264_desc', icon: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:32,height:32}}>
-      <path d="M15 10l4.553-2.069A1 1 0 0121 8.868V15.132a1 1 0 01-1.447.9L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z"/>
-    </svg>
-  )},
-  { titleKey: 'feat_webrtc_title', descKey: 'feat_webrtc_desc', icon: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:32,height:32}}>
-      <circle cx="12" cy="12" r="3"/>
-      <path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/>
-    </svg>
-  )},
-  { titleKey: 'feat_e2ee_title', descKey: 'feat_e2ee_desc', icon: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:32,height:32}}>
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-      <path d="M7 11V7a5 5 0 0110 0v4"/>
-    </svg>
-  )},
-  { titleKey: 'feat_cross_title', descKey: 'feat_cross_desc', icon: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:32,height:32}}>
-      <rect x="2" y="3" width="20" height="14" rx="2"/>
-      <path d="M8 21h8M12 17v4"/>
-    </svg>
-  )},
-  { titleKey: 'feat_latency_title', descKey: 'feat_latency_desc', icon: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:32,height:32}}>
-      <path d="M13 10V3L4 14h7v7l9-11h-7z"/>
-    </svg>
-  )},
-  { titleKey: 'feat_chat_title', descKey: 'feat_chat_desc', icon: (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{width:32,height:32}}>
-      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-    </svg>
-  )},
+// ── CSS var shorthands ─────────────────────────────────────────────────────────
+const V = {
+  bg:        'var(--bg)',
+  surface:   'var(--surface)',
+  surface2:  'var(--surface-2)',
+  surface3:  'var(--surface-3)',
+  border:    'var(--border)',
+  border2:   'var(--border-2)',
+  border3:   'var(--border-3)',
+  accent:    'var(--accent)',
+  accentDim: 'var(--accent-dim)',
+  accentBdr: 'var(--accent-bdr)',
+  green:     'var(--green)',
+  greenDim:  'var(--green-dim)',
+  text1:     'var(--text-1)',
+  text2:     'var(--text-2)',
+  text3:     'var(--text-3)',
+  mono:      'var(--mono)',
+  sans:      'var(--sans)',
+  display:   'var(--display)',
+}
+
+// ── Grid background pattern ────────────────────────────────────────────────────
+const gridBg = `
+  linear-gradient(var(--border) 1px, transparent 1px),
+  linear-gradient(90deg, var(--border) 1px, transparent 1px)
+`
+
+// ── Feature definitions ────────────────────────────────────────────────────────
+const features = [
+  { num: '01', titleKey: 'feat_h264_title',    descKey: 'feat_h264_desc' },
+  { num: '02', titleKey: 'feat_webrtc_title',  descKey: 'feat_webrtc_desc' },
+  { num: '03', titleKey: 'feat_e2ee_title',    descKey: 'feat_e2ee_desc' },
+  { num: '04', titleKey: 'feat_cross_title',   descKey: 'feat_cross_desc' },
+  { num: '05', titleKey: 'feat_latency_title', descKey: 'feat_latency_desc' },
+  { num: '06', titleKey: 'feat_chat_title',    descKey: 'feat_chat_desc' },
 ]
 
-const AppleLogo = () => (
-  <svg viewBox="0 0 24 24" fill="currentColor" style={{width:36,height:36}}>
-    <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.54 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/>
-  </svg>
-)
-
-const WindowsLogo = () => (
-  <svg viewBox="0 0 24 24" style={{width:38,height:38}}>
-    <path fill="#F25022" d="M1 1h10v10H1z"/>
-    <path fill="#7FBA00" d="M13 1h10v10H13z"/>
-    <path fill="#00A4EF" d="M1 13h10v10H1z"/>
-    <path fill="#FFB900" d="M13 13h10v10H13z"/>
-  </svg>
-)
-
-const platforms: { nameKey: string; icon: ReactNode; fileKey: string; ext: string; label: string }[] = [
-  { nameKey: 'app_macos', icon: <AppleLogo />, fileKey: 'macos', ext: 'zip', label: 'remotectl-app-macos' },
-  { nameKey: 'app_windows', icon: <WindowsLogo />, fileKey: 'windows', ext: 'zip', label: 'remotectl-app-windows-amd64' },
-  { nameKey: 'app_linux', icon: '🐧', fileKey: 'linux', ext: 'tar.gz', label: 'remotectl-app-linux-amd64' },
-  { nameKey: 'agent_linux', icon: '⚙️', fileKey: 'agent', ext: 'tar.gz', label: 'remotectl-agent-linux-amd64' },
+const platforms: { nameKey: string; icon: ReactNode; label: string; ext: string }[] = [
+  { nameKey: 'app_macos',   icon: <AppleIcon />,   label: 'remotectl-app-macos',           ext: 'zip'    },
+  { nameKey: 'app_windows', icon: <WinIcon />,     label: 'remotectl-app-windows-amd64',   ext: 'zip'    },
+  { nameKey: 'app_linux',   icon: '🐧',             label: 'remotectl-app-linux-amd64',     ext: 'tar.gz' },
+  { nameKey: 'agent_linux', icon: '⚙️',             label: 'remotectl-agent-linux-amd64',   ext: 'tar.gz' },
 ]
 
+function AppleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" style={{width:20,height:20}}>
+      <path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.54 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zm3.378-3.066c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701z"/>
+    </svg>
+  )
+}
+function WinIcon() {
+  return (
+    <svg viewBox="0 0 24 24" style={{width:20,height:20}}>
+      <path fill="#F25022" d="M1 1h10v10H1z"/>
+      <path fill="#7FBA00" d="M13 1h10v10H13z"/>
+      <path fill="#00A4EF" d="M1 13h10v10H1z"/>
+      <path fill="#FFB900" d="M13 13h10v10H13z"/>
+    </svg>
+  )
+}
+
+// ── Connection diagram (hero visual) ──────────────────────────────────────────
+function ConnectionDiagram() {
+  return (
+    <div style={{
+      position: 'relative',
+      width: 340,
+      height: 160,
+      flexShrink: 0,
+    }}>
+      {/* Left device */}
+      <div style={{
+        position: 'absolute',
+        left: 0, top: '50%', transform: 'translateY(-50%)',
+        width: 120, padding: '14px 16px',
+        background: V.surface2,
+        border: `1px solid ${V.border2}`,
+        borderRadius: 4,
+        animation: 'rc-slide-r 0.6s 0.3s both',
+      }}>
+        <div style={{fontFamily:V.mono, fontSize:9, color:V.text3, letterSpacing:'0.08em', marginBottom:6}}>LOCAL</div>
+        <div style={{fontFamily:V.mono, fontSize:11, color:V.text1, letterSpacing:'0.05em'}}>192.168.1.x</div>
+        <div style={{display:'flex', alignItems:'center', gap:5, marginTop:8}}>
+          <div style={{
+            width:6, height:6, borderRadius:'50%', background:V.green,
+            animation:'rc-pulse-dot 2s infinite',
+          }}/>
+          <span style={{fontFamily:V.mono, fontSize:9, color:V.green}}>READY</span>
+        </div>
+      </div>
+
+      {/* SVG connection line */}
+      <svg style={{position:'absolute', left:120, top:0, width:'calc(100% - 240px)', height:'100%', overflow:'visible'}}
+           viewBox="0 0 100 160" preserveAspectRatio="none">
+        <line x1="0" y1="80" x2="100" y2="80"
+          stroke="var(--border-2)" strokeWidth="1" strokeDasharray="4 3"/>
+        <line x1="0" y1="80" x2="100" y2="80"
+          stroke="var(--accent)" strokeWidth="1.5"
+          strokeDasharray="12 188"
+          style={{animation:'rc-travel 2.5s linear infinite'}}/>
+      </svg>
+
+      {/* P2P badge */}
+      <div style={{
+        position: 'absolute',
+        left: '50%', top: '50%',
+        transform: 'translate(-50%, -50%)',
+        background: V.surface,
+        border: `1px solid ${V.accentBdr}`,
+        borderRadius: 2,
+        padding: '3px 7px',
+        fontFamily: V.mono,
+        fontSize: 8,
+        color: V.accent,
+        letterSpacing: '0.12em',
+        whiteSpace: 'nowrap',
+        zIndex: 2,
+      }}>P2P</div>
+
+      {/* Right device */}
+      <div style={{
+        position: 'absolute',
+        right: 0, top: '50%', transform: 'translateY(-50%)',
+        width: 120, padding: '14px 16px',
+        background: V.surface2,
+        border: `1px solid ${V.border2}`,
+        borderRadius: 4,
+        animation: 'rc-slide-l 0.6s 0.3s both',
+      }}>
+        <div style={{fontFamily:V.mono, fontSize:9, color:V.text3, letterSpacing:'0.08em', marginBottom:6}}>REMOTE</div>
+        <div style={{fontFamily:V.mono, fontSize:11, color:V.text1, letterSpacing:'0.05em'}}>987654321</div>
+        <div style={{display:'flex', alignItems:'center', gap:5, marginTop:8}}>
+          <div style={{width:6, height:6, borderRadius:'50%', background:V.accent}}/>
+          <span style={{fontFamily:V.mono, fontSize:9, color:V.accent}}>CTRL</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
 export default function LandingPage() {
   const navigate = useNavigate()
   const { t, lang, setLang } = useI18n()
-  const [version, setVersion] = useState<string>('')
+  const [version, setVersion] = useState('')
   const [scrolled, setScrolled] = useState(false)
   const [showLang, setShowLang] = useState(false)
+  const langRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    fetch('/api/version')
-      .then(r => r.json())
-      .then((d: VersionInfo) => setVersion(d.version || ''))
-      .catch(() => {})
+    fetch('/api/version').then(r => r.json()).then((d: VersionInfo) => setVersion(d.version || '')).catch(() => {})
   }, [])
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20)
-    window.addEventListener('scroll', onScroll)
-    return () => window.removeEventListener('scroll', onScroll)
+    const fn = () => setScrolled(window.scrollY > 10)
+    window.addEventListener('scroll', fn)
+    return () => window.removeEventListener('scroll', fn)
   }, [])
 
-  const downloadUrl = (p: typeof platforms[0]) => {
-    if (!version) return RELEASES_PAGE
-    return `${RELEASES_BASE}/${version}/${p.label}-${version}.${p.ext}`
-  }
+  useEffect(() => {
+    const fn = (e: MouseEvent) => {
+      if (langRef.current && !langRef.current.contains(e.target as Node)) setShowLang(false)
+    }
+    document.addEventListener('mousedown', fn)
+    return () => document.removeEventListener('mousedown', fn)
+  }, [])
 
-  // Styles
-  const s = {
-    root: {
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #0a0e1a 0%, #0f1629 50%, #0a0e1a 100%)',
-      color: '#e2e8f0',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-      overflowX: 'hidden' as const,
-    },
-    nav: {
-      position: 'fixed' as const,
-      top: 0, left: 0, right: 0,
-      zIndex: 100,
-      transition: 'all 0.3s',
-      background: scrolled ? 'rgba(10,14,26,0.95)' : 'transparent',
-      backdropFilter: scrolled ? 'blur(12px)' : 'none',
-      borderBottom: scrolled ? '1px solid rgba(99,102,241,0.15)' : '1px solid transparent',
-    },
-    navInner: {
-      maxWidth: 1200,
-      margin: '0 auto',
-      padding: '0 24px',
-      height: 64,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    logo: {
-      fontSize: 22,
-      fontWeight: 700,
-      background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-      WebkitBackgroundClip: 'text' as const,
-      WebkitTextFillColor: 'transparent' as const,
-      letterSpacing: '-0.5px',
-    },
-    navLinks: {
-      display: 'flex',
-      gap: 32,
-      listStyle: 'none',
-      margin: 0,
-      padding: 0,
-      alignItems: 'center',
-    },
-    navLink: {
-      color: '#94a3b8',
-      textDecoration: 'none',
-      fontSize: 14,
-      cursor: 'pointer',
-      transition: 'color 0.2s',
-    },
-    btnPrimary: {
-      background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-      color: 'white',
-      border: 'none',
-      borderRadius: 8,
-      padding: '10px 20px',
-      fontSize: 14,
-      fontWeight: 600,
-      cursor: 'pointer',
-      transition: 'opacity 0.2s, transform 0.2s',
-    },
-    hero: {
-      paddingTop: 160,
-      paddingBottom: 120,
-      textAlign: 'center' as const,
-      position: 'relative' as const,
-    },
-    heroBadge: {
-      display: 'inline-block',
-      background: 'rgba(99,102,241,0.15)',
-      border: '1px solid rgba(99,102,241,0.3)',
-      borderRadius: 100,
-      padding: '6px 16px',
-      fontSize: 13,
-      color: '#a5b4fc',
-      marginBottom: 24,
-    },
-    heroTitle: {
-      fontSize: 'clamp(48px, 8vw, 80px)',
-      fontWeight: 800,
-      lineHeight: 1.1,
-      letterSpacing: '-2px',
-      margin: '0 0 24px',
-      background: 'linear-gradient(135deg, #ffffff 0%, #a5b4fc 50%, #8b5cf6 100%)',
-      WebkitBackgroundClip: 'text' as const,
-      WebkitTextFillColor: 'transparent' as const,
-    },
-    heroSubtitle: {
-      fontSize: 20,
-      color: '#94a3b8',
-      maxWidth: 560,
-      margin: '0 auto 48px',
-      lineHeight: 1.7,
-    },
-    heroCta: {
-      display: 'flex',
-      gap: 16,
-      justifyContent: 'center',
-      flexWrap: 'wrap' as const,
-    },
-    btnLarge: {
-      background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-      color: 'white',
-      border: 'none',
-      borderRadius: 12,
-      padding: '16px 32px',
-      fontSize: 16,
-      fontWeight: 600,
-      cursor: 'pointer',
-      textDecoration: 'none',
-      display: 'inline-block',
-    },
-    btnOutline: {
-      background: 'transparent',
-      color: '#e2e8f0',
-      border: '1px solid rgba(226,232,240,0.2)',
-      borderRadius: 12,
-      padding: '16px 32px',
-      fontSize: 16,
-      fontWeight: 600,
-      cursor: 'pointer',
-      textDecoration: 'none',
-      display: 'inline-block',
-    },
-    heroGlow: {
-      position: 'absolute' as const,
-      top: '50%', left: '50%',
-      transform: 'translate(-50%, -50%)',
-      width: 600, height: 600,
-      background: 'radial-gradient(circle, rgba(99,102,241,0.08) 0%, transparent 70%)',
-      pointerEvents: 'none' as const,
-      zIndex: -1,
-    },
-    section: {
-      maxWidth: 1200,
-      margin: '0 auto',
-      padding: '80px 24px',
-    },
-    sectionTitle: {
-      fontSize: 36,
-      fontWeight: 700,
-      textAlign: 'center' as const,
-      marginBottom: 12,
-      letterSpacing: '-0.5px',
-    },
-    sectionSub: {
-      color: '#64748b',
-      textAlign: 'center' as const,
-      marginBottom: 56,
-      fontSize: 16,
-    },
-    featuresGrid: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-      gap: 24,
-    },
-    featureCard: {
-      background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(255,255,255,0.06)',
-      borderRadius: 16,
-      padding: 28,
-      transition: 'border-color 0.2s, transform 0.2s',
-    },
-    featureIcon: {
-      width: 56, height: 56,
-      borderRadius: 12,
-      background: 'rgba(99,102,241,0.12)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 20,
-      color: '#a5b4fc',
-    },
-    featureTitle: {
-      fontSize: 17,
-      fontWeight: 600,
-      marginBottom: 8,
-    },
-    featureDesc: {
-      color: '#64748b',
-      fontSize: 14,
-      lineHeight: 1.7,
-    },
-    downloadsGrid: {
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-      gap: 20,
-    },
-    downloadCard: {
-      background: 'rgba(255,255,255,0.03)',
-      border: '1px solid rgba(255,255,255,0.06)',
-      borderRadius: 16,
-      padding: 28,
-      textAlign: 'center' as const,
-      transition: 'border-color 0.2s',
-    },
-    downloadIcon: {
-      fontSize: 40,
-      marginBottom: 12,
-      height: 48,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    downloadName: {
-      fontSize: 16,
-      fontWeight: 600,
-      marginBottom: 16,
-    },
-    downloadBtn: {
-      display: 'inline-block',
-      background: 'rgba(99,102,241,0.15)',
-      border: '1px solid rgba(99,102,241,0.3)',
-      color: '#a5b4fc',
-      borderRadius: 8,
-      padding: '10px 24px',
-      fontSize: 14,
-      fontWeight: 500,
-      textDecoration: 'none',
-      cursor: 'pointer',
-      transition: 'background 0.2s',
-    },
-    divider: {
-      height: 1,
-      background: 'linear-gradient(90deg, transparent, rgba(99,102,241,0.2), transparent)',
-      margin: '0 24px',
-    },
-    footer: {
-      textAlign: 'center' as const,
-      padding: '40px 24px',
-      color: '#334155',
-      fontSize: 14,
-    },
-    langBtn: {
-      background: 'transparent',
-      border: '1px solid rgba(148,163,184,0.2)',
-      borderRadius: 6,
-      color: '#94a3b8',
-      padding: '6px 12px',
-      fontSize: 13,
-      cursor: 'pointer',
-      position: 'relative' as const,
-    },
-    langDropdown: {
-      position: 'absolute' as const,
-      top: '100%',
-      right: 0,
-      marginTop: 4,
-      background: '#1e293b',
-      border: '1px solid rgba(255,255,255,0.1)',
-      borderRadius: 8,
-      overflow: 'hidden',
-      minWidth: 130,
-      zIndex: 200,
-    },
-    langOption: {
-      padding: '10px 16px',
-      fontSize: 14,
-      cursor: 'pointer',
-      color: '#e2e8f0',
-      background: 'transparent',
-      border: 'none',
-      width: '100%',
-      textAlign: 'left' as const,
-      transition: 'background 0.15s',
-    },
-  }
+  const dlUrl = (p: typeof platforms[0]) =>
+    version ? `${RELEASES_BASE}/${version}/${p.label}-${version}.${p.ext}` : RELEASES_PAGE
 
+  // ── Nav ──────────────────────────────────────────────────────────────────────
   return (
-    <div style={s.root}>
-      {/* Nav */}
-      <nav style={s.nav}>
-        <div style={s.navInner}>
-          <span style={s.logo}>RemoteCtl</span>
-          <ul style={s.navLinks}>
-            <li><a href="#features" style={s.navLink}>{t('nav_features')}</a></li>
-            <li><a href="#download" style={s.navLink}>{t('nav_download')}</a></li>
-            <li style={s.navLink} onClick={() => navigate('/admin')}>{t('nav_admin')}</li>
-            <li style={{position:'relative'}}>
-              <button style={s.langBtn} onClick={() => setShowLang(v => !v)}>
-                🌐 {LANG_NAMES[lang]}
+    <div style={{ fontFamily: V.sans, color: V.text1, minHeight: '100vh', background: V.bg }}>
+
+      <nav style={{
+        position: 'fixed', top:0, left:0, right:0, zIndex:100,
+        height: 56,
+        borderBottom: `1px solid ${scrolled ? V.border2 : 'transparent'}`,
+        background: scrolled ? 'rgba(7,10,15,0.92)' : 'transparent',
+        backdropFilter: scrolled ? 'blur(16px)' : 'none',
+        transition: 'all 0.25s',
+        display: 'flex', alignItems: 'center',
+      }}>
+        <div style={{
+          maxWidth:1200, margin:'0 auto', padding:'0 28px',
+          width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between',
+        }}>
+          {/* Logo */}
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <div style={{
+              width:28, height:28, borderRadius:3,
+              background: V.accent,
+              display:'flex', alignItems:'center', justifyContent:'center',
+              flexShrink: 0,
+            }}>
+              <svg viewBox="0 0 16 16" fill="none" style={{width:14,height:14}}>
+                <rect x="1" y="2" width="14" height="10" rx="1.5" stroke="white" strokeWidth="1.5"/>
+                <path d="M5 15h6M8 12v3" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <span style={{fontFamily:V.display, fontSize:15, fontWeight:700, letterSpacing:'-0.02em', color:V.text1}}>
+              RemoteCtl
+            </span>
+          </div>
+
+          {/* Links */}
+          <div style={{display:'flex', alignItems:'center', gap:4}}>
+            {[
+              ['#features', t('nav_features')],
+              ['#download', t('nav_download')],
+            ].map(([href, label]) => (
+              <a key={href} href={href} style={{
+                color:V.text2, textDecoration:'none', fontSize:13,
+                padding:'6px 14px', borderRadius:3,
+                transition:'color 0.15s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.color = V.text1)}
+              onMouseLeave={e => (e.currentTarget.style.color = V.text2)}
+              >{label}</a>
+            ))}
+
+            <button onClick={() => navigate('/admin')} style={{
+              background:'transparent', border:`1px solid ${V.border2}`,
+              color:V.text2, borderRadius:3, padding:'5px 14px', fontSize:13,
+              cursor:'pointer', transition:'all 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor=V.border3; e.currentTarget.style.color=V.text1 }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor=V.border2; e.currentTarget.style.color=V.text2 }}
+            >{t('nav_admin')}</button>
+
+            {/* Language switcher */}
+            <div ref={langRef} style={{position:'relative', marginLeft:4}}>
+              <button onClick={() => setShowLang(v => !v)} style={{
+                background:'transparent', border:`1px solid ${V.border2}`,
+                color:V.text3, borderRadius:3, padding:'5px 10px', fontSize:12,
+                cursor:'pointer', fontFamily:V.mono, letterSpacing:'0.04em',
+                transition:'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.color=V.text2; e.currentTarget.style.borderColor=V.border3 }}
+              onMouseLeave={e => { e.currentTarget.style.color=V.text3; e.currentTarget.style.borderColor=V.border2 }}
+              >
+                {lang.toUpperCase().replace('_','/')}
               </button>
               {showLang && (
-                <div style={s.langDropdown}>
+                <div style={{
+                  position:'absolute', top:'calc(100% + 6px)', right:0,
+                  background:V.surface, border:`1px solid ${V.border2}`,
+                  borderRadius:4, overflow:'hidden', minWidth:130, zIndex:200,
+                  boxShadow:'0 8px 24px rgba(0,0,0,0.4)',
+                }}>
                   {(['zh','en','zh_TW'] as Lang[]).map(l => (
-                    <button
-                      key={l}
-                      style={{...s.langOption, fontWeight: l === lang ? 600 : 400, color: l === lang ? '#a5b4fc' : '#e2e8f0'}}
-                      onClick={() => { setLang(l); setShowLang(false) }}
-                    >
-                      {LANG_NAMES[l]}
-                    </button>
+                    <button key={l} onClick={() => { setLang(l); setShowLang(false) }} style={{
+                      padding:'9px 16px', fontSize:13, cursor:'pointer',
+                      color: l === lang ? V.accent : V.text2,
+                      fontWeight: l === lang ? 600 : 400,
+                      background: l === lang ? V.accentDim : 'transparent',
+                      border:'none', width:'100%', textAlign:'left',
+                      fontFamily: V.sans,
+                      transition:'background 0.1s',
+                    }}
+                    onMouseEnter={e => { if (l !== lang) e.currentTarget.style.background = V.surface2 }}
+                    onMouseLeave={e => { if (l !== lang) e.currentTarget.style.background = 'transparent' }}
+                    >{LANG_NAMES[l]}</button>
                   ))}
                 </div>
               )}
-            </li>
-          </ul>
-          <button style={s.btnPrimary} onClick={() => navigate('/control')}>
-            {t('nav_connect')}
-          </button>
+            </div>
+
+            {/* CTA */}
+            <button onClick={() => navigate('/control')} style={{
+              marginLeft:8,
+              background:V.accent, border:'none', borderRadius:3,
+              color:'white', padding:'7px 18px', fontSize:13, fontWeight:600,
+              cursor:'pointer', transition:'opacity 0.15s',
+              letterSpacing:'-0.01em',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.opacity = '0.88')}
+            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+            >{t('nav_connect')}</button>
+          </div>
         </div>
       </nav>
 
-      {/* Hero */}
-      <div style={s.hero}>
-        <div style={s.heroGlow} />
-        <div style={s.heroBadge}>{t('hero_title')}</div>
-        <h1 style={s.heroTitle}>RemoteCtl</h1>
-        <p style={s.heroSubtitle}>{t('hero_subtitle')}</p>
-        <div style={s.heroCta}>
-          <button style={s.btnLarge} onClick={() => navigate('/control')}>
-            {t('hero_start')} →
-          </button>
-          <a href="#download" style={s.btnOutline}>
-            {t('hero_download')}
-          </a>
-        </div>
-      </div>
+      {/* ── Hero ─────────────────────────────────────────────────────────────── */}
+      <section style={{
+        minHeight: '100vh',
+        display: 'flex', alignItems: 'center',
+        backgroundImage: gridBg,
+        backgroundSize: '48px 48px',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        {/* Radial vignette */}
+        <div style={{
+          position:'absolute', inset:0, pointerEvents:'none',
+          background:'radial-gradient(ellipse 80% 60% at 50% 50%, transparent 30%, var(--bg) 100%)',
+        }}/>
+        {/* Orange glow bottom-left */}
+        <div style={{
+          position:'absolute', bottom:-120, left:-80,
+          width:500, height:500, borderRadius:'50%', pointerEvents:'none',
+          background:'radial-gradient(circle, rgba(255,80,51,0.06) 0%, transparent 70%)',
+        }}/>
 
-      {/* Features */}
-      <div style={s.divider} />
-      <div id="features" style={s.section}>
-        <h2 style={s.sectionTitle}>{t('nav_features')}</h2>
-        <div style={s.featuresGrid}>
-          {featureKeys.map(f => (
-            <div key={f.titleKey} style={s.featureCard}>
-              <div style={s.featureIcon}>{f.icon}</div>
-              <div style={s.featureTitle}>{t(f.titleKey)}</div>
-              <div style={s.featureDesc}>{t(f.descKey)}</div>
+        <div style={{
+          maxWidth:1200, margin:'0 auto', padding:'120px 28px 80px',
+          width:'100%', position:'relative', zIndex:1,
+          display:'flex', alignItems:'center', justifyContent:'space-between',
+          gap:48, flexWrap:'wrap',
+        }}>
+          {/* Text block */}
+          <div style={{ maxWidth:560 }}>
+            {/* Tag */}
+            <div style={{
+              display:'inline-flex', alignItems:'center', gap:8,
+              border:`1px solid ${V.accentBdr}`,
+              borderRadius:2, padding:'5px 12px',
+              marginBottom:28,
+              animation:'rc-fade-up 0.5s 0.1s both',
+            }}>
+              <div style={{width:5,height:5,borderRadius:'50%',background:V.accent}}/>
+              <span style={{fontFamily:V.mono, fontSize:10, color:V.accent, letterSpacing:'0.12em'}}>
+                WebRTC · P2P · E2EE
+              </span>
+            </div>
+
+            {/* Title */}
+            <h1 style={{
+              fontFamily: V.display,
+              fontSize: 'clamp(48px,7vw,76px)',
+              fontWeight: 800,
+              lineHeight: 1.05,
+              letterSpacing: '-0.035em',
+              marginBottom: 24,
+              animation: 'rc-fade-up 0.5s 0.2s both',
+            }}>
+              <span style={{color:V.text1}}>Remote</span>
+              <br/>
+              <span style={{color:V.accent}}>Desktop</span>
+              <br/>
+              <span style={{color:V.text1}}>Control</span>
+            </h1>
+
+            {/* Subtitle */}
+            <p style={{
+              fontSize:16, color:V.text2, lineHeight:1.75, marginBottom:40,
+              maxWidth:440,
+              animation:'rc-fade-up 0.5s 0.3s both',
+            }}>
+              {t('hero_subtitle')}
+            </p>
+
+            {/* CTAs */}
+            <div style={{
+              display:'flex', gap:12, flexWrap:'wrap',
+              animation:'rc-fade-up 0.5s 0.4s both',
+            }}>
+              <button onClick={() => navigate('/control')} style={{
+                background:V.accent, border:'none', borderRadius:3,
+                color:'white', padding:'13px 28px', fontSize:15, fontWeight:600,
+                cursor:'pointer', letterSpacing:'-0.01em',
+                transition:'opacity 0.15s, transform 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.opacity='0.9'; e.currentTarget.style.transform='translateY(-1px)' }}
+              onMouseLeave={e => { e.currentTarget.style.opacity='1'; e.currentTarget.style.transform='translateY(0)' }}
+              >{t('hero_start')} →</button>
+
+              <a href="#download" style={{
+                background:'transparent', border:`1px solid ${V.border2}`,
+                borderRadius:3, color:V.text1, padding:'13px 28px', fontSize:15,
+                fontWeight:500, textDecoration:'none', cursor:'pointer',
+                transition:'border-color 0.15s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.borderColor = V.border3)}
+              onMouseLeave={e => (e.currentTarget.style.borderColor = V.border2)}
+              >{t('hero_download')}</a>
+            </div>
+
+            {/* Stats row */}
+            <div style={{
+              display:'flex', gap:32, marginTop:48,
+              paddingTop:32, borderTop:`1px solid ${V.border}`,
+              animation:'rc-fade-up 0.5s 0.5s both',
+            }}>
+              {[
+                ['H.264', 'Hardware Enc.'],
+                ['P2P', 'Direct Connect'],
+                ['E2EE', 'Input Encrypted'],
+              ].map(([val, lbl]) => (
+                <div key={val}>
+                  <div style={{fontFamily:V.mono, fontSize:14, color:V.accent, fontWeight:600, letterSpacing:'0.04em'}}>{val}</div>
+                  <div style={{fontSize:11, color:V.text3, marginTop:3, letterSpacing:'0.04em'}}>{lbl}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Diagram */}
+          <div style={{animation:'rc-fade-in 0.8s 0.5s both'}}>
+            <ConnectionDiagram />
+          </div>
+        </div>
+      </section>
+
+      {/* ── Features ───────────────────────────────────────────────────────── */}
+      <section id="features" style={{
+        maxWidth:1200, margin:'0 auto', padding:'80px 28px',
+      }}>
+        {/* Section header */}
+        <div style={{display:'flex', alignItems:'baseline', gap:16, marginBottom:48}}>
+          <h2 style={{
+            fontFamily:V.display, fontSize:32, fontWeight:800,
+            letterSpacing:'-0.03em', color:V.text1,
+          }}>{t('nav_features')}</h2>
+          <div style={{flex:1, height:1, background:V.border}}/>
+          <span style={{fontFamily:V.mono, fontSize:10, color:V.text3, letterSpacing:'0.1em'}}>
+            06 MODULES
+          </span>
+        </div>
+
+        <div style={{
+          display:'grid',
+          gridTemplateColumns:'repeat(auto-fill, minmax(340px, 1fr))',
+          gap:1,
+          background:V.border2,
+          border:`1px solid ${V.border2}`,
+          borderRadius:4,
+          overflow:'hidden',
+        }}>
+          {features.map(f => (
+            <div key={f.num} style={{
+              background:V.surface,
+              padding:'28px 28px 28px 24px',
+              transition:'background 0.15s',
+              position:'relative',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = V.surface2)}
+            onMouseLeave={e => (e.currentTarget.style.background = V.surface)}
+            >
+              <div style={{
+                fontFamily:V.mono, fontSize:10, color:V.accent,
+                letterSpacing:'0.1em', marginBottom:14,
+              }}>{f.num}</div>
+              <div style={{
+                fontFamily:V.display, fontSize:16, fontWeight:700,
+                color:V.text1, marginBottom:10, letterSpacing:'-0.01em',
+              }}>{t(f.titleKey)}</div>
+              <div style={{fontSize:13, color:V.text2, lineHeight:1.7}}>{t(f.descKey)}</div>
             </div>
           ))}
         </div>
-      </div>
+      </section>
 
-      {/* Downloads */}
-      <div style={s.divider} />
-      <div id="download" style={s.section}>
-        <h2 style={s.sectionTitle}>{t('dl_title')}</h2>
-        <p style={s.sectionSub}>
-          {version ? `${t('dl_latest')}: ${version}` : t('dl_subtitle')}
-        </p>
-        <div style={s.downloadsGrid}>
-          {platforms.map(p => (
-            <div key={p.nameKey} style={s.downloadCard}>
-              <div style={s.downloadIcon}>{p.icon}</div>
-              <div style={s.downloadName}>{t(p.nameKey)}</div>
-              <a href={downloadUrl(p)} style={s.downloadBtn} target="_blank" rel="noopener noreferrer">
-                {version ? `↓ ${version}` : t('dl_github')}
-              </a>
+      {/* ── Downloads ──────────────────────────────────────────────────────── */}
+      <section id="download" style={{
+        maxWidth:1200, margin:'0 auto', padding:'0 28px 80px',
+      }}>
+        <div style={{display:'flex', alignItems:'baseline', gap:16, marginBottom:48}}>
+          <h2 style={{
+            fontFamily:V.display, fontSize:32, fontWeight:800,
+            letterSpacing:'-0.03em',
+          }}>{t('dl_title')}</h2>
+          <div style={{flex:1, height:1, background:V.border}}/>
+          {version && (
+            <span style={{
+              fontFamily:V.mono, fontSize:10, color:V.green,
+              letterSpacing:'0.1em', padding:'3px 8px',
+              border:`1px solid ${V.greenDim}`, borderRadius:2,
+            }}>{version}</span>
+          )}
+        </div>
+
+        <div style={{
+          border:`1px solid ${V.border2}`, borderRadius:4, overflow:'hidden',
+        }}>
+          {/* Table header */}
+          <div style={{
+            display:'grid', gridTemplateColumns:'1fr 2fr auto',
+            padding:'10px 24px',
+            background:V.surface,
+            borderBottom:`1px solid ${V.border2}`,
+          }}>
+            {[t('platform'), t('file'), ''].map((h, i) => (
+              <div key={i} style={{
+                fontFamily:V.mono, fontSize:10, color:V.text3,
+                letterSpacing:'0.1em',
+                textAlign: i === 2 ? 'right' as const : 'left' as const,
+              }}>{h}</div>
+            ))}
+          </div>
+
+          {/* Platform rows */}
+          {platforms.map((p, i) => (
+            <div key={p.nameKey} style={{
+              display:'grid', gridTemplateColumns:'1fr 2fr auto',
+              padding:'16px 24px', alignItems:'center',
+              borderBottom: i < platforms.length - 1 ? `1px solid ${V.border}` : 'none',
+              background: V.bg,
+              transition:'background 0.12s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = V.surface)}
+            onMouseLeave={e => (e.currentTarget.style.background = V.bg)}
+            >
+              <div style={{display:'flex', alignItems:'center', gap:10, color:V.text1, fontSize:13, fontWeight:500}}>
+                <span style={{color:V.text2}}>{p.icon}</span>
+                {t(p.nameKey)}
+              </div>
+              <div style={{fontFamily:V.mono, fontSize:11, color:V.text3, letterSpacing:'0.04em'}}>
+                {p.label}-{version || 'vX.Y.Z'}.{p.ext}
+              </div>
+              <a href={dlUrl(p)} target="_blank" rel="noopener noreferrer" style={{
+                fontFamily:V.mono, fontSize:11, color:V.accent, textDecoration:'none',
+                border:`1px solid ${V.accentBdr}`, borderRadius:2, padding:'5px 14px',
+                letterSpacing:'0.06em', transition:'all 0.15s',
+                display:'inline-block',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background=V.accentDim }}
+              onMouseLeave={e => { e.currentTarget.style.background='transparent' }}
+              >↓ {version || t('dl_github')}</a>
             </div>
           ))}
         </div>
-        <p style={{textAlign:'center', marginTop:32, color:'#334155', fontSize:14}}>
-          <a href={RELEASES_PAGE} style={{color:'#6366f1'}} target="_blank" rel="noopener noreferrer">
-            {t('dl_github')} →
-          </a>
-        </p>
-      </div>
 
-      <div style={s.divider} />
-      <footer style={s.footer}>
-        <p>© 2025 RemoteCtl · WebRTC</p>
+        <div style={{marginTop:16, display:'flex', justifyContent:'flex-end'}}>
+          <a href={RELEASES_PAGE} target="_blank" rel="noopener noreferrer" style={{
+            fontFamily:V.mono, fontSize:11, color:V.text3,
+            textDecoration:'none', letterSpacing:'0.06em',
+            transition:'color 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.color = V.text2)}
+          onMouseLeave={e => (e.currentTarget.style.color = V.text3)}
+          >{t('dl_github')} ↗</a>
+        </div>
+      </section>
+
+      {/* ── Footer ─────────────────────────────────────────────────────────── */}
+      <footer style={{
+        borderTop:`1px solid ${V.border}`,
+        padding:'28px',
+        display:'flex', alignItems:'center', justifyContent:'space-between',
+        flexWrap:'wrap', gap:12,
+      }}>
+        <div style={{display:'flex', alignItems:'center', gap:8}}>
+          <div style={{width:16,height:16,borderRadius:2,background:V.accent,opacity:0.9}}/>
+          <span style={{fontFamily:V.mono, fontSize:11, color:V.text3, letterSpacing:'0.06em'}}>
+            REMOTECTL · WebRTC · © 2025
+          </span>
+        </div>
+        <div style={{fontFamily:V.mono, fontSize:10, color:V.text3, letterSpacing:'0.06em'}}>
+          {version || '—'}
+        </div>
       </footer>
     </div>
   )

@@ -7,10 +7,80 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png"/>
     <link rel="apple-touch-icon" sizes="256x256" href="/apple-touch-icon.png"/>
     <title>RemoteCtl</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=JetBrains+Mono:wght@400;500;600&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet">
     <style>
       *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-      body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; height: 100dvh; }
+      :root {
+        --bg:         #070A0F;
+        --surface:    #0D1117;
+        --surface-2:  #131B26;
+        --surface-3:  #1C2740;
+        --border:     rgba(148,163,184,0.07);
+        --border-2:   rgba(148,163,184,0.13);
+        --border-3:   rgba(148,163,184,0.22);
+        --accent:     #FF5033;
+        --accent-dim: rgba(255,80,51,0.10);
+        --accent-bdr: rgba(255,80,51,0.28);
+        --green:      #1EE0A3;
+        --green-dim:  rgba(30,224,163,0.10);
+        --green-bdr:  rgba(30,224,163,0.28);
+        --blue:       #5BA8FF;
+        --text-1:     #EEF0F4;
+        --text-2:     #8A96AD;
+        --text-3:     #45526A;
+        --mono:       'JetBrains Mono', 'Fira Code', monospace;
+        --sans:       'DM Sans', system-ui, sans-serif;
+        --display:    'Syne', sans-serif;
+      }
+      html { scroll-behavior: smooth; }
+      body {
+        font-family: var(--sans);
+        background: var(--bg);
+        color: var(--text-1);
+        height: 100dvh;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
       #root { height: 100%; }
+      ::-webkit-scrollbar { width: 4px; height: 4px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 2px; }
+      ::-webkit-scrollbar-thumb:hover { background: var(--border-3); }
+
+      @keyframes rc-fade-up {
+        from { opacity: 0; transform: translateY(20px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes rc-fade-in {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+      }
+      @keyframes rc-pulse-dot {
+        0%   { box-shadow: 0 0 0 0 rgba(30,224,163,0.5); }
+        70%  { box-shadow: 0 0 0 6px rgba(30,224,163,0); }
+        100% { box-shadow: 0 0 0 0 rgba(30,224,163,0); }
+      }
+      @keyframes rc-travel {
+        from { stroke-dashoffset: 200; }
+        to   { stroke-dashoffset: 0; }
+      }
+      @keyframes rc-blink {
+        0%, 100% { opacity: 1; }
+        50%       { opacity: 0.2; }
+      }
+      @keyframes rc-slide-r {
+        from { opacity: 0; transform: translateX(-16px); }
+        to   { opacity: 1; transform: translateX(0); }
+      }
+      @keyframes rc-slide-l {
+        from { opacity: 0; transform: translateX(16px); }
+        to   { opacity: 1; transform: translateX(0); }
+      }
+      @keyframes rc-spin {
+        to { transform: rotate(360deg); }
+      }
     </style>
   </head>
   <body>

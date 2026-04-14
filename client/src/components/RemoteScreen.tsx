@@ -369,14 +369,14 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
             <label style={styles.swapLabel} title={t('ctrl_swap_title')}>
               <input type="checkbox" checked={swapCtrlCmd}
                 onChange={e => setSwapCtrlCmd(e.target.checked)} style={{ marginRight: 4 }} />
-              <span style={{ fontSize: 12, color: swapCtrlCmd ? '#86efac' : '#94a3b8' }}>Ctrl ⇄ ⌘</span>
+              <span style={{ fontSize: 12, color: swapCtrlCmd ? 'var(--green)' : 'var(--text-3)', fontFamily: 'var(--mono)' }}>Ctrl ⇄ ⌘</span>
             </label>
           )}
           <button style={styles.toolBtn} onClick={sendClipboard}
             title={t('paste_title')}>{t('paste')}</button>
           {isMobile && (
             <button
-              style={{ ...styles.toolBtn, color: showKb ? '#86efac' : '#e2e8f0' }}
+              style={{ ...styles.toolBtn, color: showKb ? 'var(--green)' : 'var(--text-2)', borderColor: showKb ? 'var(--green-bdr)' : 'var(--border-2)' }}
               onClick={toggleKeyboard}>{t('keyboard')}</button>
           )}
           <button style={styles.disconnectBtn} onClick={onDisconnect}>{t('disconnect')}</button>
@@ -481,9 +481,9 @@ function ModKey({ label, active = false, onTap }: { label: string; active?: bool
         padding: '5px 10px',
         margin: '0 2px',
         borderRadius: 5,
-        border: `1px solid ${active ? '#3b82f6' : 'rgba(255,255,255,0.2)'}`,
-        background: active ? 'rgba(59,130,246,0.75)' : 'rgba(255,255,255,0.1)',
-        color: active ? '#fff' : 'rgba(255,255,255,0.8)',
+        border: `1px solid ${active ? 'var(--accent-bdr)' : 'var(--border-2)'}`,
+        background: active ? 'var(--accent-dim)' : 'var(--surface-2)',
+        color: active ? 'var(--accent)' : 'var(--text-2)',
         fontSize: 12,
         fontWeight: active ? 700 : 400,
         cursor: 'pointer',
@@ -522,22 +522,27 @@ const styles: Record<string, React.CSSProperties> = {
   },
   toolbar: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '6px 12px', background: '#1e293b', borderBottom: '1px solid #334155',
-    flexShrink: 0, overflowX: 'auto', gap: 8,
+    padding: '6px 12px', background: 'var(--surface)',
+    borderBottom: '1px solid var(--border)', flexShrink: 0, overflowX: 'auto', gap: 8,
   },
-  toolbarLabel: { fontSize: 13, fontWeight: 600, color: '#e2e8f0', whiteSpace: 'nowrap' },
+  toolbarLabel: {
+    fontSize: 13, fontWeight: 600, color: 'var(--text-1)',
+    whiteSpace: 'nowrap', fontFamily: 'var(--mono)',
+  },
   toolbarRight: { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 },
   swapLabel: { display: 'flex', alignItems: 'center', cursor: 'pointer', userSelect: 'none' as const },
   toolBtn: {
-    background: '#334155', color: '#e2e8f0', border: 'none', borderRadius: 4,
-    padding: '4px 10px', fontSize: 12, cursor: 'pointer',
+    background: 'var(--surface-2)', color: 'var(--text-2)',
+    border: '1px solid var(--border-2)', borderRadius: 6,
+    padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--sans)',
   },
   disconnectBtn: {
-    background: '#dc2626', color: '#fff', border: 'none', borderRadius: 4,
-    padding: '4px 12px', fontSize: 12, cursor: 'pointer',
+    background: 'var(--accent-dim)', color: 'var(--accent)',
+    border: '1px solid var(--accent-bdr)', borderRadius: 6,
+    padding: '4px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--sans)',
   },
   modRow: {
-    background: '#0f172a', borderBottom: '1px solid #1e293b',
+    background: 'var(--bg)', borderBottom: '1px solid var(--border)',
     flexShrink: 0, overflowX: 'auto',
   },
   modRowInner: {
@@ -545,7 +550,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: 'max-content',
   },
   modSep: {
-    width: 1, height: 20, background: 'rgba(255,255,255,0.15)',
+    width: 1, height: 20, background: 'var(--border-2)',
     margin: '0 6px', flexShrink: 0,
   },
   videoWrapper: {
@@ -559,12 +564,13 @@ const styles: Record<string, React.CSSProperties> = {
   cursor: {
     display: 'none', position: 'absolute', width: 14, height: 14,
     marginLeft: -7, marginTop: -7, borderRadius: '50%',
-    border: '2px solid #fff', boxShadow: '0 0 0 1px #000, inset 0 0 0 1px #000',
+    border: '2px solid rgba(255,255,255,0.9)', boxShadow: '0 0 0 1px #000, inset 0 0 0 1px #000',
     pointerEvents: 'none', zIndex: 10,
   },
   waiting: {
     position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
-    justifyContent: 'center', color: '#475569', fontSize: 15,
+    justifyContent: 'center', color: 'var(--text-3)', fontSize: 14,
+    fontFamily: 'var(--mono)', letterSpacing: '0.04em',
   },
   hiddenInput: {
     position: 'fixed', left: '-9999px', top: 0,
@@ -575,8 +581,10 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center', paddingBottom: 40, pointerEvents: 'none', zIndex: 20,
   },
   hintBox: {
-    background: 'rgba(0,0,0,0.7)', color: '#e2e8f0', borderRadius: 10,
+    background: 'rgba(7,10,15,0.85)', color: 'var(--text-2)',
+    border: '1px solid var(--border-2)', borderRadius: 10,
     padding: '10px 18px', fontSize: 13, lineHeight: 1.8, textAlign: 'center',
+    backdropFilter: 'blur(8px)',
     backdropFilter: 'blur(4px)',
   },
 }
