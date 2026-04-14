@@ -4,10 +4,22 @@ export type Lang = 'zh' | 'en' | 'zh_TW'
 
 const STORAGE_KEY = 'rc_lang'
 
+function detectBrowserLang(): Lang {
+  const tags = [navigator.language, ...(navigator.languages ?? [])]
+  for (const tag of tags) {
+    const t = tag.toLowerCase()
+    if (t === 'zh-tw' || t === 'zh-hk' || t === 'zh-mo') return 'zh_TW'
+    if (t.startsWith('zh')) return 'zh'
+    if (t.startsWith('en')) return 'en'
+  }
+  return 'zh'
+}
+
 export function loadSavedLang(): Lang {
   const v = localStorage.getItem(STORAGE_KEY)
-  if (v === 'en' || v === 'zh_TW') return v
-  return 'zh'
+  if (v === 'zh' || v === 'en' || v === 'zh_TW') return v
+  // First visit: follow browser language
+  return detectBrowserLang()
 }
 
 export function saveLang(lang: Lang) {

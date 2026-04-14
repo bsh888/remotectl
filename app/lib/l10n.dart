@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,10 +7,29 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 final localeNotifier = ValueNotifier<Locale>(const Locale('zh'));
 
+/// Detect system locale and map to one of the three supported locales.
+Locale _detectSystemLocale() {
+  final sys = PlatformDispatcher.instance.locale;
+  final lang = sys.languageCode.toLowerCase();
+  final country = sys.countryCode?.toUpperCase() ?? '';
+  if (lang == 'zh') {
+    if (country == 'TW' || country == 'HK' || country == 'MO') {
+      return const Locale('zh', 'TW');
+    }
+    return const Locale('zh');
+  }
+  if (lang == 'en') return const Locale('en');
+  return const Locale('zh'); // default fallback
+}
+
 Future<void> loadSavedLocale() async {
   final prefs = await SharedPreferences.getInstance();
   final tag = prefs.getString('locale');
-  if (tag == null) return;
+  if (tag == null) {
+    // First launch: follow system locale
+    localeNotifier.value = _detectSystemLocale();
+    return;
+  }
   if (tag == 'zh') {
     localeNotifier.value = const Locale('zh');
   } else if (tag == 'en') {
