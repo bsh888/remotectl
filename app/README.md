@@ -73,6 +73,20 @@ flutter build ios --release   # 需要 macOS + Xcode
 
 > iPhone 需安装与 Xcode 匹配的 iOS 版本 SDK。如果 Xcode 报"iOS X.X is not installed"，到 **Xcode → Settings → Platforms** 下载对应版本。
 
+## 多语言
+
+App 内置简体中文 / English / 繁體中文，点击右上角地球图标切换，偏好通过 SharedPreferences 持久化。
+
+## 会话内聊天
+
+连接建立后，控制端和被控端可互发文字消息和文件：
+
+- **控制端**（`remote_screen.dart` / `remote_screen_desktop.dart`）：工具栏/底栏聊天按钮打开 `ChatPanel`
+  - 移动端：`DraggableScrollableSheet` 底部弹出
+  - 桌面端：右侧固定宽 300px 覆盖层
+- **被控端**（`hosted_screen.dart`）：agent 运行中聊天图标出现，通过 stdio IPC 与 agent 子进程通信
+- 文件保存到 `~/Downloads`；iOS/Android 保存到 App Documents 目录
+
 ## 平台对比
 
 | 平台 | 控制端界面 | 键盘捕获 | 鼠标右键 |
@@ -154,3 +168,18 @@ flutter build ios --release
 
 - **本地网络访问**：WebRTC ICE 打洞需要，首次弹窗时选"允许"
 - **摄像头 / 麦克风**：flutter_webrtc 初始化时请求，实际不会使用本机摄像头和麦克风
+
+## App 图标
+
+图标源文件：`scripts/icon-source.svg`（SIGNAL DARK 风格，深色背景 + 橙色 accent）
+
+修改图标后运行以下命令重新生成所有平台图标（需要 `rsvg-convert` + `magick`）：
+
+```bash
+# macOS 安装依赖（一次性）
+brew install librsvg imagemagick
+
+bash scripts/gen-icons.sh
+```
+
+覆盖 macOS / iOS / Android / Windows 全平台尺寸。

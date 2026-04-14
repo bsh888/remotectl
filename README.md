@@ -10,12 +10,15 @@
 - **E2EE 输入加密**：ECDH P-256 + HKDF-SHA256 + AES-256-GCM，或通过 WebRTC DataChannel 的 DTLS 加密传输
 - **低延迟鼠标**：输入事件走 WebRTC DataChannel P2P 直连，本地光标叠加层即时反馈
 - **跨平台剪贴板**：从控制端粘贴文本到远程（中文/Emoji 均支持）
+- **会话内聊天**：控制端与被控端通过 WebRTC DataChannel 实时文字聊天，支持文件传输（含进度控制）
+- **系统通知**：被控端收到聊天消息/文件时触发系统通知（macOS / Windows / Linux）
 - **Ctrl ⇄ Cmd 自动转换**：Windows/Linux 连接 Mac 时自动映射快捷键
 - **TLS 加密传输**：信令通道全程 TLS，支持自签名证书
 - **自动重连**：被控端 pipeline 异常中断后自动重启，无需人工干预
 - **一体化桌面 App**：macOS/Windows/Linux 原生 App 同时内置"远程控制"和"共享本机"两种模式，一个程序搞定；iOS/Android 作纯控制端
 - **会话密码认证**：被控端每次启动随机生成 8 位数字会话密码，控制端凭设备 ID + 会话密码连接，简单安全
 - **自动设备 ID**：被控端首次运行自动生成 9 位随机数字 ID 并持久化，无需手动配置
+- **多语言界面**：简体中文 / English / 繁體中文，语言偏好持久化保存
 - **YAML 配置文件**：服务端和 agent 均支持配置文件，无需记忆命令行参数
 - **systemd 部署**：发布包内置 install.sh，一键部署为 systemd 服务，无需 root 绑定 443 端口
 
@@ -636,6 +639,24 @@ WARNING: Accessibility permission not granted — mouse/keyboard injection will 
 ---
 
 ## 控制端操作说明
+
+### 语言切换
+
+界面支持**简体中文 / English / 繁體中文**：
+
+- **Flutter App**：右上角地球图标 → 弹窗选择，立即生效并持久化保存
+- **Web 控制端**（`/`）：导航栏 🌐 下拉菜单
+- **Web 管理后台**（`/admin`）：顶栏语言下拉，或登录页按钮组
+
+### 聊天与文件传输
+
+连接建立后，控制端和被控端可通过 WebRTC DataChannel 实时通信：
+
+- 工具栏（桌面）或底栏（移动）点击聊天图标打开聊天面板
+- 支持发送文字消息和文件
+- 被控端收到消息时触发系统通知
+- 文件保存到 `~/Downloads`，重名自动加时间戳后缀
+- 传输使用滑动窗口流量控制（每 8 个分块等待 ACK），最大在途 ~96 KB
 
 ### 键盘快捷键
 
