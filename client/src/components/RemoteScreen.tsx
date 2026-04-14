@@ -585,6 +585,5 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid var(--border-2)', borderRadius: 10,
     padding: '10px 18px', fontSize: 13, lineHeight: 1.8, textAlign: 'center',
     backdropFilter: 'blur(8px)',
-    backdropFilter: 'blur(4px)',
   },
 }
