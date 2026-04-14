@@ -202,6 +202,7 @@ class _HostedScreenState extends State<HostedScreen> {
                   const SizedBox(height: 16),
                   Text(
                     AppLocalizations.of(context).hostedUnsupported,
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.54),
                       fontSize: 18,

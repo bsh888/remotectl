@@ -42,6 +42,7 @@ export default function ConnectPanel({ onConnect, error, connecting, history, on
   const [deviceID, setDeviceID] = useState(() => localStorage.getItem('rc_device') ?? '')
   const [password, setPassword] = useState('')
   const passwordRef = useRef<HTMLInputElement>(null)
+  const [pendingRemove, setPendingRemove] = useState<{ deviceID: string; serverURL: string } | null>(null)
 
   useEffect(() => { localStorage.setItem('rc_server', serverURL) }, [serverURL])
   useEffect(() => { localStorage.setItem('rc_device', deviceID) }, [deviceID])
@@ -132,7 +133,7 @@ export default function ConnectPanel({ onConnect, error, connecting, history, on
                       </div>
                     </div>
                     <button
-                      onClick={e => { e.stopPropagation(); onRemoveHistory(entry.deviceID, entry.serverURL) }}
+                      onClick={e => { e.stopPropagation(); setPendingRemove({ deviceID: entry.deviceID, serverURL: entry.serverURL }) }}
                       title={t('remove')}
                       style={{
                         background: 'none', border: 'none', color: 'var(--text-3)',
@@ -228,6 +229,52 @@ export default function ConnectPanel({ onConnect, error, connecting, history, on
           </form>
         </div>
       </div>
+
+      {/* Delete record confirmation modal */}
+      {pendingRemove && (
+        <div
+          onClick={() => setPendingRemove(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 200,
+            background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'var(--surface)', border: '1px solid var(--border-2)',
+              borderRadius: 16, padding: '24px 28px', maxWidth: 360, width: '100%',
+              animation: 'rc-fade-up 0.2s ease both',
+            }}
+          >
+            <div style={{ fontFamily: 'var(--display)', fontWeight: 700, fontSize: 16, color: 'var(--text-1)', marginBottom: 10 }}>
+              {t('delete_record_title')}
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-2)', lineHeight: 1.6, marginBottom: 20 }}>
+              {t('delete_record_msg')}
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setPendingRemove(null)}
+                style={{
+                  background: 'var(--surface-2)', border: '1px solid var(--border-2)',
+                  borderRadius: 8, padding: '8px 18px', color: 'var(--text-2)',
+                  fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'var(--sans)',
+                }}
+              >{t('cancel')}</button>
+              <button
+                onClick={() => { onRemoveHistory(pendingRemove.deviceID, pendingRemove.serverURL); setPendingRemove(null) }}
+                style={{
+                  background: 'var(--accent)', border: 'none',
+                  borderRadius: 8, padding: '8px 18px', color: '#fff',
+                  fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: 'var(--sans)',
+                }}
+              >{t('delete')}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
