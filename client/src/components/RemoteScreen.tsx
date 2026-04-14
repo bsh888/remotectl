@@ -360,7 +360,7 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
       {/* ── toolbar ── */}
       <div style={{
         ...styles.toolbar,
-        transform: !toolbarVisible ? 'translateY(-100%)' : 'none',
+        transform: toolbarVisible ? 'none' : 'translateY(-100%)',
         transition: 'transform 0.2s ease',
       }}>
         <span style={styles.toolbarLabel}>🖥 {deviceName}</span>
@@ -379,9 +379,28 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
               style={{ ...styles.toolBtn, color: showKb ? 'var(--green)' : 'var(--text-2)', borderColor: showKb ? 'var(--green-bdr)' : 'var(--border-2)' }}
               onClick={toggleKeyboard}>{t('keyboard')}</button>
           )}
+          <button style={styles.toolBtn} onClick={() => setToolbarVisible(false)}
+            title="Hide toolbar">▲</button>
           <button style={styles.disconnectBtn} onClick={onDisconnect}>{t('disconnect')}</button>
         </div>
       </div>
+
+      {/* ── show-toolbar trigger (top edge, visible when toolbar hidden) ── */}
+      {!toolbarVisible && (
+        <div
+          onClick={() => { setToolbarVisible(true); resetHideTimer() }}
+          style={{
+            position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 20, cursor: 'pointer', padding: '2px 16px',
+            background: 'var(--surface)', border: '1px solid var(--border-2)',
+            borderTop: 'none', borderRadius: '0 0 8px 8px',
+            color: 'var(--text-3)', fontSize: 11, lineHeight: '18px',
+            transition: 'color 0.15s',
+          }}
+          onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-1)')}
+          onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-3)')}
+        >▼</div>
+      )}
 
       {/* ── mobile modifier key row ── */}
       {isMobile && showKb && (
@@ -518,12 +537,13 @@ function MobileHint() {
 
 const styles: Record<string, React.CSSProperties> = {
   wrapper: {
-    display: 'flex', flexDirection: 'column', height: '100%', background: '#000',
+    position: 'relative', height: '100%', background: '#000', overflow: 'hidden',
   },
   toolbar: {
+    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10,
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     padding: '6px 12px', background: 'var(--surface)',
-    borderBottom: '1px solid var(--border)', flexShrink: 0, overflowX: 'auto', gap: 8,
+    borderBottom: '1px solid var(--border)', overflowX: 'auto', gap: 8,
   },
   toolbarLabel: {
     fontSize: 13, fontWeight: 600, color: 'var(--text-1)',
@@ -542,8 +562,11 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '4px 12px', fontSize: 12, cursor: 'pointer', fontFamily: 'var(--sans)',
   },
   modRow: {
+    position: 'absolute', left: 0, right: 0, zIndex: 9,
     background: 'var(--bg)', borderBottom: '1px solid var(--border)',
-    flexShrink: 0, overflowX: 'auto',
+    overflowX: 'auto',
+    // positioned just below the toolbar; toolbar height ~36px
+    top: 36,
   },
   modRowInner: {
     display: 'flex', alignItems: 'center', padding: '5px 8px',
@@ -554,8 +577,9 @@ const styles: Record<string, React.CSSProperties> = {
     margin: '0 6px', flexShrink: 0,
   },
   videoWrapper: {
-    flex: 1, overflow: 'hidden', display: 'flex', alignItems: 'center',
-    justifyContent: 'center', position: 'relative', background: '#000',
+    position: 'absolute', inset: 0,
+    display: 'flex', alignItems: 'center',
+    justifyContent: 'center', background: '#000',
   },
   video: {
     width: '100%', height: '100%', objectFit: 'contain',

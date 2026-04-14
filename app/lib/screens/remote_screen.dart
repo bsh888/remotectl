@@ -67,7 +67,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
     super.initState();
     WakelockPlus.enable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    _resetHideTimer();
+    _showToolbar();
     widget.session.chat.addListener(_onChatUpdate);
 
     // Desktop: capture all physical keyboard events via HardwareKeyboard.
@@ -100,12 +100,19 @@ class _RemoteScreenState extends State<RemoteScreen> {
 
   // ── toolbar auto-hide ───────────────────────────────────────────────────────
 
+  // Only resets the hide timer. Does NOT re-show the toolbar — call
+  // _showToolbar() explicitly when the user wants to bring it back.
   void _resetHideTimer() {
     _hideTimer?.cancel();
-    if (!_toolbarVisible) setState(() => _toolbarVisible = true);
     _hideTimer = Timer(const Duration(seconds: 4), () {
       if (mounted && !_kbVisible) setState(() => _toolbarVisible = false);
     });
+  }
+
+  void _showToolbar() {
+    _hideTimer?.cancel();
+    setState(() => _toolbarVisible = true);
+    _resetHideTimer();
   }
 
   // ── coordinate mapping ──────────────────────────────────────────────────────
@@ -546,7 +553,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
           }
 
           return GestureDetector(
-            onTap: _resetHideTimer,
+            onTap: () {}, // tap handled by _GestureArea; don't auto-show toolbar
             child: _GestureArea(
               onTouchStart: (p) => _onTouchStart(p, widgetSize),
               onTouchMove: (p) => _onTouchMove(p, widgetSize),
@@ -599,6 +606,30 @@ class _RemoteScreenState extends State<RemoteScreen> {
           _buildToolbar(),
         ]),
       ),
+
+      // ── show-toolbar handle (visible only when toolbar is hidden) ──────────
+      if (!_toolbarVisible)
+        Positioned(
+          bottom: 0,
+          left: 0,
+          right: 0,
+          child: GestureDetector(
+            onTap: _showToolbar,
+            child: Center(
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white12),
+                ),
+                child: const Icon(Icons.keyboard_arrow_up_rounded,
+                    color: Colors.white54, size: 20),
+              ),
+            ),
+          ),
+        ),
     ]);
   }
 
