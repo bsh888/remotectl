@@ -112,6 +112,21 @@ class RemoteSession extends ChangeNotifier {
 
   // ── sendInput ─────────────────────────────────────────────────────────────────
 
+  // sendViewport tells the agent the physical pixel dimensions of the viewer's
+  // render area so it can adapt the capture resolution for pixel-perfect output.
+  void sendViewport(double cssW, double cssH, double devicePixelRatio) {
+    final pw = (cssW * devicePixelRatio).round();
+    final ph = (cssH * devicePixelRatio).round();
+    if (pw <= 0 || ph <= 0) return;
+    _pendingViewport = {'w': pw, 'h': ph};
+    if (_inputDCOpen && _inputDC != null) {
+      _inputDC!.send(RTCDataChannelMessage(
+          jsonEncode({'event': 'viewport', 'vw': pw, 'vh': ph})));
+    }
+  }
+
+  Map<String, int>? _pendingViewport;
+
   Future<void> sendInput(Map<String, dynamic> ev) async {
     final event = ev['event'] as String?;
     // mousemove goes through the unreliable channel — stale positions are
@@ -229,6 +244,13 @@ class RemoteSession extends ChangeNotifier {
           _inputDCOpen = channel.state == RTCDataChannelState.RTCDataChannelOpen;
           channel.onDataChannelState = (state) {
             _inputDCOpen = state == RTCDataChannelState.RTCDataChannelOpen;
+            if (_inputDCOpen) {
+              final vp = _pendingViewport;
+              if (vp != null) {
+                channel.send(RTCDataChannelMessage(
+                    jsonEncode({'event': 'viewport', 'vw': vp['w'], 'vh': vp['h']})));
+              }
+            }
           };
         } else if (channel.label == 'input-move') {
           _inputMoveDC = channel;

@@ -14,6 +14,7 @@ void rc_linux_stop(void);
 int  rc_linux_check(void);
 void rc_linux_get_diag(int *cap_frames, int *enc_frames, int *last_err);
 void rc_linux_request_keyframe(void);
+void rc_linux_native_size(int *w, int *h);
 */
 import "C"
 
@@ -57,6 +58,13 @@ func linuxError(code int) string {
 		return s
 	}
 	return "unknown error"
+}
+
+// NativeSize returns the physical pixel dimensions of the primary X11 display.
+func NativeSize() (int, int) {
+	var w, h C.int
+	C.rc_linux_native_size(&w, &h)
+	return int(w), int(h)
 }
 
 // Stop shuts down the pipeline.

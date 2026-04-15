@@ -270,3 +270,12 @@ void rc_linux_stop(void) {
         x264_picture_clean(&g_pic_in);
     }
 }
+
+void rc_linux_native_size(int *w, int *h) {
+    Display *dpy = XOpenDisplay(NULL);
+    if (!dpy) { *w = 0; *h = 0; return; }
+    int screen = DefaultScreen(dpy);
+    *w = DisplayWidth(dpy, screen);
+    *h = DisplayHeight(dpy, screen);
+    XCloseDisplay(dpy);
+}

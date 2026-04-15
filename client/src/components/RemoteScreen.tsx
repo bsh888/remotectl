@@ -9,15 +9,17 @@ interface Props {
   videoStream: MediaStream | null
   onInput: (e: InputEvent) => void
   onDisconnect: () => void
+  onViewport?: (w: number, h: number) => void
   deviceName: string
   remotePlatform: string
 }
 
-export default function RemoteScreen({ videoStream, onInput, onDisconnect, deviceName, remotePlatform }: Props) {
+export default function RemoteScreen({ videoStream, onInput, onDisconnect, onViewport, deviceName, remotePlatform }: Props) {
   const { t } = useI18n()
-  const videoRef    = useRef<HTMLVideoElement>(null)
-  const cursorRef   = useRef<HTMLDivElement>(null)
-  const kbInputRef  = useRef<HTMLInputElement>(null)
+  const videoRef      = useRef<HTMLVideoElement>(null)
+  const wrapperRef    = useRef<HTMLDivElement>(null)
+  const cursorRef     = useRef<HTMLDivElement>(null)
+  const kbInputRef    = useRef<HTMLInputElement>(null)
   const [showKb, setShowKb] = useState(false)
 
   const defaultSwap = !isLocalMac && (remotePlatform === 'darwin' || remotePlatform === '')
@@ -48,6 +50,18 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
     }
     return () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current) }
   }, [resetHideTimer])
+
+  // Notify parent of viewport size so the agent can adapt capture resolution.
+  useEffect(() => {
+    if (!onViewport || !wrapperRef.current) return
+    const el = wrapperRef.current
+    const ro = new ResizeObserver(entries => {
+      const e = entries[0]
+      if (e) onViewport(e.contentRect.width, e.contentRect.height)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [onViewport])
 
   useEffect(() => {
     const v = videoRef.current
@@ -445,7 +459,7 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
       )}
 
       {/* ── video area ── */}
-      <div style={styles.videoWrapper} onMouseMove={resetHideTimer}>
+      <div ref={wrapperRef} style={styles.videoWrapper} onMouseMove={resetHideTimer}>
         <video
           ref={videoRef}
           style={styles.video}

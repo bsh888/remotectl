@@ -21,6 +21,7 @@ interface RemoteSession {
   connect: (opts: SessionOptions) => void
   disconnect: () => void
   sendInput: (e: InputEvent) => void
+  sendViewport: (w: number, h: number) => void
 }
 
 interface E2EEState {
@@ -34,6 +35,7 @@ export function useRemoteSession(): RemoteSession {
   const e2ee = useRef<E2EEState | null>(null)
   const inputDC = useRef<RTCDataChannel | null>(null)     // reliable: clicks/keys
   const inputMoveDC = useRef<RTCDataChannel | null>(null) // unreliable: mousemove
+  const pendingViewport = useRef<{w: number, h: number} | null>(null)
   const iceServers = useRef<RTCIceServer[]>([{ urls: 'stun:stun.l.google.com:19302' }])
 
   const [state, setState] = useState<ConnectionState>('idle')
@@ -131,6 +133,13 @@ export function useRemoteSession(): RemoteSession {
             peerConn.ondatachannel = (e) => {
               if (e.channel.label === 'input') {
                 inputDC.current = e.channel
+                e.channel.onopen = () => {
+                  // Send buffered viewport as soon as the channel is ready
+                  const vp = pendingViewport.current
+                  if (vp) {
+                    e.channel.send(JSON.stringify({ event: 'viewport', vw: vp.w, vh: vp.h }))
+                  }
+                }
               } else if (e.channel.label === 'input-move') {
                 inputMoveDC.current = e.channel
               }
@@ -229,10 +238,20 @@ export function useRemoteSession(): RemoteSession {
     }
   }, [])
 
+  const sendViewport = useCallback((w: number, h: number) => {
+    const pw = Math.round(w * window.devicePixelRatio)
+    const ph = Math.round(h * window.devicePixelRatio)
+    pendingViewport.current = { w: pw, h: ph }
+    const dc = inputDC.current
+    if (dc?.readyState === 'open') {
+      dc.send(JSON.stringify({ event: 'viewport', vw: pw, vh: ph }))
+    }
+  }, [])
+
   useEffect(() => () => {
     pc.current?.close()
     ws.current?.close()
   }, [])
 
-  return { state, error, videoStream, connect, disconnect, sendInput }
+  return { state, error, videoStream, connect, disconnect, sendInput, sendViewport }
 }

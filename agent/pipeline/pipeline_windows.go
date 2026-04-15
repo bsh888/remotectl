@@ -72,6 +72,11 @@ func winError(code int) string {
 	return "unknown error"
 }
 
+// NativeSize returns the physical pixel dimensions of the primary display.
+func NativeSize() (int, int) {
+	return int(C.GetSystemMetrics(0)), int(C.GetSystemMetrics(1))
+}
+
 // Stop shuts down the pipeline.
 func Stop() {
 	C.rc_win_stop()

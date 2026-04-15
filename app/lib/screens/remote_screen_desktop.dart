@@ -317,6 +317,11 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
               builder: (context, constraints) {
                 final widgetSize =
                     Size(constraints.maxWidth, constraints.maxHeight);
+                // Notify agent of the render area size so it can adapt capture resolution.
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  final dpr = MediaQuery.of(context).devicePixelRatio;
+                  widget.session.sendViewport(widgetSize.width, widgetSize.height, dpr);
+                });
                 return MouseRegion(
                   cursor: _cursorInVideo
                       ? SystemMouseCursors.none

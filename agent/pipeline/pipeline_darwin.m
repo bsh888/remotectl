@@ -390,3 +390,9 @@ void rc_pipeline_stop(void) {
     }
     NSLog(@"[remotectl/pipeline] stopped");
 }
+
+void rc_native_size(int *w, int *h) {
+    CGDirectDisplayID disp = CGMainDisplayID();
+    *w = (int)CGDisplayPixelsWide(disp);
+    *h = (int)CGDisplayPixelsHigh(disp);
+}
