@@ -1,25 +1,49 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <defs>
-    <radialGradient id="bgGrad" cx="42%" cy="36%" r="65%" gradientUnits="objectBoundingBox">
-      <stop offset="0%"   stop-color="#131B26"/>
+    <!-- Background: pure dark with very subtle warm center glow -->
+    <radialGradient id="bgGrad" cx="50%" cy="46%" r="60%" gradientUnits="objectBoundingBox">
+      <stop offset="0%"   stop-color="#0F1118"/>
       <stop offset="100%" stop-color="#070A0F"/>
     </radialGradient>
+
+    <!-- Screen interior: nearly black, just a hint of depth -->
     <linearGradient id="screenGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%"   stop-color="#1C2740"/>
-      <stop offset="100%" stop-color="#0D1117"/>
+      <stop offset="0%"   stop-color="#0C1219"/>
+      <stop offset="100%" stop-color="#070A0F"/>
     </linearGradient>
-    <linearGradient id="bezelGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%"   stop-color="#1C2740"/>
-      <stop offset="100%" stop-color="#131B26"/>
-    </linearGradient>
-    <filter id="dotGlow">
-      <feGaussianBlur stdDeviation="6" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+
+    <!-- Green node glow -->
+    <filter id="greenGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="14" result="b1"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="6"  result="b2"/>
+      <feMerge>
+        <feMergeNode in="b1"/>
+        <feMergeNode in="b2"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
     </filter>
-    <filter id="lineGlow">
-      <feGaussianBlur stdDeviation="3" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+
+    <!-- Orange node glow -->
+    <filter id="orangeGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="14" result="b1"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="6"  result="b2"/>
+      <feMerge>
+        <feMergeNode in="b1"/>
+        <feMergeNode in="b2"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
     </filter>
+
+    <!-- Connection line glow -->
+    <filter id="lineGlow" x="-10%" y="-200%" width="120%" height="500%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Clip path for rounded square icon shape -->
     <clipPath id="iconClip">
       <rect width="1024" height="1024" rx="220" ry="220"/>
     </clipPath>
@@ -27,83 +51,88 @@
 
   <g clip-path="url(#iconClip)">
 
-    <!-- Background -->
+    <!-- ── Background ── -->
     <rect width="1024" height="1024" fill="url(#bgGrad)"/>
 
-    <!-- Subtle grid -->
+    <!-- Micro grid: barely visible, adds depth -->
     <pattern id="grid" width="64" height="64" patternUnits="userSpaceOnUse">
-      <path d="M 64 0 L 0 0 0 64" fill="none" stroke="#EEF0F4" stroke-width="0.7" stroke-opacity="0.035"/>
+      <path d="M 64 0 L 0 0 0 64" fill="none" stroke="#EEF0F4" stroke-width="0.6" stroke-opacity="0.03"/>
     </pattern>
     <rect width="1024" height="1024" fill="url(#grid)"/>
 
-    <!-- ── Monitor outer bezel ── -->
-    <rect x="136" y="186" width="752" height="492" rx="36" ry="36"
-          fill="url(#bezelGrad)" stroke="#8A96AD" stroke-width="8" stroke-opacity="0.55"/>
+    <!-- ── Monitor bezel: bright silver outline, no dark fill ── -->
+    <rect x="130" y="182" width="764" height="500" rx="40" ry="40"
+          fill="none" stroke="#A8B4C8" stroke-width="11" stroke-opacity="0.75"/>
 
-    <!-- Orange top-left corner accent -->
-    <path d="M 136 248 L 136 222 Q 136 186 172 186 L 198 186"
-          fill="none" stroke="#FF5033" stroke-width="6" stroke-linecap="round" opacity="0.9"/>
+    <!-- Orange top-left corner accent — prominent, full opacity -->
+    <path d="M 130 252 L 130 222 Q 130 182 170 182 L 202 182"
+          fill="none" stroke="#FF5033" stroke-width="10"
+          stroke-linecap="round" opacity="1"/>
 
     <!-- Screen face -->
-    <rect x="158" y="206" width="708" height="452" rx="18" ry="18"
+    <rect x="152" y="202" width="720" height="460" rx="22" ry="22"
           fill="url(#screenGrad)"/>
 
-    <!-- Screen top glare -->
-    <rect x="158" y="206" width="708" height="3" rx="1.5" fill="#EEF0F4" fill-opacity="0.06"/>
+    <!-- Screen top glare: subtle bright line -->
+    <rect x="152" y="202" width="720" height="3" rx="1.5" fill="#FFFFFF" fill-opacity="0.07"/>
 
-    <!-- ── Screen content ── -->
+    <!-- ── LEFT DEVICE: green = online controller ── -->
+    <!-- Body: dark with green border -->
+    <rect x="208" y="348" width="162" height="116" rx="14"
+          fill="#0A1220" stroke="#1EE0A3" stroke-width="3" stroke-opacity="0.7"/>
+    <!-- Screen: slightly blue-tinted dark -->
+    <rect x="222" y="360" width="134" height="76" rx="9"
+          fill="#07101A"/>
+    <!-- Large green glow dot — bright, white core -->
+    <circle cx="289" cy="398" r="18" fill="#1EE0A3" filter="url(#greenGlow)"/>
+    <circle cx="289" cy="398" r="9"  fill="#FFFFFF" opacity="0.95"/>
+    <!-- Screen content lines: clearly visible -->
+    <rect x="238" y="366" width="78" height="3.5" rx="1.75" fill="#1EE0A3" fill-opacity="0.55"/>
+    <rect x="238" y="374" width="55" height="2.5" rx="1.25" fill="#A8B4C8" fill-opacity="0.30"/>
+    <rect x="238" y="380" width="66" height="2.5" rx="1.25" fill="#A8B4C8" fill-opacity="0.22"/>
 
-    <!-- Left device node -->
-    <rect x="214" y="358" width="152" height="106" rx="12"
-          fill="#131B26" stroke="#2A3A52" stroke-width="3"/>
-    <rect x="228" y="370" width="124" height="66" rx="7"
-          fill="#070A0F"/>
-    <!-- Green "online" dot -->
-    <circle cx="290" cy="403" r="10" fill="#1EE0A3" filter="url(#dotGlow)" opacity="0.85"/>
-    <!-- Small screen lines -->
-    <rect x="244" y="376" width="72" height="3" rx="1.5" fill="#1EE0A3" fill-opacity="0.25"/>
-    <rect x="244" y="384" width="50" height="2" rx="1" fill="#EEF0F4" fill-opacity="0.08"/>
-    <rect x="244" y="390" width="60" height="2" rx="1" fill="#EEF0F4" fill-opacity="0.06"/>
+    <!-- ── RIGHT DEVICE: orange = target/controlled ── -->
+    <!-- Body: dark with orange border -->
+    <rect x="654" y="348" width="162" height="116" rx="14"
+          fill="#0A1220" stroke="#FF5033" stroke-width="3" stroke-opacity="0.7"/>
+    <!-- Screen: slightly dark -->
+    <rect x="668" y="360" width="134" height="76" rx="9"
+          fill="#07101A"/>
+    <!-- Large orange glow dot — bright, warm core -->
+    <circle cx="735" cy="398" r="17" fill="#FF5033" filter="url(#orangeGlow)"/>
+    <circle cx="735" cy="398" r="8"  fill="#FFD0C4" opacity="0.95"/>
+    <!-- Screen content lines -->
+    <rect x="684" y="366" width="78" height="3.5" rx="1.75" fill="#FF5033" fill-opacity="0.55"/>
+    <rect x="684" y="374" width="55" height="2.5" rx="1.25" fill="#A8B4C8" fill-opacity="0.30"/>
+    <rect x="684" y="380" width="66" height="2.5" rx="1.25" fill="#A8B4C8" fill-opacity="0.22"/>
 
-    <!-- Right device node -->
-    <rect x="658" y="358" width="152" height="106" rx="12"
-          fill="#131B26" stroke="#2A3A52" stroke-width="3"/>
-    <rect x="672" y="370" width="124" height="66" rx="7"
-          fill="#070A0F"/>
-    <!-- Grey "target" dot -->
-    <circle cx="734" cy="403" r="8" fill="#45526A" opacity="0.8"/>
-    <!-- Small screen lines -->
-    <rect x="688" y="376" width="72" height="3" rx="1.5" fill="#45526A" fill-opacity="0.5"/>
-    <rect x="688" y="384" width="50" height="2" rx="1" fill="#EEF0F4" fill-opacity="0.08"/>
-    <rect x="688" y="390" width="60" height="2" rx="1" fill="#EEF0F4" fill-opacity="0.06"/>
-
-    <!-- Connection line -->
-    <line x1="366" y1="411" x2="658" y2="411"
-          stroke="#FF5033" stroke-width="4"
-          stroke-dasharray="18 11"
+    <!-- ── Connection line: vivid orange, strong glow ── -->
+    <line x1="370" y1="407" x2="654" y2="407"
+          stroke="#FF5033" stroke-width="5"
+          stroke-dasharray="22 13"
           stroke-linecap="round"
           filter="url(#lineGlow)"
-          opacity="0.7"/>
+          opacity="0.95"/>
 
-    <!-- Arrowhead -->
-    <path d="M 634 397 L 658 411 L 634 425"
-          fill="none" stroke="#FF5033" stroke-width="5"
+    <!-- Arrowhead: clean bright triangle -->
+    <path d="M 626 391 L 654 407 L 626 423"
+          fill="none" stroke="#FF5033" stroke-width="6.5"
           stroke-linecap="round" stroke-linejoin="round"
           filter="url(#lineGlow)"/>
 
-    <!-- Traveling dot (accent) -->
-    <circle cx="524" cy="411" r="13" fill="#FF5033" filter="url(#dotGlow)"/>
-    <circle cx="524" cy="411" r="22" fill="none" stroke="#FF5033" stroke-width="2.5" stroke-opacity="0.3"/>
+    <!-- Traveling dot: white center + orange halo -->
+    <circle cx="518" cy="407" r="20" fill="#FF5033" filter="url(#orangeGlow)" opacity="0.85"/>
+    <circle cx="518" cy="407" r="10" fill="#FFFFFF"/>
+    <circle cx="518" cy="407" r="28" fill="none" stroke="#FF5033" stroke-width="2" stroke-opacity="0.35"/>
 
     <!-- ── Stand ── -->
-    <rect x="492" y="678" width="40" height="58" rx="8"
-          fill="url(#bezelGrad)" stroke="#2A3A52" stroke-width="3"/>
+    <rect x="492" y="682" width="40" height="56" rx="9"
+          fill="#0A1220" stroke="#5A6880" stroke-width="3"/>
     <!-- Base -->
-    <rect x="340" y="730" width="344" height="40" rx="20"
-          fill="url(#bezelGrad)" stroke="#2A3A52" stroke-width="3"/>
-
-    <!-- Orange accent line on base -->
-    <rect x="474" y="762" width="76" height="4" rx="2" fill="#FF5033" fill-opacity="0.7"/>
+    <rect x="344" y="732" width="336" height="38" rx="19"
+          fill="#0A1220" stroke="#5A6880" stroke-width="3"/>
+    <!-- Orange accent line on base: clearly visible -->
+    <rect x="472" y="763" width="80" height="5" rx="2.5" fill="#FF5033" fill-opacity="0.9"/>
 
   </g>
 </svg>

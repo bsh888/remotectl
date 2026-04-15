@@ -149,6 +149,17 @@ function ConnectionDiagram() {
   )
 }
 
+// ── Responsive hook ────────────────────────────────────────────────────────────
+function useIsMobile(breakpoint = 640) {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < breakpoint)
+  useEffect(() => {
+    const fn = () => setIsMobile(window.innerWidth < breakpoint)
+    window.addEventListener('resize', fn)
+    return () => window.removeEventListener('resize', fn)
+  }, [breakpoint])
+  return isMobile
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 export default function LandingPage() {
   const navigate = useNavigate()
@@ -156,7 +167,10 @@ export default function LandingPage() {
   const [version, setVersion] = useState('')
   const [scrolled, setScrolled] = useState(false)
   const [showLang, setShowLang] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const langRef = useRef<HTMLDivElement>(null)
+  const isMobile = useIsMobile()
+  const px = isMobile ? '16px' : '28px'
 
   useEffect(() => {
     fetch('/api/version').then(r => r.json()).then((d: VersionInfo) => setVersion(d.version || '')).catch(() => {})
@@ -185,15 +199,15 @@ export default function LandingPage() {
 
       <nav style={{
         position: 'fixed', top:0, left:0, right:0, zIndex:100,
-        height: 56,
-        borderBottom: `1px solid ${scrolled ? V.border2 : 'transparent'}`,
-        background: scrolled ? 'rgba(7,10,15,0.92)' : 'transparent',
-        backdropFilter: scrolled ? 'blur(16px)' : 'none',
+        borderBottom: `1px solid ${scrolled || menuOpen ? V.border2 : 'transparent'}`,
+        background: scrolled || menuOpen ? 'rgba(7,10,15,0.96)' : 'transparent',
+        backdropFilter: scrolled || menuOpen ? 'blur(16px)' : 'none',
         transition: 'all 0.25s',
-        display: 'flex', alignItems: 'center',
       }}>
+        {/* Main nav row */}
         <div style={{
-          maxWidth:1200, margin:'0 auto', padding:'0 28px',
+          height: 56,
+          maxWidth:1200, margin:'0 auto', padding:`0 ${px}`,
           width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between',
         }}>
           {/* Logo */}
@@ -214,82 +228,157 @@ export default function LandingPage() {
             </span>
           </div>
 
-          {/* Links */}
-          <div style={{display:'flex', alignItems:'center', gap:4}}>
+          {/* Desktop links */}
+          {!isMobile && (
+            <div style={{display:'flex', alignItems:'center', gap:4}}>
+              {[
+                ['#features', t('nav_features')],
+                ['#download', t('nav_download')],
+              ].map(([href, label]) => (
+                <a key={href} href={href} style={{
+                  color:V.text2, textDecoration:'none', fontSize:13,
+                  padding:'6px 14px', borderRadius:3,
+                  transition:'color 0.15s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.color = V.text1)}
+                onMouseLeave={e => (e.currentTarget.style.color = V.text2)}
+                >{label}</a>
+              ))}
+
+              <button onClick={() => navigate('/admin')} style={{
+                background:'transparent', border:`1px solid ${V.border2}`,
+                color:V.text2, borderRadius:3, padding:'5px 14px', fontSize:13,
+                cursor:'pointer', transition:'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor=V.border3; e.currentTarget.style.color=V.text1 }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor=V.border2; e.currentTarget.style.color=V.text2 }}
+              >{t('nav_admin')}</button>
+
+              {/* Language switcher */}
+              <div ref={langRef} style={{position:'relative', marginLeft:4}}>
+                <button onClick={() => setShowLang(v => !v)} style={{
+                  background:'transparent', border:`1px solid ${V.border2}`,
+                  color:V.text3, borderRadius:3, padding:'5px 10px', fontSize:12,
+                  cursor:'pointer', fontFamily:V.mono, letterSpacing:'0.04em',
+                  transition:'all 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color=V.text2; e.currentTarget.style.borderColor=V.border3 }}
+                onMouseLeave={e => { e.currentTarget.style.color=V.text3; e.currentTarget.style.borderColor=V.border2 }}
+                >
+                  {lang.toUpperCase().replace('_','/')}
+                </button>
+                {showLang && (
+                  <div style={{
+                    position:'absolute', top:'calc(100% + 6px)', right:0,
+                    background:V.surface, border:`1px solid ${V.border2}`,
+                    borderRadius:4, overflow:'hidden', minWidth:130, zIndex:200,
+                    boxShadow:'0 8px 24px rgba(0,0,0,0.4)',
+                  }}>
+                    {(['zh','en','zh_TW'] as Lang[]).map(l => (
+                      <button key={l} onClick={() => { setLang(l); setShowLang(false) }} style={{
+                        padding:'9px 16px', fontSize:13, cursor:'pointer',
+                        color: l === lang ? V.accent : V.text2,
+                        fontWeight: l === lang ? 600 : 400,
+                        background: l === lang ? V.accentDim : 'transparent',
+                        border:'none', width:'100%', textAlign:'left',
+                        fontFamily: V.sans,
+                        transition:'background 0.1s',
+                      }}
+                      onMouseEnter={e => { if (l !== lang) e.currentTarget.style.background = V.surface2 }}
+                      onMouseLeave={e => { if (l !== lang) e.currentTarget.style.background = 'transparent' }}
+                      >{LANG_NAMES[l]}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* CTA */}
+              <button onClick={() => navigate('/control')} style={{
+                marginLeft:8,
+                background:V.accent, border:'none', borderRadius:3,
+                color:'white', padding:'7px 18px', fontSize:13, fontWeight:600,
+                cursor:'pointer', transition:'opacity 0.15s',
+                letterSpacing:'-0.01em',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = '0.88')}
+              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+              >{t('nav_connect')}</button>
+            </div>
+          )}
+
+          {/* Mobile right: lang + connect + hamburger */}
+          {isMobile && (
+            <div style={{display:'flex', alignItems:'center', gap:8}}>
+              {/* Language switcher */}
+              <div ref={langRef} style={{position:'relative'}}>
+                <button onClick={() => setShowLang(v => !v)} style={{
+                  background:'transparent', border:`1px solid ${V.border2}`,
+                  color:V.text3, borderRadius:3, padding:'5px 8px', fontSize:11,
+                  cursor:'pointer', fontFamily:V.mono, letterSpacing:'0.04em',
+                }}>
+                  {lang.toUpperCase().replace('_','/')}
+                </button>
+                {showLang && (
+                  <div style={{
+                    position:'absolute', top:'calc(100% + 6px)', right:0,
+                    background:V.surface, border:`1px solid ${V.border2}`,
+                    borderRadius:4, overflow:'hidden', minWidth:130, zIndex:200,
+                    boxShadow:'0 8px 24px rgba(0,0,0,0.4)',
+                  }}>
+                    {(['zh','en','zh_TW'] as Lang[]).map(l => (
+                      <button key={l} onClick={() => { setLang(l); setShowLang(false) }} style={{
+                        padding:'9px 16px', fontSize:13, cursor:'pointer',
+                        color: l === lang ? V.accent : V.text2,
+                        fontWeight: l === lang ? 600 : 400,
+                        background: l === lang ? V.accentDim : 'transparent',
+                        border:'none', width:'100%', textAlign:'left',
+                        fontFamily: V.sans,
+                      }}>{LANG_NAMES[l]}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <button onClick={() => navigate('/control')} style={{
+                background:V.accent, border:'none', borderRadius:3,
+                color:'white', padding:'6px 14px', fontSize:12, fontWeight:600,
+                cursor:'pointer', letterSpacing:'-0.01em',
+              }}>{t('nav_connect')}</button>
+
+              {/* Hamburger */}
+              <button onClick={() => setMenuOpen(v => !v)} style={{
+                background:'transparent', border:`1px solid ${V.border2}`,
+                color:V.text2, borderRadius:3, padding:'6px 8px',
+                cursor:'pointer', lineHeight:1, fontSize:16,
+              }}>
+                {menuOpen ? '✕' : '☰'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Mobile dropdown menu */}
+        {isMobile && menuOpen && (
+          <div style={{
+            borderTop:`1px solid ${V.border2}`,
+            padding:'8px 0 12px',
+          }}>
             {[
               ['#features', t('nav_features')],
               ['#download', t('nav_download')],
             ].map(([href, label]) => (
-              <a key={href} href={href} style={{
-                color:V.text2, textDecoration:'none', fontSize:13,
-                padding:'6px 14px', borderRadius:3,
-                transition:'color 0.15s',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.color = V.text1)}
-              onMouseLeave={e => (e.currentTarget.style.color = V.text2)}
-              >{label}</a>
+              <a key={href} href={href} onClick={() => setMenuOpen(false)} style={{
+                display:'block', padding:'12px 16px',
+                color:V.text2, textDecoration:'none', fontSize:14,
+              }}>{label}</a>
             ))}
-
-            <button onClick={() => navigate('/admin')} style={{
-              background:'transparent', border:`1px solid ${V.border2}`,
-              color:V.text2, borderRadius:3, padding:'5px 14px', fontSize:13,
-              cursor:'pointer', transition:'all 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor=V.border3; e.currentTarget.style.color=V.text1 }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor=V.border2; e.currentTarget.style.color=V.text2 }}
-            >{t('nav_admin')}</button>
-
-            {/* Language switcher */}
-            <div ref={langRef} style={{position:'relative', marginLeft:4}}>
-              <button onClick={() => setShowLang(v => !v)} style={{
-                background:'transparent', border:`1px solid ${V.border2}`,
-                color:V.text3, borderRadius:3, padding:'5px 10px', fontSize:12,
-                cursor:'pointer', fontFamily:V.mono, letterSpacing:'0.04em',
-                transition:'all 0.15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.color=V.text2; e.currentTarget.style.borderColor=V.border3 }}
-              onMouseLeave={e => { e.currentTarget.style.color=V.text3; e.currentTarget.style.borderColor=V.border2 }}
-              >
-                {lang.toUpperCase().replace('_','/')}
-              </button>
-              {showLang && (
-                <div style={{
-                  position:'absolute', top:'calc(100% + 6px)', right:0,
-                  background:V.surface, border:`1px solid ${V.border2}`,
-                  borderRadius:4, overflow:'hidden', minWidth:130, zIndex:200,
-                  boxShadow:'0 8px 24px rgba(0,0,0,0.4)',
-                }}>
-                  {(['zh','en','zh_TW'] as Lang[]).map(l => (
-                    <button key={l} onClick={() => { setLang(l); setShowLang(false) }} style={{
-                      padding:'9px 16px', fontSize:13, cursor:'pointer',
-                      color: l === lang ? V.accent : V.text2,
-                      fontWeight: l === lang ? 600 : 400,
-                      background: l === lang ? V.accentDim : 'transparent',
-                      border:'none', width:'100%', textAlign:'left',
-                      fontFamily: V.sans,
-                      transition:'background 0.1s',
-                    }}
-                    onMouseEnter={e => { if (l !== lang) e.currentTarget.style.background = V.surface2 }}
-                    onMouseLeave={e => { if (l !== lang) e.currentTarget.style.background = 'transparent' }}
-                    >{LANG_NAMES[l]}</button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* CTA */}
-            <button onClick={() => navigate('/control')} style={{
-              marginLeft:8,
-              background:V.accent, border:'none', borderRadius:3,
-              color:'white', padding:'7px 18px', fontSize:13, fontWeight:600,
-              cursor:'pointer', transition:'opacity 0.15s',
-              letterSpacing:'-0.01em',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.opacity = '0.88')}
-            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-            >{t('nav_connect')}</button>
+            <button onClick={() => { navigate('/admin'); setMenuOpen(false) }} style={{
+              display:'block', width:'100%', textAlign:'left',
+              padding:'12px 16px', background:'transparent', border:'none',
+              color:V.text2, fontSize:14, cursor:'pointer',
+            }}>{t('nav_admin')}</button>
           </div>
-        </div>
+        )}
       </nav>
 
       {/* ── Hero ─────────────────────────────────────────────────────────────── */}
@@ -314,13 +403,15 @@ export default function LandingPage() {
         }}/>
 
         <div style={{
-          maxWidth:1200, margin:'0 auto', padding:'120px 28px 80px',
+          maxWidth:1200, margin:'0 auto',
+          padding: isMobile ? '96px 16px 64px' : '120px 28px 80px',
           width:'100%', position:'relative', zIndex:1,
-          display:'flex', alignItems:'center', justifyContent:'space-between',
+          display:'flex', alignItems:'center',
+          justifyContent: isMobile ? 'center' : 'space-between',
           gap:48, flexWrap:'wrap',
         }}>
           {/* Text block */}
-          <div style={{ maxWidth:560 }}>
+          <div style={{ maxWidth: isMobile ? '100%' : 560 }}>
             {/* Tag */}
             <div style={{
               display:'inline-flex', alignItems:'center', gap:8,
@@ -338,7 +429,7 @@ export default function LandingPage() {
             {/* Title */}
             <h1 style={{
               fontFamily: V.display,
-              fontSize: 'clamp(48px,7vw,76px)',
+              fontSize: isMobile ? 'clamp(44px,14vw,72px)' : 'clamp(48px,7vw,76px)',
               fontWeight: 800,
               lineHeight: 1.05,
               letterSpacing: '-0.035em',
@@ -354,7 +445,8 @@ export default function LandingPage() {
 
             {/* Subtitle */}
             <p style={{
-              fontSize:16, color:V.text2, lineHeight:1.75, marginBottom:40,
+              fontSize: isMobile ? 15 : 16,
+              color:V.text2, lineHeight:1.75, marginBottom:40,
               maxWidth:440,
               animation:'rc-fade-up 0.5s 0.3s both',
             }}>
@@ -368,7 +460,10 @@ export default function LandingPage() {
             }}>
               <button onClick={() => navigate('/control')} style={{
                 background:V.accent, border:'none', borderRadius:3,
-                color:'white', padding:'13px 28px', fontSize:15, fontWeight:600,
+                color:'white',
+                padding: isMobile ? '11px 22px' : '13px 28px',
+                fontSize: isMobile ? 14 : 15,
+                fontWeight:600,
                 cursor:'pointer', letterSpacing:'-0.01em',
                 transition:'opacity 0.15s, transform 0.15s',
               }}
@@ -378,7 +473,9 @@ export default function LandingPage() {
 
               <a href="#download" style={{
                 background:'transparent', border:`1px solid ${V.border2}`,
-                borderRadius:3, color:V.text1, padding:'13px 28px', fontSize:15,
+                borderRadius:3, color:V.text1,
+                padding: isMobile ? '11px 22px' : '13px 28px',
+                fontSize: isMobile ? 14 : 15,
                 fontWeight:500, textDecoration:'none', cursor:'pointer',
                 transition:'border-color 0.15s',
               }}
@@ -389,7 +486,7 @@ export default function LandingPage() {
 
             {/* Stats row */}
             <div style={{
-              display:'flex', gap:32, marginTop:48,
+              display:'flex', gap: isMobile ? 20 : 32, marginTop:48,
               paddingTop:32, borderTop:`1px solid ${V.border}`,
               animation:'rc-fade-up 0.5s 0.5s both',
             }}>
@@ -406,32 +503,36 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Diagram */}
-          <div style={{animation:'rc-fade-in 0.8s 0.5s both'}}>
-            <ConnectionDiagram />
-          </div>
+          {/* Diagram — hidden on mobile to avoid overflow */}
+          {!isMobile && (
+            <div style={{animation:'rc-fade-in 0.8s 0.5s both'}}>
+              <ConnectionDiagram />
+            </div>
+          )}
         </div>
       </section>
 
       {/* ── Features ───────────────────────────────────────────────────────── */}
       <section id="features" style={{
-        maxWidth:1200, margin:'0 auto', padding:'80px 28px',
+        maxWidth:1200, margin:'0 auto', padding:`80px ${px}`,
       }}>
         {/* Section header */}
         <div style={{display:'flex', alignItems:'baseline', gap:16, marginBottom:48}}>
           <h2 style={{
-            fontFamily:V.display, fontSize:32, fontWeight:800,
+            fontFamily:V.display, fontSize: isMobile ? 26 : 32, fontWeight:800,
             letterSpacing:'-0.03em', color:V.text1,
           }}>{t('nav_features')}</h2>
           <div style={{flex:1, height:1, background:V.border}}/>
-          <span style={{fontFamily:V.mono, fontSize:10, color:V.text3, letterSpacing:'0.1em'}}>
-            06 MODULES
-          </span>
+          {!isMobile && (
+            <span style={{fontFamily:V.mono, fontSize:10, color:V.text3, letterSpacing:'0.1em'}}>
+              06 MODULES
+            </span>
+          )}
         </div>
 
         <div style={{
           display:'grid',
-          gridTemplateColumns:'repeat(auto-fill, minmax(340px, 1fr))',
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(340px, 1fr))',
           gap:1,
           background:V.border2,
           border:`1px solid ${V.border2}`,
@@ -441,7 +542,7 @@ export default function LandingPage() {
           {features.map(f => (
             <div key={f.num} style={{
               background:V.surface,
-              padding:'28px 28px 28px 24px',
+              padding: isMobile ? '20px 16px' : '28px 28px 28px 24px',
               transition:'background 0.15s',
               position:'relative',
             }}
@@ -464,11 +565,11 @@ export default function LandingPage() {
 
       {/* ── Downloads ──────────────────────────────────────────────────────── */}
       <section id="download" style={{
-        maxWidth:1200, margin:'0 auto', padding:'0 28px 80px',
+        maxWidth:1200, margin:'0 auto', padding:`0 ${px} 80px`,
       }}>
         <div style={{display:'flex', alignItems:'baseline', gap:16, marginBottom:48}}>
           <h2 style={{
-            fontFamily:V.display, fontSize:32, fontWeight:800,
+            fontFamily:V.display, fontSize: isMobile ? 26 : 32, fontWeight:800,
             letterSpacing:'-0.03em',
           }}>{t('dl_title')}</h2>
           <div style={{flex:1, height:1, background:V.border}}/>
@@ -477,6 +578,7 @@ export default function LandingPage() {
               fontFamily:V.mono, fontSize:10, color:V.green,
               letterSpacing:'0.1em', padding:'3px 8px',
               border:`1px solid ${V.greenDim}`, borderRadius:2,
+              whiteSpace:'nowrap',
             }}>{version}</span>
           )}
         </div>
@@ -486,16 +588,17 @@ export default function LandingPage() {
         }}>
           {/* Table header */}
           <div style={{
-            display:'grid', gridTemplateColumns:'1fr 2fr auto',
-            padding:'10px 24px',
+            display:'grid',
+            gridTemplateColumns: isMobile ? '1fr auto' : '1fr 2fr auto',
+            padding: isMobile ? '10px 16px' : '10px 24px',
             background:V.surface,
             borderBottom:`1px solid ${V.border2}`,
           }}>
-            {[t('platform'), t('file'), ''].map((h, i) => (
+            {(isMobile ? [t('platform'), ''] : [t('platform'), t('file'), '']).map((h, i) => (
               <div key={i} style={{
                 fontFamily:V.mono, fontSize:10, color:V.text3,
                 letterSpacing:'0.1em',
-                textAlign: i === 2 ? 'right' as const : 'left' as const,
+                textAlign: (isMobile ? i === 1 : i === 2) ? 'right' as const : 'left' as const,
               }}>{h}</div>
             ))}
           </div>
@@ -503,8 +606,10 @@ export default function LandingPage() {
           {/* Platform rows */}
           {platforms.map((p, i) => (
             <div key={p.nameKey} style={{
-              display:'grid', gridTemplateColumns:'1fr 2fr auto',
-              padding:'16px 24px', alignItems:'center',
+              display:'grid',
+              gridTemplateColumns: isMobile ? '1fr auto' : '1fr 2fr auto',
+              padding: isMobile ? '14px 16px' : '16px 24px',
+              alignItems:'center',
               borderBottom: i < platforms.length - 1 ? `1px solid ${V.border}` : 'none',
               background: V.bg,
               transition:'background 0.12s',
@@ -516,14 +621,18 @@ export default function LandingPage() {
                 <span style={{color:V.text2}}>{p.icon}</span>
                 {t(p.nameKey)}
               </div>
-              <div style={{fontFamily:V.mono, fontSize:11, color:V.text3, letterSpacing:'0.04em'}}>
-                {p.label}-{version || 'vX.Y.Z'}.{p.ext}
-              </div>
+              {/* Filename — hidden on mobile */}
+              {!isMobile && (
+                <div style={{fontFamily:V.mono, fontSize:11, color:V.text3, letterSpacing:'0.04em'}}>
+                  {p.label}-{version || 'vX.Y.Z'}.{p.ext}
+                </div>
+              )}
               <a href={dlUrl(p)} target="_blank" rel="noopener noreferrer" style={{
                 fontFamily:V.mono, fontSize:11, color:V.accent, textDecoration:'none',
-                border:`1px solid ${V.accentBdr}`, borderRadius:2, padding:'5px 14px',
+                border:`1px solid ${V.accentBdr}`, borderRadius:2,
+                padding: isMobile ? '5px 10px' : '5px 14px',
                 letterSpacing:'0.06em', transition:'all 0.15s',
-                display:'inline-block',
+                display:'inline-block', whiteSpace:'nowrap',
               }}
               onMouseEnter={e => { e.currentTarget.style.background=V.accentDim }}
               onMouseLeave={e => { e.currentTarget.style.background='transparent' }}
@@ -547,7 +656,7 @@ export default function LandingPage() {
       {/* ── Footer ─────────────────────────────────────────────────────────── */}
       <footer style={{
         borderTop:`1px solid ${V.border}`,
-        padding:'28px',
+        padding: isMobile ? '20px 16px' : '28px',
         display:'flex', alignItems:'center', justifyContent:'space-between',
         flexWrap:'wrap', gap:12,
       }}>

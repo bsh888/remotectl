@@ -3,6 +3,7 @@
 package main
 
 import (
+	"strconv"
 	"strings"
 
 	"golang.org/x/sys/windows/registry"
@@ -27,5 +28,14 @@ func osVersion() string {
 	if err != nil || productName == "" {
 		return "Windows"
 	}
-	return strings.TrimPrefix(productName, "Microsoft ")
+	name := strings.TrimPrefix(productName, "Microsoft ")
+
+	// Windows 11 keeps ProductName as "Windows 10 ..." for compatibility.
+	// Check CurrentBuildNumber: builds ≥ 22000 are Windows 11.
+	if buildStr, _, err2 := k.GetStringValue("CurrentBuildNumber"); err2 == nil {
+		if build, err3 := strconv.Atoi(buildStr); err3 == nil && build >= 22000 {
+			name = strings.Replace(name, "Windows 10", "Windows 11", 1)
+		}
+	}
+	return name
 }

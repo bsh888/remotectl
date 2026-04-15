@@ -9,12 +9,15 @@ class MainFlutterWindow: NSWindow {
 
     self.minSize = NSSize(width: 480, height: 600)
 
-    // Start at 80 % of the visible screen area, capped at 1200 × 800.
-    // This prevents the window from being larger than smaller Mac screens
-    // (e.g. 13-inch MacBook at 1280 × 800 logical points).
+    // Open at a sensible default size (never fullscreen).
+    // Clamp to 90 % of the visible screen so the window fits on small Macs.
     let screen = NSScreen.main ?? NSScreen.screens.first!
     let vis = screen.visibleFrame
-    self.setFrame(vis, display: true)
+    let w = min(1100.0, vis.width  * 0.9)
+    let h = min(760.0,  vis.height * 0.9)
+    let x = vis.minX + (vis.width  - w) / 2
+    let y = vis.minY + (vis.height - h) / 2
+    self.setFrame(NSRect(x: x, y: y, width: w, height: h), display: true)
 
     super.awakeFromNib()
   }

@@ -223,6 +223,11 @@ type Agent struct {
 	chatDCs  map[string]*webrtc.DataChannel
 	chatMu   sync.RWMutex
 
+	// pipelineKickC is signalled when a viewer DataChannel opens, so encodePump
+	// can abort its retry sleep and attempt pipeline start immediately (e.g.
+	// after the remote operator wakes a sleeping display via a keypress).
+	pipelineKickC chan struct{}
+
 	// In-flight inbound file transfers (chat)
 	fileRx   map[string]*chatFileReceiver
 	fileRxMu sync.Mutex
@@ -471,6 +476,16 @@ func (a *Agent) startRTC(viewerID string) {
 	if err != nil {
 		log.Printf("CreateDataChannel(input) for %s: %v", viewerID, err)
 	} else {
+		dc.OnOpen(func() {
+			// Kick encodePump to retry immediately — handles the case where the
+			// screen was sleeping when the viewer connected: viewer sends a key to
+			// wake the display, and we want video to start as soon as possible
+			// rather than waiting up to 30 s for the next scheduled retry.
+			select {
+			case a.pipelineKickC <- struct{}{}:
+			default:
+			}
+		})
 		dc.OnMessage(func(msg webrtc.DataChannelMessage) { a.handleDCMessage(msg) })
 	}
 
@@ -1222,6 +1237,8 @@ func (a *Agent) encodePump(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-time.After(delay):
+			case <-a.pipelineKickC:
+				log.Printf("pipeline: viewer connected, retrying now")
 			}
 			delay = min(delay*2, maxDelay)
 			continue
@@ -1256,6 +1273,8 @@ func (a *Agent) encodePump(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-time.After(delay):
+		case <-a.pipelineKickC:
+			log.Printf("pipeline: viewer connected, retrying now")
 		}
 	}
 }
@@ -1375,8 +1394,9 @@ func main() {
 		videoTrack: videoTrack,
 		rtcPeers:   make(map[string]*webrtc.PeerConnection),
 		pendingIce: make(map[string][]webrtc.ICECandidateInit),
-		chatDCs:    make(map[string]*webrtc.DataChannel),
-		fileRx:     make(map[string]*chatFileReceiver),
+		chatDCs:       make(map[string]*webrtc.DataChannel),
+		fileRx:        make(map[string]*chatFileReceiver),
+		pipelineKickC: make(chan struct{}, 1),
 	}
 
 	// Forward CHAT_SEND: commands from Flutter hosted screen to viewer DataChannels.

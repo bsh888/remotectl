@@ -30,16 +30,22 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [toolbarVisible, setToolbarVisible] = useState(true)
 
+  // Only resets the auto-hide countdown — does NOT show the toolbar.
+  // Separating show from timer-reset means clicking ▲ permanently hides
+  // the toolbar; mouse movement can't bring it back (only ▼ can).
   const resetHideTimer = useCallback(() => {
     if (!isMobile) {
       if (hideTimerRef.current) clearTimeout(hideTimerRef.current)
-      setToolbarVisible(true)
       hideTimerRef.current = setTimeout(() => setToolbarVisible(false), 3000)
     }
   }, [])
 
   useEffect(() => {
-    if (!isMobile) resetHideTimer()
+    if (!isMobile) {
+      // Show toolbar initially, then start the auto-hide countdown.
+      setToolbarVisible(true)
+      resetHideTimer()
+    }
     return () => { if (hideTimerRef.current) clearTimeout(hideTimerRef.current) }
   }, [resetHideTimer])
 
