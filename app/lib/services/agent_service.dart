@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'hosted_chat_service.dart';
 
@@ -51,6 +52,16 @@ class AgentConfig {
 }
 
 enum AgentStatus { stopped, starting, running, error }
+
+// MethodChannel used to tell AppDelegate whether the agent is running,
+// so the macOS close button can show a confirmation dialog.
+const _windowChannel = MethodChannel('remotectl/window');
+
+void _notifyWindowAgentRunning(bool running) {
+  if (!kIsWeb && Platform.isMacOS) {
+    _windowChannel.invokeMethod('setAgentRunning', running).catchError((_) {});
+  }
+}
 
 class AgentService extends ChangeNotifier {
   AgentStatus _status = AgentStatus.stopped;
@@ -124,6 +135,7 @@ class AgentService extends ChangeNotifier {
 
       _process = await Process.start(binary, args);
       _status = AgentStatus.running;
+      _notifyWindowAgentRunning(true);
       _chatSvc.setSendCallback((json) {
         _process?.stdin.writeln('CHAT_SEND:$json');
       });
@@ -144,6 +156,7 @@ class AgentService extends ChangeNotifier {
           _status = code == 0 ? AgentStatus.stopped : AgentStatus.error;
           _error = code == 0 ? '' : 'Agent 退出 (exit $code)';
           _process = null;
+          _notifyWindowAgentRunning(false);
           notifyListeners();
         }
       });
@@ -159,6 +172,7 @@ class AgentService extends ChangeNotifier {
     _status = AgentStatus.stopped;
     _error = '';
     _sessionPwd = '';
+    _notifyWindowAgentRunning(false);
     _chatSvc.setConnected(false);
     // On Windows, SIGTERM maps to a console event that may not reliably
     // terminate the subprocess; use SIGKILL (TerminateProcess) instead.

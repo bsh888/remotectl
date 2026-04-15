@@ -381,6 +381,7 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, onVie
       <div style={{
         ...styles.toolbar,
         transform: toolbarVisible ? 'none' : 'translateY(-100%)',
+        pointerEvents: toolbarVisible ? undefined : 'none',
         transition: 'transform 0.2s ease',
       }}>
         <span style={styles.toolbarLabel}>🖥 {deviceName}</span>

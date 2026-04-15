@@ -1336,7 +1336,6 @@ func (a *Agent) drainPipeline(ctx context.Context, frames <-chan pipeline.Frame,
 			return true
 		case <-a.pipelineRestartC:
 			log.Printf("pipeline: viewport changed, restarting at new scale")
-			pipeline.Stop()
 			return true
 		case <-watchdog.C:
 			log.Printf("pipeline: no frame for %s — assuming capture died, restarting", noFrameTimeout)

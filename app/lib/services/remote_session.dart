@@ -247,8 +247,17 @@ class RemoteSession extends ChangeNotifier {
             if (_inputDCOpen) {
               final vp = _pendingViewport;
               if (vp != null) {
-                channel.send(RTCDataChannelMessage(
-                    jsonEncode({'event': 'viewport', 'vw': vp['w'], 'vh': vp['h']})));
+                // Defer send to next microtask to avoid calling native code
+                // from within a native state-change callback (can deadlock on
+                // some flutter_webrtc versions, especially on Windows).
+                Future.microtask(() {
+                  if (_inputDCOpen && _inputDC != null) {
+                    try {
+                      _inputDC!.send(RTCDataChannelMessage(
+                          jsonEncode({'event': 'viewport', 'vw': vp['w'], 'vh': vp['h']})));
+                    } catch (_) {}
+                  }
+                });
               }
             }
           };
