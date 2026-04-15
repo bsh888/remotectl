@@ -1,9 +1,14 @@
 import Cocoa
 import FlutterMacOS
 
-// Global flag updated by Flutter via MethodChannel when the agent starts/stops.
-// Read by MainFlutterWindow.performClose to decide whether to show a dialog.
-var agentIsRunning = false
+// Updated by Flutter via MethodChannel when the agent starts/stops (or locale changes).
+// Read by MainFlutterWindow.performClose to decide whether to show a dialog and
+// which localized strings to display.
+var agentIsRunning      = false
+var closeDialogTitle    = "退出确认"
+var closeDialogMessage  = "当前正在共享屏幕，退出后远程连接将断开。"
+var closeDialogQuit     = "停止共享并退出"
+var closeDialogCancel   = "取消"
 
 @main
 class AppDelegate: FlutterAppDelegate {
@@ -11,14 +16,21 @@ class AppDelegate: FlutterAppDelegate {
   override func applicationDidFinishLaunching(_ notification: Notification) {
     super.applicationDidFinishLaunching(notification)
 
-    // Register the MethodChannel so Flutter can update agentIsRunning.
+    // Register the MethodChannel so Flutter can update agentIsRunning and
+    // the localized dialog strings whenever the agent starts/stops or the
+    // user switches language.
     if let vc = mainFlutterWindow?.contentViewController as? FlutterViewController {
       FlutterMethodChannel(
         name: "remotectl/window",
         binaryMessenger: vc.engine.binaryMessenger
       ).setMethodCallHandler { call, result in
-        if call.method == "setAgentRunning" {
-          agentIsRunning = call.arguments as? Bool ?? false
+        if call.method == "setAgentRunning",
+           let args = call.arguments as? [String: Any] {
+          agentIsRunning     = args["running"] as? Bool   ?? agentIsRunning
+          closeDialogTitle   = args["title"]   as? String ?? closeDialogTitle
+          closeDialogMessage = args["message"] as? String ?? closeDialogMessage
+          closeDialogQuit    = args["quit"]    as? String ?? closeDialogQuit
+          closeDialogCancel  = args["cancel"]  as? String ?? closeDialogCancel
           result(nil)
         } else {
           result(FlutterMethodNotImplemented)

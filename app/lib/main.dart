@@ -155,6 +155,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               onPressed: () {
                 Navigator.pop(ctx);
                 saveLocale(item.$1);
+                _agentService.syncWindowLocale();
               },
               child: Row(
                 children: [

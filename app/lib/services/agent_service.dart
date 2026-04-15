@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'hosted_chat_service.dart';
+import '../l10n.dart';
 
 class AgentConfig {
   String server;
@@ -59,7 +60,14 @@ const _windowChannel = MethodChannel('remotectl/window');
 
 void _notifyWindowAgentRunning(bool running) {
   if (!kIsWeb && Platform.isMacOS) {
-    _windowChannel.invokeMethod('setAgentRunning', running).catchError((_) {});
+    final l = AppLocalizations(localeNotifier.value);
+    _windowChannel.invokeMethod('setAgentRunning', {
+      'running': running,
+      'title':   l.exitConfirmTitle,
+      'message': l.exitConfirmContent,
+      'quit':    l.exitConfirm,
+      'cancel':  l.exitCancel,
+    }).catchError((_) {});
   }
 }
 
@@ -182,6 +190,10 @@ class AgentService extends ChangeNotifier {
     _process = null;
     if (prev != AgentStatus.stopped) notifyListeners();
   }
+
+  /// Re-sends the current running state + freshly-localised dialog strings to
+  /// AppDelegate. Call this after the user switches the app language.
+  void syncWindowLocale() => _notifyWindowAgentRunning(isRunning);
 
   void clearLogs() {
     _logs.clear();

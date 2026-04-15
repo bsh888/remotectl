@@ -32,10 +32,10 @@ class MainFlutterWindow: NSWindow {
     }
 
     let alert = NSAlert()
-    alert.messageText     = "停止共享"
-    alert.informativeText = "Agent 正在运行，退出将停止屏幕共享。确定要退出吗？"
-    alert.addButton(withTitle: "退出")
-    alert.addButton(withTitle: "取消")
+    alert.messageText     = closeDialogTitle
+    alert.informativeText = closeDialogMessage
+    alert.addButton(withTitle: closeDialogQuit)
+    alert.addButton(withTitle: closeDialogCancel)
     alert.alertStyle = .warning
 
     let response = alert.runModal()
