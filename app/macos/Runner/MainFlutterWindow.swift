@@ -21,4 +21,27 @@ class MainFlutterWindow: NSWindow {
 
     super.awakeFromNib()
   }
+
+  // Intercept the red ✕ close button (and Cmd+W) before the window disappears.
+  // Overriding performClose: is more reliable than NSWindowDelegate.windowShouldClose:
+  // because it fires synchronously on user action regardless of who the delegate is.
+  override func performClose(_ sender: Any?) {
+    guard agentIsRunning else {
+      super.performClose(sender)
+      return
+    }
+
+    let alert = NSAlert()
+    alert.messageText     = "停止共享"
+    alert.informativeText = "Agent 正在运行，退出将停止屏幕共享。确定要退出吗？"
+    alert.addButton(withTitle: "退出")
+    alert.addButton(withTitle: "取消")
+    alert.alertStyle = .warning
+
+    let response = alert.runModal()
+    if response == .alertFirstButtonReturn {
+      super.performClose(sender)
+    }
+    // else: user cancelled — window stays open, do nothing
+  }
 }
