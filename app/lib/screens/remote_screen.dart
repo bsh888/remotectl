@@ -43,7 +43,6 @@ class _RemoteScreenState extends State<RemoteScreen> {
   final _kbController = TextEditingController(text: '\u200b'); // zero-width space sentinel
   String _prevKbText = '\u200b';
   bool _kbVisible = false;
-  bool _kbExpanded = false;
 
   // Desktop hardware keyboard capture (Windows/macOS/Linux viewer)
   // HardwareKeyboard.addHandler works without focus — reliable for remote desktop.
@@ -222,7 +221,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
     if (_kbVisible || _toolbarVisible) {
       _kbFocus.unfocus();
       _hideTimer?.cancel();
-      setState(() { _kbVisible = false; _kbExpanded = false; _mods.clear(); _toolbarVisible = false; });
+      setState(() { _kbVisible = false; _mods.clear(); _toolbarVisible = false; });
     }
     Offset sum = Offset.zero;
     for (final f in fingers) sum += f;
@@ -255,25 +254,15 @@ class _RemoteScreenState extends State<RemoteScreen> {
 
   void _toggleKeyboard() {
     if (_kbVisible) {
-      if (!_isDesktopViewer) _kbFocus.unfocus();
-      setState(() { _kbVisible = false; _kbExpanded = false; _mods.clear(); });
+      // Hide panel → restore system keyboard so user can type freely
+      if (!_isDesktopViewer) _kbFocus.requestFocus();
+      setState(() { _kbVisible = false; _mods.clear(); });
       if (!_isDesktopViewer) _resetHideTimer();
     } else {
-      setState(() { _kbVisible = true; _kbExpanded = false; });
-      if (!_isDesktopViewer) {
-        _kbFocus.requestFocus();
-        _hideTimer?.cancel();
-      }
-    }
-  }
-
-  void _toggleKbExpand() {
-    if (_kbExpanded) {
-      setState(() => _kbExpanded = false);
-      if (!_isDesktopViewer) _kbFocus.requestFocus();
-    } else {
-      setState(() => _kbExpanded = true);
+      // Show full panel → dismiss system keyboard (our grid covers digits/special keys)
       if (!_isDesktopViewer) _kbFocus.unfocus();
+      setState(() => _kbVisible = true);
+      _hideTimer?.cancel();
     }
   }
 
@@ -669,12 +658,12 @@ class _RemoteScreenState extends State<RemoteScreen> {
       ),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         _buildQuickRow(),
-        if (_kbExpanded) _buildExpandedRows(),
+        _buildExpandedRows(),
       ]),
     );
   }
 
-  // Quick row: Esc Tab Ctrl Alt Cmd / | ~ -  +  expand-toggle
+  // Quick row: Esc Tab Ctrl Alt Cmd / | ~ -  (9 equal keys, no expand toggle)
   Widget _buildQuickRow() {
     Widget k(String label, VoidCallback onTap, {bool active = false}) =>
         Expanded(child: _KbKey(label: label, active: active, onTap: onTap));
@@ -699,15 +688,6 @@ class _RemoteScreenState extends State<RemoteScreen> {
         k('~',    () => _sendSpecialKey('~', 'Backquote')),
         const SizedBox(width: 3),
         k('-',    () => _sendSpecialKey('-', 'Minus')),
-        const SizedBox(width: 3),
-        // Expand/collapse toggle
-        _KbKey(
-          icon: _kbExpanded
-              ? Icons.keyboard_arrow_down_rounded
-              : Icons.keyboard_arrow_up_rounded,
-          fixedWidth: 36,
-          onTap: _toggleKbExpand,
-        ),
       ]),
     );
   }
@@ -953,14 +933,12 @@ class _KbKey extends StatelessWidget {
   final String? label;
   final IconData? icon;
   final bool active;
-  final double? fixedWidth;
   final VoidCallback onTap;
 
   const _KbKey({
     this.label,
     this.icon,
     this.active = false,
-    this.fixedWidth,
     required this.onTap,
   }) : assert(label != null || icon != null, 'label or icon required');
 
@@ -989,7 +967,6 @@ class _KbKey extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 100),
-        width: fixedWidth,
         height: 36,
         alignment: Alignment.center,
         decoration: BoxDecoration(
