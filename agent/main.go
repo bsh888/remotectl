@@ -1288,12 +1288,21 @@ func (a *Agent) encodePump(ctx context.Context) {
 			}
 		}()
 
-		stopped := a.drainPipeline(ctx, frames, pipeline.Done())
+		stopped, viewportRestart := a.drainPipeline(ctx, frames, pipeline.Done())
 		diagCancel()
 		pipeline.Stop()
 
 		if !stopped {
 			return // ctx cancelled — clean exit
+		}
+
+		if viewportRestart {
+			// Intentional restart due to viewer viewport change — restart
+			// immediately with no backoff so the video stream resumes without
+			// a visible pause on the viewer side.
+			delay = baseDelay
+			log.Printf("pipeline: viewport restart, restarting immediately")
+			continue
 		}
 
 		runFor := time.Since(startedAt)
@@ -1316,13 +1325,15 @@ func (a *Agent) encodePump(ctx context.Context) {
 }
 
 // drainPipeline reads frames until the pipeline stops or ctx is cancelled.
-// Returns true if the pipeline stopped on its own (restart warranted),
-// false if ctx was cancelled.
+// Returns (stopped, viewportRestart):
+//   - stopped=false → ctx cancelled, caller should exit
+//   - stopped=true, viewportRestart=true  → viewer sent a new viewport; restart immediately
+//   - stopped=true, viewportRestart=false → pipeline died/watchdog; restart with backoff
 //
 // A watchdog timer fires if no frame arrives within 5 s — this catches the
 // Windows case where the GDI capture thread dies silently without closing the
 // frame channel or the Done() channel.
-func (a *Agent) drainPipeline(ctx context.Context, frames <-chan pipeline.Frame, done <-chan struct{}) bool {
+func (a *Agent) drainPipeline(ctx context.Context, frames <-chan pipeline.Frame, done <-chan struct{}) (bool, bool) {
 	const noFrameTimeout = 5 * time.Second
 	watchdog := time.NewTimer(noFrameTimeout)
 	defer watchdog.Stop()
@@ -1331,18 +1342,18 @@ func (a *Agent) drainPipeline(ctx context.Context, frames <-chan pipeline.Frame,
 	for {
 		select {
 		case <-ctx.Done():
-			return false
+			return false, false
 		case <-done:
-			return true
+			return true, false
 		case <-a.pipelineRestartC:
 			log.Printf("pipeline: viewport changed, restarting at new scale")
-			return true
+			return true, true
 		case <-watchdog.C:
 			log.Printf("pipeline: no frame for %s — assuming capture died, restarting", noFrameTimeout)
-			return true
+			return true, false
 		case f, ok := <-frames:
 			if !ok {
-				return true
+				return true, false
 			}
 			// Reset watchdog each time a frame arrives.
 			if !watchdog.Stop() {
