@@ -14,7 +14,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"math"
 	"math/big"
 	"net/url"
 	"os"
@@ -228,10 +227,6 @@ type Agent struct {
 	// can abort its retry sleep and attempt pipeline start immediately (e.g.
 	// after the remote operator wakes a sleeping display via a keypress).
 	pipelineKickC chan struct{}
-
-	// pipelineRestartC is signalled when the viewer sends a viewport resize, so
-	// encodePump stops the running pipeline and restarts at the new scale.
-	pipelineRestartC chan struct{}
 
 	// In-flight inbound file transfers (chat)
 	fileRx   map[string]*chatFileReceiver
@@ -570,38 +565,11 @@ func (a *Agent) handleDCMessage(msg webrtc.DataChannelMessage) {
 	if json.Unmarshal(msg.Data, &ev) != nil {
 		return
 	}
-	if ev.Event == "viewport" {
-		if ev.ViewportW > 0 && ev.ViewportH > 0 {
-			a.updateScaleFromViewport(ev.ViewportW, ev.ViewportH)
-		}
-		return
-	}
 	if a.scale > 0 && a.scale != 1.0 {
 		ev.X /= a.scale
 		ev.Y /= a.scale
 	}
 	input.Handle(ev)
-}
-
-// updateScaleFromViewport recomputes the capture scale so that the output
-// resolution matches the viewer's physical window size as closely as possible.
-// Restarts the pipeline if the scale changes by more than 5%.
-func (a *Agent) updateScaleFromViewport(viewerW, viewerH int) {
-	nW, nH := pipeline.NativeSize()
-	if nW <= 0 || nH <= 0 {
-		return
-	}
-	newScale := math.Min(float64(viewerW)/float64(nW), float64(viewerH)/float64(nH))
-	newScale = math.Max(0.25, math.Min(1.0, newScale))
-	if math.Abs(newScale-a.scale)/a.scale > 0.05 {
-		log.Printf("viewport %dx%d → native %dx%d → scale %.3f (was %.3f)",
-			viewerW, viewerH, nW, nH, newScale, a.scale)
-		a.scale = newScale
-		select {
-		case a.pipelineRestartC <- struct{}{}:
-		default:
-		}
-	}
 }
 
 // handleChatDCMessage processes an incoming chat DataChannel message from a viewer.
@@ -1286,8 +1254,6 @@ func (a *Agent) encodePump(ctx context.Context) {
 			case <-time.After(delay):
 			case <-a.pipelineKickC:
 				log.Printf("pipeline: viewer connected, retrying now")
-			case <-a.pipelineRestartC:
-				log.Printf("pipeline: viewport changed, retrying now")
 			}
 			delay = min(delay*2, maxDelay)
 			continue
@@ -1303,21 +1269,12 @@ func (a *Agent) encodePump(ctx context.Context) {
 			}
 		}()
 
-		stopped, viewportRestart := a.drainPipeline(ctx, frames, pipeline.Done())
+		stopped := a.drainPipeline(ctx, frames, pipeline.Done())
 		diagCancel()
 		pipeline.Stop()
 
 		if !stopped {
 			return // ctx cancelled — clean exit
-		}
-
-		if viewportRestart {
-			// Intentional restart due to viewer viewport change — restart
-			// immediately with no backoff so the video stream resumes without
-			// a visible pause on the viewer side.
-			delay = baseDelay
-			log.Printf("pipeline: viewport restart, restarting immediately")
-			continue
 		}
 
 		runFor := time.Since(startedAt)
@@ -1333,22 +1290,18 @@ func (a *Agent) encodePump(ctx context.Context) {
 		case <-time.After(delay):
 		case <-a.pipelineKickC:
 			log.Printf("pipeline: viewer connected, retrying now")
-		case <-a.pipelineRestartC:
-			log.Printf("pipeline: viewport changed, retrying now")
 		}
 	}
 }
 
 // drainPipeline reads frames until the pipeline stops or ctx is cancelled.
-// Returns (stopped, viewportRestart):
-//   - stopped=false → ctx cancelled, caller should exit
-//   - stopped=true, viewportRestart=true  → viewer sent a new viewport; restart immediately
-//   - stopped=true, viewportRestart=false → pipeline died/watchdog; restart with backoff
+// Returns true if the pipeline stopped on its own (restart warranted),
+// false if ctx was cancelled.
 //
 // A watchdog timer fires if no frame arrives within 5 s — this catches the
 // Windows case where the GDI capture thread dies silently without closing the
 // frame channel or the Done() channel.
-func (a *Agent) drainPipeline(ctx context.Context, frames <-chan pipeline.Frame, done <-chan struct{}) (bool, bool) {
+func (a *Agent) drainPipeline(ctx context.Context, frames <-chan pipeline.Frame, done <-chan struct{}) bool {
 	const noFrameTimeout = 5 * time.Second
 	watchdog := time.NewTimer(noFrameTimeout)
 	defer watchdog.Stop()
@@ -1357,18 +1310,15 @@ func (a *Agent) drainPipeline(ctx context.Context, frames <-chan pipeline.Frame,
 	for {
 		select {
 		case <-ctx.Done():
-			return false, false
+			return false
 		case <-done:
-			return true, false
-		case <-a.pipelineRestartC:
-			log.Printf("pipeline: viewport changed, restarting at new scale")
-			return true, true
+			return true
 		case <-watchdog.C:
 			log.Printf("pipeline: no frame for %s — assuming capture died, restarting", noFrameTimeout)
-			return true, false
+			return true
 		case f, ok := <-frames:
 			if !ok {
-				return true, false
+				return true
 			}
 			// Reset watchdog each time a frame arrives.
 			if !watchdog.Stop() {
@@ -1461,8 +1411,7 @@ func main() {
 		pendingIce: make(map[string][]webrtc.ICECandidateInit),
 		chatDCs:       make(map[string]*webrtc.DataChannel),
 		fileRx:        make(map[string]*chatFileReceiver),
-		pipelineKickC:    make(chan struct{}, 1),
-		pipelineRestartC: make(chan struct{}, 1),
+		pipelineKickC: make(chan struct{}, 1),
 	}
 
 	// Forward CHAT_SEND: commands from Flutter hosted screen to viewer DataChannels.

@@ -521,11 +521,6 @@ class _RemoteScreenState extends State<RemoteScreen> {
         top: topOffset, bottom: 0,
         child: LayoutBuilder(builder: (context, constraints) {
           final widgetSize = Size(constraints.maxWidth, constraints.maxHeight);
-          // Notify agent of render area so it can adapt capture resolution.
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            final dpr = MediaQuery.of(context).devicePixelRatio;
-            widget.session.sendViewport(widgetSize.width, widgetSize.height, dpr);
-          });
           final vW = renderer.videoWidth.toDouble();
           final vH = renderer.videoHeight.toDouble();
 

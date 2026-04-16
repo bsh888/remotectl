@@ -4,7 +4,7 @@ package input
 
 // Event is the wire format sent by the viewer client.
 type Event struct {
-	Event  string   `json:"event"`  // mousemove|mousedown|mouseup|click|dblclick|scroll|keydown|keyup|paste_text|viewport
+	Event  string   `json:"event"`  // mousemove|mousedown|mouseup|click|dblclick|scroll|keydown|keyup|paste_text
 	X      float64  `json:"x,omitempty"`
 	Y      float64  `json:"y,omitempty"`
 	Button int      `json:"button,omitempty"` // 0=left 1=middle 2=right
@@ -14,10 +14,6 @@ type Event struct {
 	DeltaX float64  `json:"dx,omitempty"`
 	DeltaY float64  `json:"dy,omitempty"`
 	Text   string   `json:"text,omitempty"` // paste_text: unicode string to type
-	// viewport: physical pixel dimensions of the viewer's render area.
-	// Agent uses these to compute the optimal capture scale.
-	ViewportW int `json:"vw,omitempty"`
-	ViewportH int `json:"vh,omitempty"`
 }
 
 // Handle dispatches an input event to the OS-level injector.

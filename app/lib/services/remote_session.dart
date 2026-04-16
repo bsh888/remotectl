@@ -112,36 +112,6 @@ class RemoteSession extends ChangeNotifier {
 
   // ── sendInput ─────────────────────────────────────────────────────────────────
 
-  // sendViewport tells the agent the physical pixel dimensions of the viewer's
-  // render area so it can adapt the capture resolution for pixel-perfect output.
-  void sendViewport(double cssW, double cssH, double devicePixelRatio) {
-    final pw = (cssW * devicePixelRatio).round();
-    final ph = (cssH * devicePixelRatio).round();
-    if (pw <= 0 || ph <= 0) return;
-    _pendingViewport = {'w': pw, 'h': ph};
-    if (_inputDCOpen && _inputDC != null) {
-      _inputDC!.send(RTCDataChannelMessage(
-          jsonEncode({'event': 'viewport', 'vw': pw, 'vh': ph})));
-    }
-  }
-
-  Map<String, int>? _pendingViewport;
-
-  // Sends _pendingViewport over the input DC.  Deferred via Future.microtask
-  // to avoid calling native send from within a native callback (deadlock risk).
-  void _flushPendingViewport() {
-    final vp = _pendingViewport;
-    if (vp == null) return;
-    Future.microtask(() {
-      if (_inputDCOpen && _inputDC != null) {
-        try {
-          _inputDC!.send(RTCDataChannelMessage(
-              jsonEncode({'event': 'viewport', 'vw': vp['w'], 'vh': vp['h']})));
-        } catch (_) {}
-      }
-    });
-  }
-
   Future<void> sendInput(Map<String, dynamic> ev) async {
     final event = ev['event'] as String?;
     // mousemove goes through the unreliable channel — stale positions are
@@ -257,14 +227,8 @@ class RemoteSession extends ChangeNotifier {
           // flutter_webrtc updates channel.state asynchronously — track open
           // state explicitly via the state callback instead of reading .state.
           _inputDCOpen = channel.state == RTCDataChannelState.RTCDataChannelOpen;
-          // If the DC arrived already open (connection was established before
-          // onDataChannel fired), flush any viewport that sendViewport stored
-          // while the DC wasn't ready yet.  Without this, the onDataChannelState
-          // callback never fires "open" again and the viewport is never sent.
-          if (_inputDCOpen) _flushPendingViewport();
           channel.onDataChannelState = (state) {
             _inputDCOpen = state == RTCDataChannelState.RTCDataChannelOpen;
-            if (_inputDCOpen) _flushPendingViewport();
           };
         } else if (channel.label == 'input-move') {
           _inputMoveDC = channel;

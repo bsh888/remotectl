@@ -36,7 +36,6 @@ export default function ControlPage() {
         videoStream={session.videoStream}
         onInput={session.sendInput}
         onDisconnect={session.disconnect}
-        onViewport={session.sendViewport}
         deviceName={connectedDevice}
         remotePlatform=''
       />

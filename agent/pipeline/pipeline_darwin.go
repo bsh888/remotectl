@@ -15,7 +15,6 @@ void rc_pipeline_stop(void);
 int  rc_check_screen_recording(void);
 void rc_get_diag(int *stream_frames, int *vt_calls, int *vt_callbacks, int *last_status);
 void rc_pipeline_request_keyframe(void);
-void rc_native_size(int *w, int *h);
 // goStreamStopped is declared here so the .m file can call it via extern
 extern void goStreamStopped(void);
 */
@@ -84,14 +83,6 @@ func Stop() {
 // Call this when an RTCP PLI or FIR is received from a viewer.
 func RequestKeyframe() {
 	C.rc_pipeline_request_keyframe()
-}
-
-// NativeSize returns the physical pixel dimensions of the main display.
-// Used to compute the optimal capture scale for a given viewer window size.
-func NativeSize() (int, int) {
-	var w, h C.int
-	C.rc_native_size(&w, &h)
-	return int(w), int(h)
 }
 
 // LogDiag prints internal pipeline counters — call after ~5 s to diagnose zero-frame issues.

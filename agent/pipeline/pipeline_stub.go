@@ -21,6 +21,3 @@ func Done() <-chan struct{} { return make(chan struct{}) }
 
 // RequestKeyframe is a no-op on unsupported platforms.
 func RequestKeyframe() {}
-
-// NativeSize returns 0,0 on unsupported platforms.
-func NativeSize() (int, int) { return 0, 0 }
