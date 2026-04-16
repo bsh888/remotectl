@@ -2,6 +2,9 @@ import Cocoa
 import FlutterMacOS
 
 class MainFlutterWindow: NSWindow {
+
+  private var channel: FlutterMethodChannel?
+
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
     self.contentViewController = flutterViewController
@@ -19,29 +22,28 @@ class MainFlutterWindow: NSWindow {
     let y = vis.minY + (vis.height - h) / 2
     self.setFrame(NSRect(x: x, y: y, width: w, height: h), display: true)
 
+    // Set up MethodChannel.  Flutter calls "confirmClose" when the user
+    // confirms the exit dialog; we then actually close the window.
+    channel = FlutterMethodChannel(
+      name: "remotectl/window",
+      binaryMessenger: flutterViewController.engine.binaryMessenger)
+    channel?.setMethodCallHandler { [weak self] call, result in
+      if call.method == "confirmClose" {
+        result(nil)
+        self?.close()
+      } else {
+        result(FlutterMethodNotImplemented)
+      }
+    }
+
     super.awakeFromNib()
   }
 
-  // Intercept the red ✕ close button (and Cmd+W) before the window disappears.
-  // Overriding performClose: is more reliable than NSWindowDelegate.windowShouldClose:
-  // because it fires synchronously on user action regardless of who the delegate is.
+  // Intercept the red ✕ close button (and Cmd+W).
+  // Instead of closing immediately, ask Flutter to handle the confirmation.
+  // Flutter will call back "confirmClose" if the user agrees.
   override func performClose(_ sender: Any?) {
-    guard agentIsRunning else {
-      super.performClose(sender)
-      return
-    }
-
-    let alert = NSAlert()
-    alert.messageText     = closeDialogTitle
-    alert.informativeText = closeDialogMessage
-    alert.addButton(withTitle: closeDialogQuit)
-    alert.addButton(withTitle: closeDialogCancel)
-    alert.alertStyle = .warning
-
-    let response = alert.runModal()
-    if response == .alertFirstButtonReturn {
-      super.performClose(sender)
-    }
-    // else: user cancelled — window stays open, do nothing
+    channel?.invokeMethod("windowCloseRequested", arguments: nil)
+    // Do NOT call super — Flutter decides whether to close.
   }
 }

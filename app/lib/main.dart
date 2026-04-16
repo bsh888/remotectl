@@ -1,10 +1,15 @@
+import 'dart:io';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'l10n.dart';
 import 'screens/connect_screen.dart';
 import 'screens/hosted_screen.dart';
 import 'services/agent_service.dart';
+
+// MethodChannel shared with MainFlutterWindow.swift on macOS.
+const _windowChannel = MethodChannel('remotectl/window');
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -83,6 +88,54 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _lifecycleListener = AppLifecycleListener(
       onExitRequested: _onExitRequested,
     );
+    // macOS: MainFlutterWindow.performClose sends "windowCloseRequested"
+    // instead of closing immediately. We show the dialog here (where we have
+    // full context + localization), then call back "confirmClose" to let Swift
+    // actually close the window.
+    if (!kIsWeb && Platform.isMacOS) {
+      _windowChannel.setMethodCallHandler(_onWindowMethodCall);
+    }
+  }
+
+  Future<dynamic> _onWindowMethodCall(MethodCall call) async {
+    if (call.method == 'windowCloseRequested') {
+      if (!_agentService.isRunning) {
+        _windowChannel.invokeMethod('confirmClose');
+        return;
+      }
+      if (!mounted) {
+        await _agentService.stop();
+        _windowChannel.invokeMethod('confirmClose');
+        return;
+      }
+      final l = AppLocalizations.of(context);
+      final confirmed = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: Text(l.exitConfirmTitle),
+          content: Text(l.exitConfirmContent),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l.exitCancel),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.red.shade700,
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l.exitConfirm),
+            ),
+          ],
+        ),
+      );
+      if (confirmed == true) {
+        await _agentService.stop();
+        _windowChannel.invokeMethod('confirmClose');
+      }
+      // else: user cancelled — do nothing, window stays open
+    }
   }
 
   Future<AppExitResponse> _onExitRequested() async {
@@ -155,7 +208,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               onPressed: () {
                 Navigator.pop(ctx);
                 saveLocale(item.$1);
-                _agentService.syncWindowLocale();
               },
               child: Row(
                 children: [
