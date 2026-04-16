@@ -99,80 +99,55 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<dynamic> _onWindowMethodCall(MethodCall call) async {
     if (call.method == 'windowCloseRequested') {
-      if (!_agentService.isRunning) {
-        _windowChannel.invokeMethod('confirmClose');
-        return;
-      }
       if (!mounted) {
         await _agentService.stop();
         _windowChannel.invokeMethod('confirmClose');
         return;
       }
-      final l = AppLocalizations.of(context);
-      final confirmed = await showDialog<bool>(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          title: Text(l.exitConfirmTitle),
-          content: Text(l.exitConfirmContent),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(l.exitCancel),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: Colors.red.shade700,
-              ),
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(l.exitConfirm),
-            ),
-          ],
-        ),
-      );
+      final confirmed = await _showQuitDialog();
       if (confirmed == true) {
         await _agentService.stop();
         _windowChannel.invokeMethod('confirmClose');
       }
-      // else: user cancelled — do nothing, window stays open
+      // else: user cancelled — window stays open
     }
   }
 
   Future<AppExitResponse> _onExitRequested() async {
-    if (!_agentService.isRunning) return AppExitResponse.exit;
     if (!mounted) {
       await _agentService.stop();
       return AppExitResponse.exit;
     }
+    final confirmed = await _showQuitDialog();
+    if (confirmed == true) {
+      await _agentService.stop();
+      return AppExitResponse.exit;
+    }
+    return AppExitResponse.cancel;
+  }
 
+  Future<bool?> _showQuitDialog() {
     final l = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
+    final agentRunning = _agentService.isRunning;
+    return showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         title: Text(l.exitConfirmTitle),
-        content: Text(l.exitConfirmContent),
+        content: Text(agentRunning ? l.exitConfirmContent : l.exitConfirmContentIdle),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
             child: Text(l.exitCancel),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red.shade700,
-            ),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
             onPressed: () => Navigator.pop(ctx, true),
-            child: Text(l.exitConfirm),
+            child: Text(agentRunning ? l.exitConfirm : l.exitConfirmIdle),
           ),
         ],
       ),
     );
-
-    if (confirmed == true) {
-      await _agentService.stop();
-      return AppExitResponse.exit;
-    }
-    return AppExitResponse.cancel;
   }
 
   @override

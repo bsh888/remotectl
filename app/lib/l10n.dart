@@ -100,6 +100,8 @@ class AppLocalizations {
           '目前正在共享螢幕，退出後遠程連線將斷開。');
   String get exitCancel => _s('取消', 'Cancel', '取消');
   String get exitConfirm => _s('停止共享并退出', 'Stop & Exit', '停止共享並退出');
+  String get exitConfirmContentIdle => _s('确定要退出程序吗？', 'Are you sure you want to quit?', '確定要退出程式嗎？');
+  String get exitConfirmIdle => _s('退出', 'Quit', '退出');
 
   // ── connect_screen.dart ──────────────────────────────────────────────────────
   String get connectSubtitle => _s('远程桌面控制', 'Remote Desktop', '遠程桌面控制');
