@@ -139,12 +139,12 @@ class _ConnectScreenState extends State<ConnectScreen> {
               ? RemoteScreenDesktop(
                   session: _session,
                   deviceName: _lastDevice,
-                  remotePlatform: '',
+                  remotePlatform: _session.remotePlatform,
                 )
               : RemoteScreen(
                   session: _session,
                   deviceName: _lastDevice,
-                  remotePlatform: '',
+                  remotePlatform: _session.remotePlatform,
                 ),
         ),
       );

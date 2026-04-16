@@ -14,11 +14,13 @@ enum SessionState { idle, connecting, connected, error }
 class RemoteSession extends ChangeNotifier {
   SessionState _state = SessionState.idle;
   String _error = '';
+  String _remotePlatform = '';
   RTCVideoRenderer? _renderer;
   final ChatService _chat = ChatService();
 
   SessionState get state => _state;
   String get error => _error;
+  String get remotePlatform => _remotePlatform;
   RTCVideoRenderer? get renderer => _renderer;
   ChatService get chat => _chat;
 
@@ -100,6 +102,7 @@ class RemoteSession extends ChangeNotifier {
     _ws?.sink.close();
     _ws = null;
     _iceServers = [{'urls': 'stun:stun.l.google.com:19302'}];
+    _remotePlatform = '';
     _chat.detach();
     final r = _renderer;
     _renderer = null;
@@ -157,6 +160,9 @@ class RemoteSession extends ChangeNotifier {
         if (rawICE != null && rawICE.isNotEmpty) {
           _iceServers = rawICE.cast<Map<String, dynamic>>();
         }
+        // Store remote platform so the UI can adapt (e.g. Cmd vs ⊞)
+        final p = payload?['platform'] as String?;
+        if (p != null && p.isNotEmpty) _remotePlatform = p;
         break;
       case 'key_offer':
         await _handleKeyOffer(payload!);
