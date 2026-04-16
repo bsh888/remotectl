@@ -19,6 +19,7 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
   const cursorRef   = useRef<HTMLDivElement>(null)
   const kbInputRef    = useRef<HTMLInputElement>(null)
   const [showKb, setShowKb] = useState(false)
+  const [showDisconnectDlg, setShowDisconnectDlg] = useState(false)
 
   const defaultSwap = !isLocalMac && (remotePlatform === 'darwin' || remotePlatform === '')
   const [swapCtrlCmd, setSwapCtrlCmd] = useState(defaultSwap)
@@ -388,7 +389,7 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
           )}
           <button style={styles.toolBtn} onClick={() => setToolbarVisible(false)}
             title="Hide toolbar">▲</button>
-          <button style={styles.disconnectBtn} onClick={onDisconnect}>{t('disconnect')}</button>
+          <button style={styles.disconnectBtn} onClick={() => setShowDisconnectDlg(true)}>{t('disconnect')}</button>
         </div>
       </div>
 
@@ -492,6 +493,24 @@ export default function RemoteScreen({ videoStream, onInput, onDisconnect, devic
 
       {/* ── mobile gesture hint ── */}
       {isMobile && videoStream && <MobileHint />}
+
+      {/* ── disconnect confirmation dialog ── */}
+      {showDisconnectDlg && (
+        <div style={styles.dlgOverlay} onClick={() => setShowDisconnectDlg(false)}>
+          <div style={styles.dlgBox} onClick={e => e.stopPropagation()}>
+            <div style={styles.dlgTitle}>{t('disconnect')}</div>
+            <div style={styles.dlgBody}>{t('disconnect_confirm')}</div>
+            <div style={styles.dlgActions}>
+              <button style={styles.dlgCancel} onClick={() => setShowDisconnectDlg(false)}>
+                {t('cancel')}
+              </button>
+              <button style={styles.dlgConfirm} onClick={onDisconnect}>
+                {t('disconnect')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -614,7 +633,35 @@ const styles: Record<string, React.CSSProperties> = {
   hintBox: {
     background: 'rgba(7,10,15,0.85)', color: 'var(--text-2)',
     border: '1px solid var(--border-2)', borderRadius: 10,
-    padding: '10px 18px', fontSize: 13, lineHeight: 1.8, textAlign: 'center',
+    padding: '10px 18px', fontSize: 13, lineHeight: 1.8, textAlign: 'center' as const,
     backdropFilter: 'blur(8px)',
+  },
+  dlgOverlay: {
+    position: 'absolute' as const, inset: 0, zIndex: 100,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)',
+  },
+  dlgBox: {
+    background: 'var(--surface)', border: '1px solid var(--border-2)',
+    borderRadius: 12, padding: '20px 24px', minWidth: 260, maxWidth: 340,
+  },
+  dlgTitle: {
+    fontSize: 15, fontWeight: 600, color: 'var(--text-1)', marginBottom: 8,
+  },
+  dlgBody: {
+    fontSize: 13, color: 'var(--text-2)', marginBottom: 20, lineHeight: 1.5,
+  },
+  dlgActions: {
+    display: 'flex', justifyContent: 'flex-end', gap: 8,
+  },
+  dlgCancel: {
+    background: 'var(--surface-2)', color: 'var(--text-2)',
+    border: '1px solid var(--border-2)', borderRadius: 6,
+    padding: '5px 14px', fontSize: 13, cursor: 'pointer',
+  },
+  dlgConfirm: {
+    background: 'var(--accent-dim)', color: 'var(--accent)',
+    border: '1px solid var(--accent-bdr)', borderRadius: 6,
+    padding: '5px 14px', fontSize: 13, cursor: 'pointer', fontWeight: 600,
   },
 }
