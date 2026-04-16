@@ -43,6 +43,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
   final _kbController = TextEditingController(text: '\u200b'); // zero-width space sentinel
   String _prevKbText = '\u200b';
   bool _kbVisible = false;
+  bool _kbExpanded = false;
 
   // Desktop hardware keyboard capture (Windows/macOS/Linux viewer)
   // HardwareKeyboard.addHandler works without focus — reliable for remote desktop.
@@ -221,7 +222,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
     if (_kbVisible || _toolbarVisible) {
       _kbFocus.unfocus();
       _hideTimer?.cancel();
-      setState(() { _kbVisible = false; _mods.clear(); _toolbarVisible = false; });
+      setState(() { _kbVisible = false; _kbExpanded = false; _mods.clear(); _toolbarVisible = false; });
     }
     Offset sum = Offset.zero;
     for (final f in fingers) sum += f;
@@ -255,16 +256,41 @@ class _RemoteScreenState extends State<RemoteScreen> {
   void _toggleKeyboard() {
     if (_kbVisible) {
       if (!_isDesktopViewer) _kbFocus.unfocus();
-      setState(() { _kbVisible = false; _mods.clear(); });
+      setState(() { _kbVisible = false; _kbExpanded = false; _mods.clear(); });
       if (!_isDesktopViewer) _resetHideTimer();
     } else {
-      setState(() => _kbVisible = true);
+      setState(() { _kbVisible = true; _kbExpanded = false; });
       if (!_isDesktopViewer) {
-        // Must call requestFocus synchronously within the tap handler for iOS.
         _kbFocus.requestFocus();
         _hideTimer?.cancel();
       }
     }
+  }
+
+  void _toggleKbExpand() {
+    if (_kbExpanded) {
+      setState(() => _kbExpanded = false);
+      if (!_isDesktopViewer) _kbFocus.requestFocus();
+    } else {
+      setState(() => _kbExpanded = true);
+      if (!_isDesktopViewer) _kbFocus.unfocus();
+    }
+  }
+
+  void _sendCtrlKey(String char) {
+    final String key, code;
+    if (RegExp(r'^[a-zA-Z]$').hasMatch(char)) {
+      key = char.toUpperCase();
+      code = 'Key${char.toUpperCase()}';
+    } else if (char == '[') {
+      key = '[';
+      code = 'BracketLeft';
+    } else {
+      key = char;
+      code = char;
+    }
+    widget.session.sendInput({'event': 'keydown', 'key': key, 'code': code, 'mods': ['ctrl']});
+    widget.session.sendInput({'event': 'keyup',   'key': key, 'code': code, 'mods': ['ctrl']});
   }
 
   void _toggleModifier(String mod) {
@@ -602,7 +628,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
         right: 0,
         bottom: _toolbarVisible ? mq.viewInsets.bottom : -200,
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          if (_kbVisible) _buildModifierRow(),
+          if (_kbVisible) _buildKbPanel(),
           _buildToolbar(),
         ]),
       ),
@@ -633,124 +659,158 @@ class _RemoteScreenState extends State<RemoteScreen> {
     ]);
   }
 
-  Widget _buildModifierRow() {
-    Widget sep() => Container(
-      width: 1, height: 24,
-      margin: const EdgeInsets.symmetric(horizontal: 6),
-      color: Colors.white24,
-    );
+  // ── Termius-style keyboard panel ───────────────────────────────────────────
+
+  Widget _buildKbPanel() {
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.9),
-        border: const Border(top: BorderSide(color: Colors.white12)),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0D1117),
+        border: Border(top: BorderSide(color: Color(0xFF30363D))),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(children: [
-          // ── sticky modifiers ──
-          _ModKey(label: 'Ctrl',  active: _mods.contains('ctrl'),  onTap: () => _toggleModifier('ctrl')),
-          _ModKey(label: 'Shift', active: _mods.contains('shift'), onTap: () => _toggleModifier('shift')),
-          _ModKey(label: 'Alt',   active: _mods.contains('alt'),   onTap: () => _toggleModifier('alt')),
-          _ModKey(label: 'Cmd',   active: _mods.contains('meta'),  onTap: () => _toggleModifier('meta')),
-          sep(),
-          // ── digits — placed early so Ctrl+B+number needs no scrolling ──
-          for (final d in ['1','2','3','4','5','6','7','8','9','0'])
-            _ModKey(label: d, small: true, onTap: () => _sendSpecialKey(d, 'Digit$d')),
-          sep(),
-          // ── editing ──
-          _ModKey(label: 'Tab',   onTap: () => _sendSpecialKey('Tab',    'Tab')),
-          _ModKey(label: 'Esc',   onTap: () => _sendSpecialKey('Escape', 'Escape')),
-          _ModKey(label: 'Del',   onTap: () => _sendSpecialKey('Delete', 'Delete')),
-          _ModKey(label: '`',     onTap: () => _sendSpecialKey('`',      'Backquote')),
-          _ModKey(label: 'Space', onTap: () => _sendSpecialKey(' ',      'Space')),
-          sep(),
-          // ── arrow keys ──
-          _ModKey(label: '←', onTap: () => _sendSpecialKey('ArrowLeft',  'ArrowLeft')),
-          _ModKey(label: '↑', onTap: () => _sendSpecialKey('ArrowUp',    'ArrowUp')),
-          _ModKey(label: '↓', onTap: () => _sendSpecialKey('ArrowDown',  'ArrowDown')),
-          _ModKey(label: '→', onTap: () => _sendSpecialKey('ArrowRight', 'ArrowRight')),
-          sep(),
-          // ── navigation ──
-          _ModKey(label: 'Home',  onTap: () => _sendSpecialKey('Home',     'Home')),
-          _ModKey(label: 'End',   onTap: () => _sendSpecialKey('End',      'End')),
-          _ModKey(label: 'PgUp',  onTap: () => _sendSpecialKey('PageUp',  'PageUp')),
-          _ModKey(label: 'PgDn',  onTap: () => _sendSpecialKey('PageDown','PageDown')),
-          sep(),
-          // ── function keys ──
-          for (int i = 1; i <= 12; i++)
-            _ModKey(label: 'F$i', onTap: () => _sendSpecialKey('F$i', 'F$i')),
-          // ── Win key (Windows only) ──
-          if (widget.remotePlatform == 'windows') ...[
-            sep(),
-            _ModKey(label: '⊞', onTap: () => _sendSpecialKey('Meta', 'MetaLeft')),
-          ],
-        ]),
-      ),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        _buildQuickRow(),
+        if (_kbExpanded) _buildExpandedRows(),
+      ]),
     );
+  }
+
+  // Quick row: Esc Tab Ctrl Alt / | ~ -  +  expand-toggle
+  Widget _buildQuickRow() {
+    Widget k(String label, VoidCallback onTap, {bool active = false}) =>
+        Expanded(child: _KbKey(label: label, active: active, onTap: onTap));
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      child: Row(children: [
+        k('Esc',  () => _sendSpecialKey('Escape', 'Escape')),
+        const SizedBox(width: 3),
+        k('Tab',  () => _sendSpecialKey('Tab', 'Tab')),
+        const SizedBox(width: 3),
+        k('Ctrl', () => _toggleModifier('ctrl'),  active: _mods.contains('ctrl')),
+        const SizedBox(width: 3),
+        k('Alt',  () => _toggleModifier('alt'),   active: _mods.contains('alt')),
+        const SizedBox(width: 3),
+        k('/',    () => _sendSpecialKey('/', 'Slash')),
+        const SizedBox(width: 3),
+        k('|',    () => _sendSpecialKey('|', 'Backslash')),
+        const SizedBox(width: 3),
+        k('~',    () => _sendSpecialKey('~', 'Backquote')),
+        const SizedBox(width: 3),
+        k('-',    () => _sendSpecialKey('-', 'Minus')),
+        const SizedBox(width: 3),
+        // Expand/collapse toggle
+        _KbKey(
+          icon: _kbExpanded
+              ? Icons.keyboard_arrow_down_rounded
+              : Icons.keyboard_arrow_up_rounded,
+          fixedWidth: 40,
+          onTap: _toggleKbExpand,
+        ),
+      ]),
+    );
+  }
+
+  // Expanded rows: ctrl shortcuts, navigation, F keys
+  Widget _buildExpandedRows() {
+    // Build a fixed 8-column row
+    Widget row(List<_KbKey> keys) {
+      return Padding(
+        padding: const EdgeInsets.only(left: 4, right: 4, bottom: 4),
+        child: Row(
+          children: [
+            for (int i = 0; i < keys.length; i++) ...[
+              if (i > 0) const SizedBox(width: 3),
+              Expanded(child: keys[i]),
+            ],
+          ],
+        ),
+      );
+    }
+
+    return Column(mainAxisSize: MainAxisSize.min, children: [
+      const Divider(height: 1, color: Color(0xFF30363D)),
+      const SizedBox(height: 4),
+
+      // Row 1: Terminal Ctrl shortcuts
+      row([
+        _KbKey(label: '^C', onTap: () => _sendCtrlKey('c')),
+        _KbKey(label: '^Z', onTap: () => _sendCtrlKey('z')),
+        _KbKey(label: '^A', onTap: () => _sendCtrlKey('a')),
+        _KbKey(label: '^E', onTap: () => _sendCtrlKey('e')),
+        _KbKey(label: '^K', onTap: () => _sendCtrlKey('k')),
+        _KbKey(label: '^U', onTap: () => _sendCtrlKey('u')),
+        _KbKey(label: '^W', onTap: () => _sendCtrlKey('w')),
+        _KbKey(label: '^[', onTap: () => _sendCtrlKey('[')),
+      ]),
+
+      // Row 2: Navigation + arrows
+      row([
+        _KbKey(label: 'Home', onTap: () => _sendSpecialKey('Home',     'Home')),
+        _KbKey(label: 'End',  onTap: () => _sendSpecialKey('End',      'End')),
+        _KbKey(label: 'PgUp', onTap: () => _sendSpecialKey('PageUp',   'PageUp')),
+        _KbKey(label: 'PgDn', onTap: () => _sendSpecialKey('PageDown', 'PageDown')),
+        _KbKey(icon: Icons.arrow_back_rounded,    onTap: () => _sendSpecialKey('ArrowLeft',  'ArrowLeft')),
+        _KbKey(icon: Icons.arrow_forward_rounded, onTap: () => _sendSpecialKey('ArrowRight', 'ArrowRight')),
+        _KbKey(icon: Icons.arrow_upward_rounded,  onTap: () => _sendSpecialKey('ArrowUp',    'ArrowUp')),
+        _KbKey(icon: Icons.arrow_downward_rounded,onTap: () => _sendSpecialKey('ArrowDown',  'ArrowDown')),
+      ]),
+
+      // Row 3: F1–F8
+      row([
+        for (int i = 1; i <= 8; i++)
+          _KbKey(label: 'F$i', onTap: () => _sendSpecialKey('F$i', 'F$i')),
+      ]),
+
+      // Row 4: F9–F12 + Del + ` + Shift + Space
+      row([
+        for (int i = 9; i <= 12; i++)
+          _KbKey(label: 'F$i', onTap: () => _sendSpecialKey('F$i', 'F$i')),
+        _KbKey(label: 'Del',   onTap: () => _sendSpecialKey('Delete', 'Delete')),
+        _KbKey(label: '`',     onTap: () => _sendSpecialKey('`', 'Backquote')),
+        _KbKey(label: 'Shift', active: _mods.contains('shift'), onTap: () => _toggleModifier('shift')),
+        _KbKey(label: 'Spc',   onTap: () => _sendSpecialKey(' ', 'Space')),
+      ]),
+    ]);
   }
 
   Widget _buildToolbar() {
     final bottom = MediaQuery.of(context).padding.bottom;
     final name = widget.deviceName.isNotEmpty ? widget.deviceName : AppLocalizations.of(context).remoteDesktop;
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.75),
-        border: const Border(top: BorderSide(color: Colors.white12)),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0D1117),
+        border: Border(top: BorderSide(color: Color(0xFF30363D))),
       ),
-      padding: EdgeInsets.fromLTRB(8, 6, 8, bottom + 6),
+      padding: EdgeInsets.fromLTRB(12, 4, 6, bottom + 4),
       child: Row(children: [
-        // Device name
-        const SizedBox(width: 4),
-        const Icon(Icons.laptop_mac, color: Colors.white38, size: 16),
+        const Icon(Icons.laptop_mac, color: Colors.white30, size: 14),
         const SizedBox(width: 6),
         Expanded(
           child: Text(name,
-              style: const TextStyle(color: Colors.white54, fontSize: 13),
+              style: const TextStyle(color: Colors.white38, fontSize: 12),
               overflow: TextOverflow.ellipsis),
         ),
-        // Zoom reset (visible only when zoomed)
         if (_videoScale != 1.0)
-          _ToolbarBtn(
+          _ActionBtn(
             icon: Icons.zoom_out_map_rounded,
-            label: AppLocalizations.of(context).restore,
             active: true,
             onTap: () => setState(() { _videoScale = 1.0; _videoPan = Offset.zero; }),
           ),
-        // Keyboard toggle
-        _ToolbarBtn(
+        _ActionBtn(
           icon: _kbVisible ? Icons.keyboard_hide_rounded : Icons.keyboard_rounded,
-          label: AppLocalizations.of(context).keyboard,
           active: _kbVisible,
           onTap: _toggleKeyboard,
         ),
-        // Paste
-        _ToolbarBtn(
-          icon: Icons.content_paste_rounded,
-          label: AppLocalizations.of(context).paste,
-          onTap: _sendPaste,
-        ),
-        // Chat
-        _ChatToolbarBtn(
-          unread: widget.session.chat.unreadCount,
-          onTap: _openChat,
-        ),
-        // Hide toolbar
-        _ToolbarBtn(
+        _ActionBtn(icon: Icons.content_paste_rounded, onTap: _sendPaste),
+        _ChatActionBtn(unread: widget.session.chat.unreadCount, onTap: _openChat),
+        _ActionBtn(
           icon: Icons.keyboard_arrow_down_rounded,
-          label: AppLocalizations.of(context).hide,
           onTap: () {
             _hideTimer?.cancel();
             setState(() => _toolbarVisible = false);
           },
         ),
-        // Disconnect
-        _ToolbarBtn(
-          icon: Icons.close_rounded,
-          label: AppLocalizations.of(context).disconnect,
-          danger: true,
-          onTap: _disconnect,
-        ),
+        _ActionBtn(icon: Icons.close_rounded, danger: true, onTap: _disconnect),
       ]),
     );
   }
@@ -792,63 +852,16 @@ class _RemoteScreenState extends State<RemoteScreen> {
   }
 }
 
-// ── Chat toolbar button (with unread badge) ────────────────────────────────────
+// ── Action bar button (icon-only, compact) ────────────────────────────────────
 
-class _ChatToolbarBtn extends StatelessWidget {
-  final int unread;
-  final VoidCallback onTap;
-  const _ChatToolbarBtn({required this.unread, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.chat_bubble_outline_rounded, color: Colors.white70, size: 22),
-              const SizedBox(height: 2),
-              Text(AppLocalizations.of(context).chat, style: const TextStyle(color: Colors.white70, fontSize: 10)),
-            ]),
-          ),
-        ),
-        if (unread > 0)
-          Positioned(
-            top: 2,
-            right: 6,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-              decoration: BoxDecoration(
-                color: Colors.redAccent,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                unread > 9 ? '9+' : '$unread',
-                style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-// ── Toolbar button ─────────────────────────────────────────────────────────────
-
-class _ToolbarBtn extends StatelessWidget {
+class _ActionBtn extends StatelessWidget {
   final IconData icon;
-  final String label;
   final VoidCallback onTap;
   final bool active;
   final bool danger;
 
-  const _ToolbarBtn({
+  const _ActionBtn({
     required this.icon,
-    required this.label,
     required this.onTap,
     this.active = false,
     this.danger = false,
@@ -857,72 +870,109 @@ class _ToolbarBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = danger
-        ? Colors.redAccent
+        ? const Color(0xFFFF5033)
         : active
-            ? Theme.of(context).colorScheme.primary
-            : Colors.white70;
+            ? const Color(0xFFFF5033)
+            : Colors.white54;
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(6),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, color: color, size: 22),
-          const SizedBox(height: 2),
-          Text(label, style: TextStyle(color: color, fontSize: 10)),
-        ]),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+        child: Icon(icon, color: color, size: 20),
       ),
     );
   }
 }
 
-// ── Modifier key chip ─────────────────────────────────────────────────────────
+// ── Chat action button (icon-only with unread badge) ──────────────────────────
 
-class _ModKey extends StatelessWidget {
-  final String label;
-  final bool active;
-  final bool small;   // compact style for digit keys
+class _ChatActionBtn extends StatelessWidget {
+  final int unread;
   final VoidCallback onTap;
-
-  const _ModKey({
-    required this.label,
-    required this.onTap,
-    this.active = false,
-    this.small = false,
-  });
+  const _ChatActionBtn({required this.unread, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: small ? 2 : 3, vertical: 2),
-      child: GestureDetector(
+    return Stack(clipBehavior: Clip.none, children: [
+      InkWell(
         onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          padding: EdgeInsets.symmetric(
-            horizontal: small ? 9 : 12,
-            vertical: 6,
-          ),
-          decoration: BoxDecoration(
-            color: active
-                ? Theme.of(context).colorScheme.primary.withOpacity(0.85)
-                : Colors.white.withOpacity(0.12),
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(
-              color: active
-                  ? Theme.of(context).colorScheme.primary
-                  : Colors.white24,
+        borderRadius: BorderRadius.circular(6),
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+          child: Icon(Icons.chat_bubble_outline_rounded, color: Colors.white54, size: 20),
+        ),
+      ),
+      if (unread > 0)
+        Positioned(
+          top: 3, right: 5,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+            decoration: BoxDecoration(
+              color: Colors.redAccent,
+              borderRadius: BorderRadius.circular(6),
             ),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: active ? Colors.white : Colors.white70,
-              fontSize: small ? 12 : 13,
-              fontWeight: active ? FontWeight.bold : FontWeight.normal,
+            child: Text(
+              unread > 9 ? '9+' : '$unread',
+              style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
             ),
           ),
         ),
+    ]);
+  }
+}
+
+// ── Termius-style keyboard key ────────────────────────────────────────────────
+
+class _KbKey extends StatelessWidget {
+  final String? label;
+  final IconData? icon;
+  final bool active;
+  final double? fixedWidth;
+  final VoidCallback onTap;
+
+  const _KbKey({
+    this.label,
+    this.icon,
+    this.active = false,
+    this.fixedWidth,
+    required this.onTap,
+  }) : assert(label != null || icon != null, 'label or icon required');
+
+  @override
+  Widget build(BuildContext context) {
+    const kAccent = Color(0xFFFF5033);
+    final bg = active ? const Color(0x33FF5033) : const Color(0xFF21262D);
+    final borderColor = active ? kAccent : const Color(0xFF30363D);
+    final fgColor = active ? kAccent : Colors.white70;
+
+    Widget content = icon != null
+        ? Icon(icon, size: 15, color: fgColor)
+        : Text(
+            label!,
+            style: TextStyle(
+              color: fgColor,
+              fontSize: 12,
+              fontWeight: active ? FontWeight.bold : FontWeight.w500,
+            ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+            textAlign: TextAlign.center,
+          );
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 100),
+        width: fixedWidth,
+        height: 36,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: borderColor, width: 1),
+        ),
+        child: content,
       ),
     );
   }
