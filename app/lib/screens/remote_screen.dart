@@ -621,36 +621,50 @@ class _RemoteScreenState extends State<RemoteScreen> {
     );
   }
 
-  // Quick row: Esc Tab Ctrl Alt Cmd / | ~ -  + expand toggle
+  // Quick row: scrollable, fixed-width keys so they never get cramped
   Widget _buildQuickRow() {
-    Widget k(String label, VoidCallback onTap, {bool active = false}) =>
-        Expanded(child: _KbKey(label: label, active: active, onTap: onTap));
+    const kw = 48.0; // key width
+    const gap = 3.0;
 
-    return Padding(
+    Widget k(String label, VoidCallback onTap, {bool active = false}) =>
+        SizedBox(width: kw, child: _KbKey(label: label, active: active, onTap: onTap));
+
+    final metaLabel = widget.remotePlatform == 'windows' ? '⊞' : 'Cmd';
+
+    return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       child: Row(children: [
-        k('Esc',  () => _sendSpecialKey('Escape', 'Escape')),
-        const SizedBox(width: 3),
-        k('Tab',  () => _sendSpecialKey('Tab', 'Tab')),
-        const SizedBox(width: 3),
-        k('Ctrl', () => _toggleModifier('ctrl'),  active: _mods.contains('ctrl')),
-        const SizedBox(width: 3),
-        k('Alt',  () => _toggleModifier('alt'),   active: _mods.contains('alt')),
-        const SizedBox(width: 3),
-        k(widget.remotePlatform == 'windows' ? '⊞' : 'Cmd',
-              () => _toggleModifier('meta'),  active: _mods.contains('meta')),
-        const SizedBox(width: 3),
-        k('/',    () => _sendSpecialKey('/', 'Slash')),
-        const SizedBox(width: 3),
-        k('|',    () => _sendSpecialKey('|', 'Backslash')),
-        const SizedBox(width: 3),
-        k('~',    () => _sendSpecialKey('~', 'Backquote')),
-        const SizedBox(width: 3),
-        k('-',    () => _sendSpecialKey('-', 'Minus')),
-        const SizedBox(width: 3),
-        // Expand / collapse the full grid
+        // Scrollable key strip
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(children: [
+              k('Esc',      () => _sendSpecialKey('Escape', 'Escape')),
+              const SizedBox(width: gap),
+              k('Tab',      () => _sendSpecialKey('Tab', 'Tab')),
+              const SizedBox(width: gap),
+              k('Ctrl',     () => _toggleModifier('ctrl'),  active: _mods.contains('ctrl')),
+              const SizedBox(width: gap),
+              k('Alt',      () => _toggleModifier('alt'),   active: _mods.contains('alt')),
+              const SizedBox(width: gap),
+              k(metaLabel,  () => _toggleModifier('meta'),  active: _mods.contains('meta')),
+              const SizedBox(width: gap),
+              k('/',        () => _sendSpecialKey('/', 'Slash')),
+              const SizedBox(width: gap),
+              k('|',        () => _sendSpecialKey('|', 'Backslash')),
+              const SizedBox(width: gap),
+              k('~',        () => _sendSpecialKey('~', 'Backquote')),
+              const SizedBox(width: gap),
+              k('-',        () => _sendSpecialKey('-', 'Minus')),
+              const SizedBox(width: gap),
+              k('^C',       () => _sendCtrlKey('c')),
+            ]),
+          ),
+        ),
+        const SizedBox(width: gap),
+        // Expand / collapse toggle — fixed, never scrolls away
         SizedBox(
-          width: 32,
+          width: 34,
           child: _KbKey(
             icon: _kbExpanded
                 ? Icons.keyboard_arrow_down_rounded
@@ -662,88 +676,115 @@ class _RemoteScreenState extends State<RemoteScreen> {
     );
   }
 
-  // Expanded rows: digits, ctrl shortcuts, navigation, F keys
+  // Expanded grid: Termius-style 8 rows × 8 cols
   Widget _buildExpandedRows() {
-    // Build a fixed 8-column row
-    Widget row(List<_KbKey> keys) {
-      return Padding(
-        padding: const EdgeInsets.only(left: 4, right: 4, bottom: 4),
-        child: Row(
-          children: [
-            for (int i = 0; i < keys.length; i++) ...[
-              if (i > 0) const SizedBox(width: 3),
-              Expanded(child: keys[i]),
-            ],
-          ],
-        ),
-      );
+    Widget row(List<_KbKey> keys) => Padding(
+      padding: const EdgeInsets.only(left: 4, right: 4, bottom: 4),
+      child: Row(children: [
+        for (int i = 0; i < keys.length; i++) ...[
+          if (i > 0) const SizedBox(width: 3),
+          Expanded(child: keys[i]),
+        ],
+      ]),
+    );
+
+    void shiftTab() {
+      widget.session.sendInput({'event': 'keydown', 'key': 'Tab', 'code': 'Tab', 'mods': ['shift']});
+      widget.session.sendInput({'event': 'keyup',   'key': 'Tab', 'code': 'Tab', 'mods': ['shift']});
     }
+
+    final metaLabel = widget.remotePlatform == 'windows' ? '⊞' : 'Cmd';
 
     return Column(mainAxisSize: MainAxisSize.min, children: [
       const Divider(height: 1, color: Color(0xFF30363D)),
       const SizedBox(height: 4),
 
-      // Row 1: Digits
+      // Row 1: mirror of quick row (instant access without scrolling)
       row([
-        for (final d in ['1','2','3','4','5','6','7','8'])
-          _KbKey(label: d, onTap: () => _sendSpecialKey(d, 'Digit$d')),
+        _KbKey(label: 'Esc',     onTap: () => _sendSpecialKey('Escape', 'Escape')),
+        _KbKey(label: 'Tab',     onTap: () => _sendSpecialKey('Tab', 'Tab')),
+        _KbKey(label: 'Ctrl',    active: _mods.contains('ctrl'),  onTap: () => _toggleModifier('ctrl')),
+        _KbKey(label: 'Alt',     active: _mods.contains('alt'),   onTap: () => _toggleModifier('alt')),
+        _KbKey(label: metaLabel, active: _mods.contains('meta'),  onTap: () => _toggleModifier('meta')),
+        _KbKey(label: 'Shift',   active: _mods.contains('shift'), onTap: () => _toggleModifier('shift')),
+        _KbKey(label: 'Del',     onTap: () => _sendSpecialKey('Delete', 'Delete')),
+        _KbKey(label: 'Spc',     onTap: () => _sendSpecialKey(' ', 'Space')),
       ]),
 
-      // Row 2: More digits + Shift + Space + Del + `
-      row([
-        for (final d in ['9','0'])
-          _KbKey(label: d, onTap: () => _sendSpecialKey(d, 'Digit$d')),
-        _KbKey(label: 'Shift', active: _mods.contains('shift'), onTap: () => _toggleModifier('shift')),
-        _KbKey(label: 'Spc',   onTap: () => _sendSpecialKey(' ',      'Space')),
-        _KbKey(label: 'Del',   onTap: () => _sendSpecialKey('Delete', 'Delete')),
-        _KbKey(label: '`',     onTap: () => _sendSpecialKey('`',      'Backquote')),
-        _KbKey(label: '=',     onTap: () => _sendSpecialKey('=',      'Equal')),
-        _KbKey(
-          label: widget.remotePlatform == 'windows' ? '⊞' : '+',
-          onTap: widget.remotePlatform == 'windows'
-              ? () => _sendSpecialKey('Meta', 'MetaLeft')
-              : () => _sendSpecialKey('+', 'Equal'),
-        ),
-      ]),
-
-      // Row 3: Terminal Ctrl shortcuts
+      // Row 2: Ctrl shortcuts
       row([
         _KbKey(label: '^C', onTap: () => _sendCtrlKey('c')),
         _KbKey(label: '^Z', onTap: () => _sendCtrlKey('z')),
+        _KbKey(label: '^S', onTap: () => _sendCtrlKey('s')),
         _KbKey(label: '^A', onTap: () => _sendCtrlKey('a')),
-        _KbKey(label: '^E', onTap: () => _sendCtrlKey('e')),
-        _KbKey(label: '^K', onTap: () => _sendCtrlKey('k')),
-        _KbKey(label: '^U', onTap: () => _sendCtrlKey('u')),
-        _KbKey(label: '^W', onTap: () => _sendCtrlKey('w')),
-        _KbKey(label: '^[', onTap: () => _sendCtrlKey('[')),
+        _KbKey(label: '^X', onTap: () => _sendCtrlKey('x')),
+        _KbKey(label: '^⇤', onTap: shiftTab),   // Shift+Tab
+        _KbKey(label: '^R', onTap: () => _sendCtrlKey('r')),
+        _KbKey(label: '^L', onTap: () => _sendCtrlKey('l')),
       ]),
 
-      // Row 4: Navigation + arrows
+      // Row 3: navigation
       row([
         _KbKey(label: 'Home', onTap: () => _sendSpecialKey('Home',     'Home')),
+        _KbKey(label: 'pgUp', onTap: () => _sendSpecialKey('PageUp',   'PageUp')),
+        _KbKey(label: 'pgDn', onTap: () => _sendSpecialKey('PageDown', 'PageDown')),
         _KbKey(label: 'End',  onTap: () => _sendSpecialKey('End',      'End')),
-        _KbKey(label: 'PgUp', onTap: () => _sendSpecialKey('PageUp',   'PageUp')),
-        _KbKey(label: 'PgDn', onTap: () => _sendSpecialKey('PageDown', 'PageDown')),
-        _KbKey(icon: Icons.arrow_back_rounded,     onTap: () => _sendSpecialKey('ArrowLeft',  'ArrowLeft')),
-        _KbKey(icon: Icons.arrow_forward_rounded,  onTap: () => _sendSpecialKey('ArrowRight', 'ArrowRight')),
-        _KbKey(icon: Icons.arrow_upward_rounded,   onTap: () => _sendSpecialKey('ArrowUp',    'ArrowUp')),
-        _KbKey(icon: Icons.arrow_downward_rounded, onTap: () => _sendSpecialKey('ArrowDown',  'ArrowDown')),
+        _KbKey(label: '=',    onTap: () => _sendSpecialKey('=',  'Equal')),
+        _KbKey(label: ':',    onTap: () => _sendSpecialKey(':',  'Colon')),
+        _KbKey(label: ';',    onTap: () => _sendSpecialKey(';',  'Semicolon')),
+        _KbKey(label: '!',    onTap: () => _sendSpecialKey('!',  'Digit1')),
       ]),
 
-      // Row 5: F1–F8
+      // Row 4: common symbols
+      row([
+        _KbKey(label: '*',  onTap: () => _sendSpecialKey('*', 'Digit8')),
+        _KbKey(label: r'$', onTap: () => _sendSpecialKey(r'$', 'Digit4')),
+        _KbKey(label: '%',  onTap: () => _sendSpecialKey('%', 'Digit5')),
+        _KbKey(label: '^',  onTap: () => _sendSpecialKey('^', 'Digit6')),
+        _KbKey(label: '<',  onTap: () => _sendSpecialKey('<', 'Comma')),
+        _KbKey(label: '>',  onTap: () => _sendSpecialKey('>', 'Period')),
+        _KbKey(label: '(',  onTap: () => _sendSpecialKey('(', 'Digit9')),
+        _KbKey(label: ')',  onTap: () => _sendSpecialKey(')', 'Digit0')),
+      ]),
+
+      // Row 5: brackets + paste/del/ins/@
+      row([
+        _KbKey(label: '{',    onTap: () => _sendSpecialKey('{', 'BracketLeft')),
+        _KbKey(label: '}',    onTap: () => _sendSpecialKey('}', 'BracketRight')),
+        _KbKey(label: '[',    onTap: () => _sendSpecialKey('[', 'BracketLeft')),
+        _KbKey(label: ']',    onTap: () => _sendSpecialKey(']', 'BracketRight')),
+        _KbKey(label: 'pste', onTap: _sendPaste),
+        _KbKey(label: 'del',  onTap: () => _sendSpecialKey('Delete', 'Delete')),
+        _KbKey(label: 'ins',  onTap: () => _sendSpecialKey('Insert', 'Insert')),
+        _KbKey(label: '@',    onTap: () => _sendSpecialKey('@', 'Digit2')),
+      ]),
+
+      // Row 6: F1–F8
       row([
         for (int i = 1; i <= 8; i++)
           _KbKey(label: 'F$i', onTap: () => _sendSpecialKey('F$i', 'F$i')),
       ]),
 
-      // Row 6: F9–F12 + Ins + PrintScrn + Pause + ScrollLock (or placeholders)
+      // Row 7: F9–F12 + extra ctrl
       row([
         for (int i = 9; i <= 12; i++)
           _KbKey(label: 'F$i', onTap: () => _sendSpecialKey('F$i', 'F$i')),
-        _KbKey(label: 'Ins',   onTap: () => _sendSpecialKey('Insert',     'Insert')),
-        _KbKey(label: 'PrtSc', onTap: () => _sendSpecialKey('PrintScreen','PrintScreen')),
-        _KbKey(label: 'Pause', onTap: () => _sendSpecialKey('Pause',      'Pause')),
-        _KbKey(label: 'ScrLk', onTap: () => _sendSpecialKey('ScrollLock', 'ScrollLock')),
+        _KbKey(label: '^E', onTap: () => _sendCtrlKey('e')),
+        _KbKey(label: '^K', onTap: () => _sendCtrlKey('k')),
+        _KbKey(label: '^U', onTap: () => _sendCtrlKey('u')),
+        _KbKey(label: '^W', onTap: () => _sendCtrlKey('w')),
+      ]),
+
+      // Row 8: arrows (last row — natural thumb position)
+      row([
+        _KbKey(label: '^N', onTap: () => _sendCtrlKey('n')),
+        _KbKey(label: '^P', onTap: () => _sendCtrlKey('p')),
+        _KbKey(label: '^G', onTap: () => _sendCtrlKey('g')),
+        _KbKey(label: '^[', onTap: () => _sendCtrlKey('[')),
+        _KbKey(icon: Icons.arrow_back_rounded,     onTap: () => _sendSpecialKey('ArrowLeft',  'ArrowLeft')),
+        _KbKey(icon: Icons.arrow_upward_rounded,   onTap: () => _sendSpecialKey('ArrowUp',    'ArrowUp')),
+        _KbKey(icon: Icons.arrow_downward_rounded, onTap: () => _sendSpecialKey('ArrowDown',  'ArrowDown')),
+        _KbKey(icon: Icons.arrow_forward_rounded,  onTap: () => _sendSpecialKey('ArrowRight', 'ArrowRight')),
       ]),
     ]);
   }
