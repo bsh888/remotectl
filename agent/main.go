@@ -374,7 +374,18 @@ func newWebRTCAPI() *webrtc.API {
 	}, webrtc.RTPCodecTypeVideo); err != nil {
 		log.Fatalf("register RTX codec: %v", err)
 	}
-	return webrtc.NewAPI(webrtc.WithMediaEngine(m))
+	// Enable both UDP and TCP ICE network types.  TCP is a fallback for
+	// environments where UDP is blocked by a firewall (e.g. Windows Defender
+	// blocks inbound UDP by default for unknown apps).  Same-LAN connections
+	// will use the faster UDP path; cross-firewall connections fall back to TCP.
+	s := webrtc.SettingEngine{}
+	s.SetNetworkTypes([]webrtc.NetworkType{
+		webrtc.NetworkTypeUDP4,
+		webrtc.NetworkTypeUDP6,
+		webrtc.NetworkTypeTCP4,
+		webrtc.NetworkTypeTCP6,
+	})
+	return webrtc.NewAPI(webrtc.WithMediaEngine(m), webrtc.WithSettingEngine(s))
 }
 
 func (a *Agent) newPeerConnection() (*webrtc.PeerConnection, error) {
@@ -465,6 +476,10 @@ func (a *Agent) startRTC(viewerID string) {
 			SDPMid:    sdpMid,
 		})
 		a.enqueue(Message{Type: TypeRTCIceAgent, Payload: payload})
+	})
+
+	pc.OnICEConnectionStateChange(func(s webrtc.ICEConnectionState) {
+		log.Printf("RTC %s ICE: %s", viewerID, s)
 	})
 
 	pc.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {

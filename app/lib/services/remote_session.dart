@@ -297,6 +297,17 @@ class RemoteSession extends ChangeNotifier {
         }
       };
 
+      // Final fallback: once ICE is connected, ensure state transitions even if
+      // onTrack/onAddStream didn't fire (flutter_webrtc platform inconsistency).
+      pc.onIceConnectionState = (s) {
+        if (s == RTCIceConnectionState.RTCIceConnectionStateConnected ||
+            s == RTCIceConnectionState.RTCIceConnectionStateCompleted) {
+          if (_state == SessionState.connecting) {
+            _setState(SessionState.connected);
+          }
+        }
+      };
+
       pc.onConnectionState = (s) {
         if (s == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
             s == RTCPeerConnectionState.RTCPeerConnectionStateClosed) {
