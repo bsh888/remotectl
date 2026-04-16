@@ -80,6 +80,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _index = 0;
   final _agentService = AgentService();
   late final AppLifecycleListener _lifecycleListener;
+  // Set to true after the user confirms quit via the macOS ✕ dialog, so that
+  // the subsequent onExitRequested (triggered by applicationShouldTerminate)
+  // doesn't show a second confirmation dialog.
+  bool _quitConfirmed = false;
 
   @override
   void initState() {
@@ -106,6 +110,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
       final confirmed = await _showQuitDialog();
       if (confirmed == true) {
+        _quitConfirmed = true;
         await _agentService.stop();
         _windowChannel.invokeMethod('confirmClose');
       }
@@ -114,6 +119,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Future<AppExitResponse> _onExitRequested() async {
+    // On macOS, closing the window via our dialog already set _quitConfirmed;
+    // the subsequent applicationShouldTerminate call must not show a second dialog.
+    if (_quitConfirmed) return AppExitResponse.exit;
     if (!mounted) {
       await _agentService.stop();
       return AppExitResponse.exit;
