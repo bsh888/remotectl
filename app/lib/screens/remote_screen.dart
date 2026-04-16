@@ -674,7 +674,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
     );
   }
 
-  // Quick row: Esc Tab Ctrl Alt / | ~ -  +  expand-toggle
+  // Quick row: Esc Tab Ctrl Alt Cmd / | ~ -  +  expand-toggle
   Widget _buildQuickRow() {
     Widget k(String label, VoidCallback onTap, {bool active = false}) =>
         Expanded(child: _KbKey(label: label, active: active, onTap: onTap));
@@ -690,6 +690,8 @@ class _RemoteScreenState extends State<RemoteScreen> {
         const SizedBox(width: 3),
         k('Alt',  () => _toggleModifier('alt'),   active: _mods.contains('alt')),
         const SizedBox(width: 3),
+        k('Cmd',  () => _toggleModifier('meta'),  active: _mods.contains('meta')),
+        const SizedBox(width: 3),
         k('/',    () => _sendSpecialKey('/', 'Slash')),
         const SizedBox(width: 3),
         k('|',    () => _sendSpecialKey('|', 'Backslash')),
@@ -703,14 +705,14 @@ class _RemoteScreenState extends State<RemoteScreen> {
           icon: _kbExpanded
               ? Icons.keyboard_arrow_down_rounded
               : Icons.keyboard_arrow_up_rounded,
-          fixedWidth: 40,
+          fixedWidth: 36,
           onTap: _toggleKbExpand,
         ),
       ]),
     );
   }
 
-  // Expanded rows: ctrl shortcuts, navigation, F keys
+  // Expanded rows: digits, ctrl shortcuts, navigation, F keys
   Widget _buildExpandedRows() {
     // Build a fixed 8-column row
     Widget row(List<_KbKey> keys) {
@@ -731,7 +733,30 @@ class _RemoteScreenState extends State<RemoteScreen> {
       const Divider(height: 1, color: Color(0xFF30363D)),
       const SizedBox(height: 4),
 
-      // Row 1: Terminal Ctrl shortcuts
+      // Row 1: Digits
+      row([
+        for (final d in ['1','2','3','4','5','6','7','8'])
+          _KbKey(label: d, onTap: () => _sendSpecialKey(d, 'Digit$d')),
+      ]),
+
+      // Row 2: More digits + Shift + Space + Del + `
+      row([
+        for (final d in ['9','0'])
+          _KbKey(label: d, onTap: () => _sendSpecialKey(d, 'Digit$d')),
+        _KbKey(label: 'Shift', active: _mods.contains('shift'), onTap: () => _toggleModifier('shift')),
+        _KbKey(label: 'Spc',   onTap: () => _sendSpecialKey(' ',      'Space')),
+        _KbKey(label: 'Del',   onTap: () => _sendSpecialKey('Delete', 'Delete')),
+        _KbKey(label: '`',     onTap: () => _sendSpecialKey('`',      'Backquote')),
+        _KbKey(label: '=',     onTap: () => _sendSpecialKey('=',      'Equal')),
+        _KbKey(
+          label: widget.remotePlatform == 'windows' ? '⊞' : '+',
+          onTap: widget.remotePlatform == 'windows'
+              ? () => _sendSpecialKey('Meta', 'MetaLeft')
+              : () => _sendSpecialKey('+', 'Equal'),
+        ),
+      ]),
+
+      // Row 3: Terminal Ctrl shortcuts
       row([
         _KbKey(label: '^C', onTap: () => _sendCtrlKey('c')),
         _KbKey(label: '^Z', onTap: () => _sendCtrlKey('z')),
@@ -743,32 +768,32 @@ class _RemoteScreenState extends State<RemoteScreen> {
         _KbKey(label: '^[', onTap: () => _sendCtrlKey('[')),
       ]),
 
-      // Row 2: Navigation + arrows
+      // Row 4: Navigation + arrows
       row([
         _KbKey(label: 'Home', onTap: () => _sendSpecialKey('Home',     'Home')),
         _KbKey(label: 'End',  onTap: () => _sendSpecialKey('End',      'End')),
         _KbKey(label: 'PgUp', onTap: () => _sendSpecialKey('PageUp',   'PageUp')),
         _KbKey(label: 'PgDn', onTap: () => _sendSpecialKey('PageDown', 'PageDown')),
-        _KbKey(icon: Icons.arrow_back_rounded,    onTap: () => _sendSpecialKey('ArrowLeft',  'ArrowLeft')),
-        _KbKey(icon: Icons.arrow_forward_rounded, onTap: () => _sendSpecialKey('ArrowRight', 'ArrowRight')),
-        _KbKey(icon: Icons.arrow_upward_rounded,  onTap: () => _sendSpecialKey('ArrowUp',    'ArrowUp')),
-        _KbKey(icon: Icons.arrow_downward_rounded,onTap: () => _sendSpecialKey('ArrowDown',  'ArrowDown')),
+        _KbKey(icon: Icons.arrow_back_rounded,     onTap: () => _sendSpecialKey('ArrowLeft',  'ArrowLeft')),
+        _KbKey(icon: Icons.arrow_forward_rounded,  onTap: () => _sendSpecialKey('ArrowRight', 'ArrowRight')),
+        _KbKey(icon: Icons.arrow_upward_rounded,   onTap: () => _sendSpecialKey('ArrowUp',    'ArrowUp')),
+        _KbKey(icon: Icons.arrow_downward_rounded, onTap: () => _sendSpecialKey('ArrowDown',  'ArrowDown')),
       ]),
 
-      // Row 3: F1–F8
+      // Row 5: F1–F8
       row([
         for (int i = 1; i <= 8; i++)
           _KbKey(label: 'F$i', onTap: () => _sendSpecialKey('F$i', 'F$i')),
       ]),
 
-      // Row 4: F9–F12 + Del + ` + Shift + Space
+      // Row 6: F9–F12 + Ins + PrintScrn + Pause + ScrollLock (or placeholders)
       row([
         for (int i = 9; i <= 12; i++)
           _KbKey(label: 'F$i', onTap: () => _sendSpecialKey('F$i', 'F$i')),
-        _KbKey(label: 'Del',   onTap: () => _sendSpecialKey('Delete', 'Delete')),
-        _KbKey(label: '`',     onTap: () => _sendSpecialKey('`', 'Backquote')),
-        _KbKey(label: 'Shift', active: _mods.contains('shift'), onTap: () => _toggleModifier('shift')),
-        _KbKey(label: 'Spc',   onTap: () => _sendSpecialKey(' ', 'Space')),
+        _KbKey(label: 'Ins',   onTap: () => _sendSpecialKey('Insert',     'Insert')),
+        _KbKey(label: 'PrtSc', onTap: () => _sendSpecialKey('PrintScreen','PrintScreen')),
+        _KbKey(label: 'Pause', onTap: () => _sendSpecialKey('Pause',      'Pause')),
+        _KbKey(label: 'ScrLk', onTap: () => _sendSpecialKey('ScrollLock', 'ScrollLock')),
       ]),
     ]);
   }
