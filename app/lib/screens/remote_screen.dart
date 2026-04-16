@@ -43,15 +43,12 @@ class _RemoteScreenState extends State<RemoteScreen> {
   final _kbController = TextEditingController(text: '\u200b'); // zero-width space sentinel
   String _prevKbText = '\u200b';
   bool _kbVisible = false;
+  bool _kbExpanded = false;
 
   // Desktop hardware keyboard capture (Windows/macOS/Linux viewer)
   // HardwareKeyboard.addHandler works without focus — reliable for remote desktop.
   bool Function(KeyEvent)? _hwKeyHandler;
   final Set<String> _desktopMods = {}; // currently held modifier keys
-
-  // Toolbar auto-hide
-  bool _toolbarVisible = true;
-  Timer? _hideTimer;
 
   // Sticky modifier keys (armed until next keystroke)
   final Set<String> _mods = {};
@@ -67,7 +64,6 @@ class _RemoteScreenState extends State<RemoteScreen> {
     super.initState();
     WakelockPlus.enable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    _showToolbar();
     widget.session.chat.addListener(_onChatUpdate);
 
     // Desktop: capture all physical keyboard events via HardwareKeyboard.
@@ -92,27 +88,9 @@ class _RemoteScreenState extends State<RemoteScreen> {
     WakelockPlus.disable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _longPressTimer?.cancel();
-    _hideTimer?.cancel();
     _kbFocus.dispose();
     _kbController.dispose();
     super.dispose();
-  }
-
-  // ── toolbar auto-hide ───────────────────────────────────────────────────────
-
-  // Only resets the hide timer. Does NOT re-show the toolbar — call
-  // _showToolbar() explicitly when the user wants to bring it back.
-  void _resetHideTimer() {
-    _hideTimer?.cancel();
-    _hideTimer = Timer(const Duration(seconds: 4), () {
-      if (mounted && !_kbVisible) setState(() => _toolbarVisible = false);
-    });
-  }
-
-  void _showToolbar() {
-    _hideTimer?.cancel();
-    setState(() => _toolbarVisible = true);
-    _resetHideTimer();
   }
 
   // ── coordinate mapping ──────────────────────────────────────────────────────
@@ -202,7 +180,6 @@ class _RemoteScreenState extends State<RemoteScreen> {
     final start = _touchStart;
     if (start == null) return;
     if (!_twoFingerUsed && (local - start).distance < 12) {
-      _resetHideTimer();
       _sendMouse('mousemove', local, widgetSize);
       _sendMouse('mousedown', local, widgetSize);
       _sendMouse('mouseup',   local, widgetSize);
@@ -217,11 +194,10 @@ class _RemoteScreenState extends State<RemoteScreen> {
   void _onTwoFingerMove(List<Offset> fingers, Size widgetSize) {
     if (fingers.length != 2) { _prevCentroid = null; _prevPinchDist = null; return; }
     _twoFingerUsed = true;
-    // Hide keyboard and toolbar on two-finger gesture
-    if (_kbVisible || _toolbarVisible) {
+    // Two-finger gesture hides keyboard but toolbar stays
+    if (_kbVisible) {
       _kbFocus.unfocus();
-      _hideTimer?.cancel();
-      setState(() { _kbVisible = false; _mods.clear(); _toolbarVisible = false; });
+      setState(() { _kbVisible = false; _kbExpanded = false; _mods.clear(); });
     }
     Offset sum = Offset.zero;
     for (final f in fingers) sum += f;
@@ -254,15 +230,22 @@ class _RemoteScreenState extends State<RemoteScreen> {
 
   void _toggleKeyboard() {
     if (_kbVisible) {
-      // Hide panel → restore system keyboard so user can type freely
-      if (!_isDesktopViewer) _kbFocus.requestFocus();
-      setState(() { _kbVisible = false; _mods.clear(); });
-      if (!_isDesktopViewer) _resetHideTimer();
-    } else {
-      // Show full panel → dismiss system keyboard (our grid covers digits/special keys)
       if (!_isDesktopViewer) _kbFocus.unfocus();
-      setState(() => _kbVisible = true);
-      _hideTimer?.cancel();
+      setState(() { _kbVisible = false; _kbExpanded = false; _mods.clear(); });
+    } else {
+      // Show quick row + system keyboard
+      setState(() { _kbVisible = true; _kbExpanded = false; });
+      if (!_isDesktopViewer) _kbFocus.requestFocus();
+    }
+  }
+
+  void _toggleKbExpand() {
+    if (_kbExpanded) {
+      setState(() => _kbExpanded = false);
+      if (!_isDesktopViewer) _kbFocus.requestFocus(); // restore system keyboard
+    } else {
+      if (!_isDesktopViewer) _kbFocus.unfocus(); // dismiss system keyboard
+      setState(() => _kbExpanded = true);
     }
   }
 
@@ -608,43 +591,18 @@ class _RemoteScreenState extends State<RemoteScreen> {
         ),
       ),
 
-      // ── toolbar (+ modifier row) ───────────────────────────────────────────
-      // Sit above the system keyboard when it is open.
+      // ── toolbar (always visible) + quick row above system keyboard ───────────
       AnimatedPositioned(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeInOut,
         left: 0,
         right: 0,
-        bottom: _toolbarVisible ? mq.viewInsets.bottom : -200,
+        bottom: mq.viewInsets.bottom,
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           if (_kbVisible) _buildKbPanel(),
           _buildToolbar(),
         ]),
       ),
-
-      // ── show-toolbar handle (visible only when toolbar is hidden) ──────────
-      if (!_toolbarVisible)
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: GestureDetector(
-            onTap: _showToolbar,
-            child: Center(
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 6),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white12),
-                ),
-                child: const Icon(Icons.keyboard_arrow_up_rounded,
-                    color: Colors.white54, size: 20),
-              ),
-            ),
-          ),
-        ),
     ]);
   }
 
@@ -658,12 +616,12 @@ class _RemoteScreenState extends State<RemoteScreen> {
       ),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         _buildQuickRow(),
-        _buildExpandedRows(),
+        if (_kbExpanded) _buildExpandedRows(),
       ]),
     );
   }
 
-  // Quick row: Esc Tab Ctrl Alt Cmd / | ~ -  (9 equal keys, no expand toggle)
+  // Quick row: Esc Tab Ctrl Alt Cmd / | ~ -  + expand toggle
   Widget _buildQuickRow() {
     Widget k(String label, VoidCallback onTap, {bool active = false}) =>
         Expanded(child: _KbKey(label: label, active: active, onTap: onTap));
@@ -688,6 +646,17 @@ class _RemoteScreenState extends State<RemoteScreen> {
         k('~',    () => _sendSpecialKey('~', 'Backquote')),
         const SizedBox(width: 3),
         k('-',    () => _sendSpecialKey('-', 'Minus')),
+        const SizedBox(width: 3),
+        // Expand / collapse the full grid
+        SizedBox(
+          width: 32,
+          child: _KbKey(
+            icon: _kbExpanded
+                ? Icons.keyboard_arrow_down_rounded
+                : Icons.keyboard_arrow_up_rounded,
+            onTap: _toggleKbExpand,
+          ),
+        ),
       ]),
     );
   }
@@ -808,13 +777,6 @@ class _RemoteScreenState extends State<RemoteScreen> {
         ),
         _ActionBtn(icon: Icons.content_paste_rounded, onTap: _sendPaste),
         _ChatActionBtn(unread: widget.session.chat.unreadCount, onTap: _openChat),
-        _ActionBtn(
-          icon: Icons.keyboard_arrow_down_rounded,
-          onTap: () {
-            _hideTimer?.cancel();
-            setState(() => _toolbarVisible = false);
-          },
-        ),
         _ActionBtn(icon: Icons.close_rounded, danger: true, onTap: _disconnect),
       ]),
     );
