@@ -147,6 +147,17 @@ class AppLocalizations {
   String get hostedUnsupported =>
       _s('共享本机仅支持桌面平台', 'Hosting is only supported on desktop', '共享本機僅支援桌面平台');
   String get selectCaCert => _s('选择 CA 证书文件', 'Select CA Certificate', '選擇 CA 憑證檔案');
+  String get statusStopped  => _s('未共享',  'Not Sharing', '未共享');
+  String get statusStarting => _s('启动中…', 'Starting…',   '啟動中…');
+  String get statusRunning  => _s('共享中',  'Sharing',     '共享中');
+  String get statusError    => _s('错误',    'Error',       '錯誤');
+  String get localDeviceId  => _s('本机设备 ID', 'Local Device ID', '本機裝置 ID');
+  String get deviceIdConnectHint =>
+      _s('控制端输入此 ID 即可连接到本机', 'Enter this ID on the controller to connect', '在控制端輸入此 ID 即可連線到本機');
+  String get copyDeviceId   => _s('复制设备 ID', 'Copy Device ID', '複製裝置 ID');
+  String get copySessionPwd => _s('复制会话密码', 'Copy Session Password', '複製工作階段密碼');
+  String get sessionPwdRunHint =>
+      _s('每次启动随机生成，控制端连接时输入此密码', 'Randomly generated on each launch, enter when connecting', '每次啟動隨機產生，控制端連線時輸入此密碼');
 
   // ── chat_panel.dart ───────────────────────────────────────────────────────────
   String get chat => _s('聊天', 'Chat', '聊天');

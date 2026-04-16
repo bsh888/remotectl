@@ -898,11 +898,12 @@ class _DeviceIdCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final (statusLabel, statusColor) = switch (status) {
-      AgentStatus.stopped => ('未共享', Colors.white38),
-      AgentStatus.starting => ('启动中…', const Color(0xFFFB923C)),
-      AgentStatus.running => ('共享中', const Color(0xFF4ADE80)),
-      AgentStatus.error => ('错误', const Color(0xFFF87171)),
+      AgentStatus.stopped => (l.statusStopped,  Colors.white38),
+      AgentStatus.starting => (l.statusStarting, const Color(0xFFFB923C)),
+      AgentStatus.running  => (l.statusRunning,  const Color(0xFF4ADE80)),
+      AgentStatus.error    => (l.statusError,    const Color(0xFFF87171)),
     };
 
     final isRunning = status == AgentStatus.running;
@@ -985,7 +986,7 @@ class _DeviceIdCard extends StatelessWidget {
 
           // Label
           Text(
-            '本机设备 ID',
+            l.localDeviceId,
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.54),
               fontSize: 12,
@@ -1023,7 +1024,7 @@ class _DeviceIdCard extends StatelessWidget {
                 ),
                 child: IconButton(
                   onPressed: onCopy,
-                  tooltip: '复制设备 ID',
+                  tooltip: l.copyDeviceId,
                   icon: const Icon(Icons.copy_outlined, size: 16),
                   color: Colors.white.withValues(alpha: 0.60),
                   padding: EdgeInsets.zero,
@@ -1034,7 +1035,7 @@ class _DeviceIdCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '控制端输入此 ID 即可连接到本机',
+            l.deviceIdConnectHint,
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.30),
               fontSize: 11,
@@ -1047,7 +1048,7 @@ class _DeviceIdCard extends StatelessWidget {
             Divider(color: Colors.white.withValues(alpha: 0.10), height: 1),
             const SizedBox(height: 14),
             Text(
-              '会话密码',
+              l.sessionPassword,
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.54),
                 fontSize: 12,
@@ -1083,7 +1084,7 @@ class _DeviceIdCard extends StatelessWidget {
                   ),
                   child: IconButton(
                     onPressed: onCopyPwd,
-                    tooltip: '复制会话密码',
+                    tooltip: l.copySessionPwd,
                     icon: const Icon(Icons.copy_outlined, size: 16),
                     color: Colors.white.withValues(alpha: 0.60),
                     padding: EdgeInsets.zero,
@@ -1094,7 +1095,7 @@ class _DeviceIdCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '每次启动随机生成，控制端连接时输入此密码',
+              l.sessionPwdRunHint,
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.30),
                 fontSize: 11,
