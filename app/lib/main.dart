@@ -269,7 +269,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         tooltip: 'Language',
         child: const Icon(Icons.language, size: 20),
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.endTop,
+      floatingActionButtonLocation: FloatingActionButtonLocation.startTop,
     );
   }
 }
