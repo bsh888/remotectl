@@ -536,9 +536,34 @@ class _RemoteScreenDesktopState extends State<RemoteScreenDesktop> {
                 icon: Icons.logout,
                 danger: true,
                 tooltip: AppLocalizations.of(context).disconnect,
-                onTap: () {
-                  widget.session.disconnect();
-                  Navigator.of(context).pop();
+                onTap: () async {
+                  final l = AppLocalizations.of(context);
+                  final ok = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      backgroundColor: const Color(0xFF131B26),
+                      title: Text(l.disconnectConfirmTitle,
+                          style: const TextStyle(color: Colors.white, fontSize: 16)),
+                      content: Text(l.disconnectConfirmBody,
+                          style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(false),
+                          child: Text(l.cancel,
+                              style: const TextStyle(color: Colors.white54)),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(true),
+                          child: Text(l.confirm,
+                              style: const TextStyle(color: Color(0xFFFF5033),
+                                  fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (ok != true) return;
+                  await widget.session.disconnect();
+                  if (context.mounted) Navigator.of(context).pop();
                 },
               ),
             ],

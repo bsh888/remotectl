@@ -172,6 +172,9 @@ class AppLocalizations {
   String get paste => _s('粘贴', 'Paste', '貼上');
   String get hide => _s('隐藏', 'Hide', '隱藏');
   String get disconnect => _s('断开', 'Disconnect', '中斷');
+  String get disconnectConfirmTitle => _s('断开连接', 'Disconnect', '中斷連線');
+  String get disconnectConfirmBody  => _s('确定要断开与远程设备的连接吗？', 'Disconnect from the remote device?', '確定要中斷與遠端裝置的連線嗎？');
+  String get confirm => _s('断开', 'Disconnect', '中斷');
 
   // ── remote_screen_desktop.dart ────────────────────────────────────────────────
   String get connectingWebRTCDesktop =>
