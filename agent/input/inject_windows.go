@@ -76,6 +76,39 @@ type keyboardInput struct {
 	// total: 40 bytes ✓
 }
 
+// modVKTable maps modifier names to Windows virtual key codes.
+var modVKTable = map[string]uint16{
+	"ctrl":  0x11, // VK_CONTROL
+	"shift": 0x10, // VK_SHIFT
+	"alt":   0x12, // VK_MENU
+	"meta":  0x5B, // VK_LWIN
+}
+
+func sendModKey(vk uint16, up bool) {
+	flags := uint32(0)
+	if up {
+		flags = keyeventfKeyup
+	}
+	ki := keyboardInput{inputType: inputKeyboard, vk: vk, flags: flags}
+	pSendInput.Call(1, uintptr(unsafe.Pointer(&ki)), unsafe.Sizeof(ki))
+}
+
+func pressModsDown(mods []string) {
+	for _, m := range mods {
+		if vk, ok := modVKTable[m]; ok {
+			sendModKey(vk, false)
+		}
+	}
+}
+
+func releaseModsUp(mods []string) {
+	for _, m := range mods {
+		if vk, ok := modVKTable[m]; ok {
+			sendModKey(vk, true)
+		}
+	}
+}
+
 func inject(e Event) {
 	switch e.Event {
 	case "mousemove":
@@ -117,6 +150,7 @@ func inject(e Event) {
 		}
 
 	case "keydown":
+		pressModsDown(e.Mods)
 		vk, ext := windowsVK(e.Code)
 		if vk == 0 {
 			return
@@ -135,6 +169,7 @@ func inject(e Event) {
 	case "keyup":
 		vk, ext := windowsVK(e.Code)
 		if vk == 0 {
+			releaseModsUp(e.Mods)
 			return
 		}
 		flags := uint32(keyeventfKeyup)
@@ -147,6 +182,7 @@ func inject(e Event) {
 			flags:     flags,
 		}
 		pSendInput.Call(1, uintptr(unsafe.Pointer(&ki)), unsafe.Sizeof(ki))
+		releaseModsUp(e.Mods)
 
 	case "paste_text":
 		typeUnicodeText(e.Text)
