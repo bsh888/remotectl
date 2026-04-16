@@ -28,10 +28,11 @@ import (
 )
 
 var (
-	gFrameCh chan Frame
-	gFPS     int
-	gDoneCh  chan struct{}
-	gDoneOnce sync.Once
+	gFrameCh  chan Frame
+	gFPS      int
+	gDoneCh   chan struct{}
+	gDoneOnce *sync.Once   // heap-allocated per Start(); never reset by value assignment
+	gStateMu  sync.Mutex   // guards gDoneCh + gDoneOnce reads/writes
 )
 
 // CheckScreenRecording returns true if the process has Screen Recording permission.
@@ -59,10 +60,12 @@ func Done() <-chan struct{} {
 // Returns a channel that delivers encoded H.264 Annex-B frames,
 // and a non-empty error string if the pipeline failed to start.
 func Start(scale float64, fps, bitrate int) (<-chan Frame, string) {
+	gStateMu.Lock()
 	gFPS = fps
 	gFrameCh = make(chan Frame, 16)
 	gDoneCh = make(chan struct{})
-	gDoneOnce = sync.Once{}
+	gDoneOnce = new(sync.Once) // new object each time; old goStreamStopped callbacks keep their own pointer
+	gStateMu.Unlock()
 	ret := int(C.rc_pipeline_start(C.double(scale), C.int(fps), C.int(bitrate)))
 	if ret != 0 {
 		msg := pipelineErrors[ret]
@@ -95,11 +98,17 @@ func LogDiag() {
 
 //export goStreamStopped
 func goStreamStopped() {
-	gDoneOnce.Do(func() {
-		if gDoneCh != nil {
-			close(gDoneCh)
-		}
-	})
+	// Snapshot pointers under lock so we operate on the exact pipeline
+	// instance that was active when this callback fired. If Start() has
+	// already replaced gDoneOnce/gDoneCh, we work on the old heap objects
+	// and the new pipeline is unaffected.
+	gStateMu.Lock()
+	o := gDoneOnce
+	ch := gDoneCh
+	gStateMu.Unlock()
+	if o != nil && ch != nil {
+		o.Do(func() { close(ch) })
+	}
 }
 
 //export goH264Frame
