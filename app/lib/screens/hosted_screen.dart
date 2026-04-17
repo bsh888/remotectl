@@ -541,14 +541,7 @@ class _HostedScreenState extends State<HostedScreen> {
                 if (svc.logs.isNotEmpty)
                   Container(
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          const Color(0xFF060A18).withValues(alpha: 0.95),
-                          const Color(0xFF040710).withValues(alpha: 0.98),
-                        ],
-                      ),
+                      color: const Color(0xFF050810),
                       border: Border(
                         top: BorderSide(
                           color: Colors.white.withValues(alpha: 0.08),
@@ -564,7 +557,7 @@ class _HostedScreenState extends State<HostedScreen> {
                               () => _logExpanded = !_logExpanded),
                           child: Padding(
                             padding:
-                                const EdgeInsets.fromLTRB(14, 8, 6, 8),
+                                const EdgeInsets.fromLTRB(12, 6, 4, 6),
                             child: Row(children: [
                               Icon(
                                 _logExpanded
@@ -577,50 +570,50 @@ class _HostedScreenState extends State<HostedScreen> {
                               Text(
                                 AppLocalizations.of(context).logTitle,
                                 style: TextStyle(
-                                  color:
-                                      Colors.white.withValues(alpha: 0.50),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  letterSpacing: 0.3,
+                                  color: Colors.white.withValues(alpha: 0.50),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.5,
                                 ),
                               ),
                               const SizedBox(width: 8),
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 1),
+                                    horizontal: 5, vertical: 1),
                                 decoration: BoxDecoration(
-                                  color:
-                                      Colors.white.withValues(alpha: 0.08),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: Colors.white
-                                        .withValues(alpha: 0.10),
-                                  ),
+                                  color: Colors.white.withValues(alpha: 0.07),
+                                  borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
                                   '${svc.logs.length}',
                                   style: TextStyle(
-                                    color: Colors.white
-                                        .withValues(alpha: 0.38),
+                                    color: Colors.white.withValues(alpha: 0.35),
                                     fontSize: 10,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),
                               const Spacer(),
-                              if (_logExpanded)
-                                TextButton(
-                                  onPressed: svc.clearLogs,
-                                  style: TextButton.styleFrom(
-                                    foregroundColor:
-                                        Colors.white.withValues(alpha: 0.24),
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 4),
-                                    minimumSize: Size.zero,
-                                  ),
-                                  child: Text(AppLocalizations.of(context).logClear,
-                                      style: const TextStyle(fontSize: 11)),
+                              if (_logExpanded) ...[
+                                _LogHeaderBtn(
+                                  icon: Icons.copy_rounded,
+                                  tooltip: AppLocalizations.of(context).copyAll,
+                                  onTap: () {
+                                    Clipboard.setData(ClipboardData(
+                                        text: svc.logs.join('\n')));
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(SnackBar(
+                                      content: Text(AppLocalizations.of(context).copied),
+                                      duration: const Duration(seconds: 1),
+                                    ));
+                                  },
                                 ),
+                                _LogHeaderBtn(
+                                  icon: Icons.delete_outline_rounded,
+                                  tooltip: AppLocalizations.of(context).logClear,
+                                  onTap: svc.clearLogs,
+                                ),
+                              ],
                             ]),
                           ),
                         ),
@@ -628,24 +621,13 @@ class _HostedScreenState extends State<HostedScreen> {
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           curve: Curves.easeInOut,
-                          height: _logExpanded ? 180 : 0,
-                          child: SelectionArea(
-                            child: ListView.builder(
-                              controller: _logScroll,
-                              padding: const EdgeInsets.fromLTRB(
-                                  14, 0, 14, 10),
-                              itemCount: svc.logs.length,
-                              itemBuilder: (_, i) => Text(
-                                svc.logs[i],
-                                style: TextStyle(
-                                  color:
-                                      Colors.white.withValues(alpha: 0.54),
-                                  fontSize: 11,
-                                  fontFamily: 'monospace',
-                                ),
-                              ),
-                            ),
-                          ),
+                          height: _logExpanded ? 240 : 0,
+                          child: _logExpanded
+                              ? _LogContent(
+                                  logs: svc.logs,
+                                  scrollController: _logScroll,
+                                )
+                              : const SizedBox.shrink(),
                         ),
                       ],
                     ),
@@ -1184,6 +1166,84 @@ class _ChatIconButton extends StatelessWidget {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Log header icon button ─────────────────────────────────────────────────────
+
+class _LogHeaderBtn extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _LogHeaderBtn({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Icon(
+            icon,
+            size: 14,
+            color: Colors.white.withValues(alpha: 0.30),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Log content (selectable text) ─────────────────────────────────────────────
+
+class _LogContent extends StatelessWidget {
+  final List<String> logs;
+  final ScrollController scrollController;
+
+  const _LogContent({
+    required this.logs,
+    required this.scrollController,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final text = logs.asMap().entries.map((e) {
+      final idx = (e.key + 1).toString().padLeft(3, ' ');
+      return '$idx  ${e.value}';
+    }).join('\n');
+
+    return Container(
+      color: const Color(0xFF030508),
+      child: Scrollbar(
+        controller: scrollController,
+        child: SingleChildScrollView(
+          controller: scrollController,
+          padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+          child: SelectableText(
+            text,
+            style: const TextStyle(
+              color: Color(0xFF8BA0B8),
+              fontSize: 11,
+              fontFamily: 'monospace',
+              height: 1.6,
+            ),
+            contextMenuBuilder: (context, editableTextState) {
+              return AdaptiveTextSelectionToolbar.editableText(
+                editableTextState: editableTextState,
+              );
+            },
+          ),
+        ),
       ),
     );
   }
