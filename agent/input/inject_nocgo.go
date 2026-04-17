@@ -13,3 +13,5 @@ func inject(e Event) {
 
 func CheckAccessibility() bool         { return false }
 func RequestAccessibilityPrompt() bool { return false }
+
+func Init() {}

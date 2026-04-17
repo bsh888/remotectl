@@ -755,7 +755,12 @@ class _RemoteScreenState extends State<RemoteScreen> {
         _KbKey(label: '^X', onTap: () => _sendCtrlKey('x')),
         _KbKey(label: '^⇤', onTap: shiftTab),   // Shift+Tab
         _KbKey(label: '^R', onTap: () => _sendCtrlKey('r')),
-        _KbKey(label: '^L', onTap: () => _sendCtrlKey('l')),
+        // CAD = Ctrl+Alt+Delete; agent uses SendSAS() on Windows
+        _KbKey(label: 'CAD', onTap: () {
+          if (_mods.isNotEmpty) setState(() => _mods.clear());
+          widget.session.sendInput({'event': 'keydown', 'key': 'Delete', 'code': 'Delete', 'mods': ['ctrl', 'alt']});
+          widget.session.sendInput({'event': 'keyup',   'key': 'Delete', 'code': 'Delete', 'mods': ['ctrl', 'alt']});
+        }),
       ]),
 
       // Row 3: navigation

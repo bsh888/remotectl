@@ -129,3 +129,5 @@ func xdoKey(code string, mods []string) string {
 
 func CheckAccessibility() bool         { return true }
 func RequestAccessibilityPrompt() bool { return true }
+
+func Init() {}

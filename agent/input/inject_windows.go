@@ -9,10 +9,16 @@ import (
 )
 
 var (
-	user32   = windows.NewLazySystemDLL("user32.dll")
-	pSendInput = user32.NewProc("SendInput")
-	pSetCursorPos = user32.NewProc("SetCursorPos")
+	user32            = windows.NewLazySystemDLL("user32.dll")
+	pSendInput        = user32.NewProc("SendInput")
+	pSetCursorPos     = user32.NewProc("SetCursorPos")
 	pGetSystemMetrics = user32.NewProc("GetSystemMetrics")
+
+	// sas.dll — SendSAS() is the only way to trigger Ctrl+Alt+Delete
+	// programmatically. Works when SoftwareSASGeneration policy ≥ 1 (service)
+	// or ≥ 3 (application). The agent sets this registry value on first run.
+	sasDLL   = windows.NewLazySystemDLL("sas.dll")
+	pSendSAS = sasDLL.NewProc("SendSAS")
 )
 
 const (
@@ -93,6 +99,57 @@ func sendModKey(vk uint16, up bool) {
 	pSendInput.Call(1, uintptr(unsafe.Pointer(&ki)), unsafe.Sizeof(ki))
 }
 
+// sendSAS triggers Ctrl+Alt+Delete via sas.dll.
+// Requires SoftwareSASGeneration registry value ≥ 1 (set by enableSAS below).
+// Init performs one-time Windows setup (write SoftwareSASGeneration registry key).
+func Init() { enableSAS() }
+
+func sendSAS() {
+	if err := sasDLL.Load(); err != nil {
+		return
+	}
+	if err := pSendSAS.Find(); err != nil {
+		return
+	}
+	pSendSAS.Call(0) // SendSAS(FALSE) — sent as service/system
+}
+
+// enableSAS writes the SoftwareSASGeneration=1 registry value so that
+// services/agents can call SendSAS(). Safe to call repeatedly.
+func enableSAS() {
+	key, _, err := windows.RegCreateKeyEx(
+		windows.HKEY_LOCAL_MACHINE,
+		windows.StringToUTF16Ptr(`SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System`),
+		0, nil, 0,
+		windows.KEY_SET_VALUE,
+		nil, nil, nil,
+	)
+	if err != nil {
+		return
+	}
+	defer windows.RegCloseKey(key)
+	_ = windows.RegSetValueEx(key,
+		windows.StringToUTF16Ptr("SoftwareSASGeneration"),
+		0, windows.REG_DWORD,
+		(*byte)(unsafe.Pointer(new(uint32))), 4,
+	)
+	val := uint32(1)
+	_ = windows.RegSetValueEx(key,
+		windows.StringToUTF16Ptr("SoftwareSASGeneration"),
+		0, windows.REG_DWORD,
+		(*byte)(unsafe.Pointer(&val)), 4,
+	)
+}
+
+func hasMod(mods []string, m string) bool {
+	for _, v := range mods {
+		if v == m {
+			return true
+		}
+	}
+	return false
+}
+
 func pressModsDown(mods []string) {
 	for _, m := range mods {
 		if vk, ok := modVKTable[m]; ok {
@@ -150,6 +207,11 @@ func inject(e Event) {
 		}
 
 	case "keydown":
+		// Ctrl+Alt+Delete must be sent via SendSAS — SendInput cannot generate SAS.
+		if e.Code == "Delete" && hasMod(e.Mods, "ctrl") && hasMod(e.Mods, "alt") {
+			sendSAS()
+			return
+		}
 		pressModsDown(e.Mods)
 		vk, ext := windowsVK(e.Code)
 		if vk == 0 {
@@ -167,6 +229,9 @@ func inject(e Event) {
 		pSendInput.Call(1, uintptr(unsafe.Pointer(&ki)), unsafe.Sizeof(ki))
 
 	case "keyup":
+		if e.Code == "Delete" && hasMod(e.Mods, "ctrl") && hasMod(e.Mods, "alt") {
+			return // handled by SendSAS on keydown
+		}
 		vk, ext := windowsVK(e.Code)
 		if vk == 0 {
 			releaseModsUp(e.Mods)

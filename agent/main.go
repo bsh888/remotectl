@@ -1349,6 +1349,8 @@ func (a *Agent) drainPipeline(ctx context.Context, frames <-chan pipeline.Frame,
 // ── main ──────────────────────────────────────────────────────────────────────
 
 func main() {
+	input.Init() // platform-specific one-time setup (e.g. SoftwareSASGeneration on Windows)
+
 	cfg, err := loadAgentConfig(findConfigFlag())
 	if err != nil {
 		log.Fatalf("config: %v", err)

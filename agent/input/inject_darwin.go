@@ -270,3 +270,5 @@ func darwinKeyCode(code string) int {
 	}
 	return -1
 }
+
+func Init() {}
