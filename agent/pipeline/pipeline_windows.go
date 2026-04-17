@@ -14,6 +14,8 @@ int  rc_win_start(int width, int height, int fps, int bitrate);
 void rc_win_stop(void);
 void rc_win_get_diag(int *cap_frames, int *enc_frames, int *last_err);
 void rc_win_request_keyframe(void);
+void rc_win_set_dpi_aware(void);
+void rc_win_screen_size(int *w, int *h);
 */
 import "C"
 
@@ -31,15 +33,24 @@ var (
 // CheckScreenRecording always returns true on Windows (no permission needed for GDI).
 func CheckScreenRecording() bool { return true }
 
+// SetDPIAware declares this process as Per-Monitor DPI aware so that all GDI
+// screen-metrics APIs (GetDeviceCaps, GetSystemMetrics, BitBlt …) operate in
+// physical pixels instead of virtualized logical pixels.  Must be called once
+// at process startup, before any window or DC is created.
+func SetDPIAware() {
+	C.rc_win_set_dpi_aware()
+}
+
 // Start initialises the GDI capture + x264 encode pipeline.
 func Start(scale float64, fps, bitrate int) (<-chan Frame, string) {
 	gFPS = fps
 	gFrameCh = make(chan Frame, 16)
 
-	// Apply scale to reduce capture resolution (bandwidth / CPU savings).
-	// GetSystemMetrics(0/1) returns SM_CXSCREEN / SM_CYSCREEN.
-	screenW := int(C.GetSystemMetrics(0))
-	screenH := int(C.GetSystemMetrics(1))
+	// Query physical screen dimensions via DESKTOPHORZRES/VERTRES — these always
+	// return physical pixels regardless of DPI awareness mode.
+	var cw, ch C.int
+	C.rc_win_screen_size(&cw, &ch)
+	screenW, screenH := int(cw), int(ch)
 	if scale <= 0 {
 		scale = 1.0
 	}

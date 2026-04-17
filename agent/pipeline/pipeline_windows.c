@@ -42,9 +42,44 @@ static int              g_screen_h  = 0;  // physical screen height
 static int              g_fps       = 15;
 static int              g_bitrate   = 1000000;
 
-// ── rc_win_check: returns primary monitor width (>0 = display available) ─────
+// ── DPI awareness ─────────────────────────────────────────────────────────────
+// Must be called once before any GDI screen-metrics queries so that
+// GetDeviceCaps / GetSystemMetrics return physical pixels, not logical pixels.
+// Without this, a 1920×1080 display at 150 % scaling would be reported as
+// 1280×720, causing BitBlt to capture only a fraction of the desktop.
+void rc_win_set_dpi_aware(void) {
+    // Windows 10 1607+ : Per-Monitor v2 (best for multi-monitor mixed DPI)
+    BOOL (WINAPI *pSetCtx)(DPI_AWARENESS_CONTEXT) =
+        (void *)GetProcAddress(GetModuleHandleA("user32.dll"),
+                               "SetProcessDpiAwarenessContext");
+    if (pSetCtx) {
+        // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = (DPI_AWARENESS_CONTEXT)-4
+        pSetCtx((DPI_AWARENESS_CONTEXT)-4);
+        return;
+    }
+    // Windows Vista+ fallback
+    BOOL (WINAPI *pSetAware)(void) =
+        (void *)GetProcAddress(GetModuleHandleA("user32.dll"),
+                               "SetProcessDPIAware");
+    if (pSetAware) pSetAware();
+}
+
+// ── rc_win_check: returns primary monitor physical width (> 0 = available) ────
 int rc_win_check(void) {
-    return GetSystemMetrics(SM_CXSCREEN);
+    HDC dc = GetDC(NULL);
+    int w  = GetDeviceCaps(dc, DESKTOPHORZRES);
+    ReleaseDC(NULL, dc);
+    return w > 0 ? w : GetSystemMetrics(SM_CXSCREEN);
+}
+
+// ── rc_win_screen_size: physical screen dimensions ───────────────────────────
+void rc_win_screen_size(int *w, int *h) {
+    HDC dc = GetDC(NULL);
+    *w = GetDeviceCaps(dc, DESKTOPHORZRES);
+    *h = GetDeviceCaps(dc, DESKTOPVERTRES);
+    ReleaseDC(NULL, dc);
+    if (*w <= 0) *w = GetSystemMetrics(SM_CXSCREEN);
+    if (*h <= 0) *h = GetSystemMetrics(SM_CYSCREEN);
 }
 
 // ── rc_win_request_keyframe ───────────────────────────────────────────────────
@@ -185,8 +220,21 @@ int rc_win_start(int width, int height, int fps, int bitrate) {
     EnterCriticalSection(&g_cs);
     if (g_running) { LeaveCriticalSection(&g_cs); return 1; }
 
-    g_screen_w = GetSystemMetrics(SM_CXSCREEN);
-    g_screen_h = GetSystemMetrics(SM_CYSCREEN);
+    // Query physical screen size via GetDeviceCaps(DESKTOPHORZRES/VERTRES).
+    // These always return physical pixels regardless of DPI awareness, so even
+    // if rc_win_set_dpi_aware() was not yet called at this point the values
+    // are correct.  The process must have been declared DPI-aware beforehand
+    // (via Init → rc_win_set_dpi_aware) so that the screen DC we open in the
+    // capture thread is also a physical-pixel DC and BitBlt captures the full
+    // physical desktop.
+    {
+        HDC tmp_dc = GetDC(NULL);
+        g_screen_w = GetDeviceCaps(tmp_dc, DESKTOPHORZRES);
+        g_screen_h = GetDeviceCaps(tmp_dc, DESKTOPVERTRES);
+        ReleaseDC(NULL, tmp_dc);
+    }
+    if (g_screen_w <= 0) g_screen_w = GetSystemMetrics(SM_CXSCREEN); // fallback
+    if (g_screen_h <= 0) g_screen_h = GetSystemMetrics(SM_CYSCREEN);
     g_width   = (width  > 0) ? width  : g_screen_w;
     g_height  = (height > 0) ? height : g_screen_h;
     // x264 requires dimensions divisible by 2; round down if odd.

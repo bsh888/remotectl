@@ -102,8 +102,31 @@ func sendModKey(vk uint16, up bool) {
 
 // sendSAS triggers Ctrl+Alt+Delete via sas.dll.
 // Requires SoftwareSASGeneration registry value ≥ 1 (set by enableSAS below).
-// Init performs one-time Windows setup (write SoftwareSASGeneration registry key).
-func Init() { enableSAS() }
+// Init performs one-time Windows setup: DPI awareness + SoftwareSASGeneration registry key.
+func Init() {
+	setDPIAware()
+	enableSAS()
+}
+
+// setDPIAware declares the process as Per-Monitor DPI Aware so that GDI screen
+// capture returns physical pixels instead of virtualized logical pixels.
+// Without this, a 150 % scaled 1920×1080 display reports as 1280×720, causing
+// BitBlt to capture only a fraction of the screen.
+func setDPIAware() {
+	// Windows 10 1607+ : Per-Monitor v2
+	if proc := user32.NewProc("SetProcessDpiAwarenessContext"); proc != nil {
+		if err := proc.Find(); err == nil {
+			proc.Call(uintptr(0xFFFFFFFFFFFFFFFc)) // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = -4
+			return
+		}
+	}
+	// Vista+ fallback
+	if proc := user32.NewProc("SetProcessDPIAware"); proc != nil {
+		if err := proc.Find(); err == nil {
+			proc.Call()
+		}
+	}
+}
 
 func sendSAS() {
 	if err := sasDLL.Load(); err != nil {
