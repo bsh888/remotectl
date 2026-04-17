@@ -52,6 +52,16 @@ class _RemoteScreenState extends State<RemoteScreen> {
 
   // Sticky modifier keys (armed until next keystroke)
   final Set<String> _mods = {};
+  // Tracks mods armed but not yet used in a combo; double-tap disarms + sends standalone.
+  final Set<String> _modsUnused = {};
+
+  // key/code for each modifier's standalone press event
+  static const _modKeyCode = {
+    'ctrl':  ['Control', 'ControlLeft'],
+    'alt':   ['Alt',     'AltLeft'],
+    'shift': ['Shift',   'ShiftLeft'],
+    'meta':  ['Meta',    'MetaLeft'],
+  };
 
   bool get _isDesktopViewer => !kIsWeb && (
     defaultTargetPlatform == TargetPlatform.windows ||
@@ -197,7 +207,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
     // Two-finger gesture hides keyboard but toolbar stays
     if (_kbVisible) {
       _kbFocus.unfocus();
-      setState(() { _kbVisible = false; _kbExpanded = false; _mods.clear(); });
+      setState(() { _kbVisible = false; _kbExpanded = false; _mods.clear(); _modsUnused.clear(); });
     }
     Offset sum = Offset.zero;
     for (final f in fingers) sum += f;
@@ -231,7 +241,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
   void _toggleKeyboard() {
     if (_kbVisible) {
       if (!_isDesktopViewer) _kbFocus.unfocus();
-      setState(() { _kbVisible = false; _kbExpanded = false; _mods.clear(); });
+      setState(() { _kbVisible = false; _kbExpanded = false; _mods.clear(); _modsUnused.clear(); });
     } else {
       // Show quick row + system keyboard
       setState(() { _kbVisible = true; _kbExpanded = false; });
@@ -265,23 +275,26 @@ class _RemoteScreenState extends State<RemoteScreen> {
     widget.session.sendInput({'event': 'keyup',   'key': key, 'code': code, 'mods': ['ctrl']});
   }
 
-  // Long-press Win/Cmd: send the key standalone (opens Start Menu / no-op on mac).
-  void _sendMetaStandalone() {
-    widget.session.sendInput({'event': 'keydown', 'key': 'Meta', 'code': 'MetaLeft', 'mods': <String>[]});
-    widget.session.sendInput({'event': 'keyup',   'key': 'Meta', 'code': 'MetaLeft', 'mods': <String>[]});
-    // Disarm if it was armed
-    if (_mods.contains('meta')) setState(() => _mods.remove('meta'));
-  }
-
   void _toggleModifier(String mod) {
+    bool sendStandalone = false;
     setState(() {
-      if (_mods.contains(mod)) _mods.remove(mod); else _mods.add(mod);
+      if (_mods.contains(mod)) {
+        _mods.remove(mod);
+        if (_modsUnused.remove(mod)) sendStandalone = true;
+      } else {
+        _mods.add(mod);
+        _modsUnused.add(mod);
+      }
     });
+    if (sendStandalone) {
+      final kc = _modKeyCode[mod]!;
+      widget.session.sendInput({'event': 'keydown', 'key': kc[0], 'code': kc[1], 'mods': <String>[]});
+      widget.session.sendInput({'event': 'keyup',   'key': kc[0], 'code': kc[1], 'mods': <String>[]});
+    }
     _prevKbText = _kbController.text;
     // Only call requestFocus when not already focused — calling it when already
     // focused can cause iOS to move the cursor away from the end.
     if (!_kbFocus.hasFocus) _kbFocus.requestFocus();
-    // Pin cursor to end of accumulated text so the next keypress always appends.
     _kbController.selection =
         TextSelection.collapsed(offset: _kbController.text.length);
   }
@@ -290,7 +303,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
     final mods = _mods.toList();
     widget.session.sendInput({'event': 'keydown', 'key': key, 'code': code, 'mods': mods});
     widget.session.sendInput({'event': 'keyup',   'key': key, 'code': code, 'mods': mods});
-    if (_mods.isNotEmpty) setState(() => _mods.clear());
+    if (_mods.isNotEmpty) setState(() { _mods.clear(); _modsUnused.clear(); });
     // Re-focus so Tab/Esc can be pressed multiple times
     _kbFocus.requestFocus();
   }
@@ -346,7 +359,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
                 {'event': 'keyup', 'key': 'Enter', 'code': 'Enter', 'mods': mods});
           }
         }
-        if (mods.isNotEmpty) setState(() => _mods.clear());
+        if (mods.isNotEmpty) setState(() { _mods.clear(); _modsUnused.clear(); });
       }
     } else if (text.length < prev.length) {
       // Backspace(s)
@@ -681,7 +694,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
               const SizedBox(width: gap),
               k('Alt',      () => _toggleModifier('alt'),   active: _mods.contains('alt')),
               const SizedBox(width: gap),
-              SizedBox(width: kw, child: _KbKey(label: metaLabel, labelSize: metaLabelSize, active: _mods.contains('meta'), onTap: () => _toggleModifier('meta'), onLongPress: _sendMetaStandalone)),
+              SizedBox(width: kw, child: _KbKey(label: metaLabel, labelSize: metaLabelSize, active: _mods.contains('meta'), onTap: () => _toggleModifier('meta'))),
               const SizedBox(width: gap),
               k('/',        () => _sendSpecialKey('/', 'Slash')),
               const SizedBox(width: gap),
@@ -740,7 +753,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
         _KbKey(label: 'Tab',     onTap: () => _sendSpecialKey('Tab', 'Tab')),
         _KbKey(label: 'Ctrl',    active: _mods.contains('ctrl'),  onTap: () => _toggleModifier('ctrl')),
         _KbKey(label: 'Alt',     active: _mods.contains('alt'),   onTap: () => _toggleModifier('alt')),
-        _KbKey(label: metaLabel, labelSize: metaLabelSize, active: _mods.contains('meta'), onTap: () => _toggleModifier('meta'), onLongPress: _sendMetaStandalone),
+        _KbKey(label: metaLabel, labelSize: metaLabelSize, active: _mods.contains('meta'), onTap: () => _toggleModifier('meta')),
         _KbKey(label: 'Shift',   active: _mods.contains('shift'), onTap: () => _toggleModifier('shift')),
         _KbKey(label: 'Del',     onTap: () => _sendSpecialKey('Delete', 'Delete')),
         _KbKey(label: 'Spc',     onTap: () => _sendSpecialKey(' ', 'Space')),
@@ -978,7 +991,6 @@ class _KbKey extends StatelessWidget {
   final IconData? icon;
   final bool active;
   final VoidCallback onTap;
-  final VoidCallback? onLongPress;
   final double? labelSize;
 
   const _KbKey({
@@ -986,7 +998,6 @@ class _KbKey extends StatelessWidget {
     this.icon,
     this.active = false,
     required this.onTap,
-    this.onLongPress,
     this.labelSize,
   }) : assert(label != null || icon != null, 'label or icon required');
 
@@ -1013,7 +1024,6 @@ class _KbKey extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
-      onLongPress: onLongPress,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 100),
         height: 36,
