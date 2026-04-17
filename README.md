@@ -398,6 +398,62 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build-app-win.ps1
 > **注意**：Flutter 桌面应用依赖旁边的 DLL / .so 和 `data/` 目录，不能只发单个可执行文件。
 > 以上脚本已将完整运行目录打包，目标机器无需安装任何运行时，解压即用。
 
+**Android（可在 macOS / Linux 上构建）**
+
+前提：Android Studio（含 Android SDK）、Flutter
+```bash
+cd app
+
+# 调试包（快速验证）
+flutter build apk --debug
+
+# Release 包，按 ABI 拆分（包体更小，推荐）
+flutter build apk --split-per-abi --release
+# 产物：build/app/outputs/flutter-apk/
+#   app-arm64-v8a-release.apk   → 手机（主流）
+#   app-armeabi-v7a-release.apk → 老旧 32-bit 机型
+#   app-x86_64-release.apk      → 模拟器
+
+# AAB（上架 Google Play 用）
+flutter build appbundle --release
+```
+
+**Release 包签名**（发布必须）
+
+生成 keystore（一次性，妥善保管，丢失后无法更新已发布 App）：
+```bash
+keytool -genkey -v -keystore ~/remotectl.jks \
+  -keyalg RSA -keysize 2048 -validity 10000 -alias remotectl
+```
+
+创建 `app/android/key.properties`（不提交到 git）：
+```
+storeFile=/Users/<you>/remotectl.jks
+storePassword=your_password
+keyAlias=remotectl
+keyPassword=your_password
+```
+
+在 `app/android/app/build.gradle` 中加载并引用（Flutter 模板已有注释示例，取消注释即可）：
+```groovy
+def keystoreProperties = new Properties()
+keystoreProperties.load(new FileInputStream(rootProject.file('key.properties')))
+
+android {
+    signingConfigs {
+        release {
+            storeFile     file(keystoreProperties['storeFile'])
+            storePassword keystoreProperties['storePassword']
+            keyAlias      keystoreProperties['keyAlias']
+            keyPassword   keystoreProperties['keyPassword']
+        }
+    }
+    buildTypes {
+        release { signingConfig signingConfigs.release }
+    }
+}
+```
+
 #### App 密码说明
 
 连接一台被控端需要两个密码，各自作用不同，请勿混淆：

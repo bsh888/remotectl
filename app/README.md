@@ -58,9 +58,58 @@ flutter run
 flutter build macos --release
 flutter build windows --release
 flutter build linux --release
-flutter build apk --release
-flutter build ios --release   # 需要 macOS + Xcode
+flutter build ios --release           # 需要 macOS + Xcode
+
+# Android APK（按 ABI 拆分，包体更小）
+flutter build apk --split-per-abi --release
+# 产物：build/app/outputs/flutter-apk/app-arm64-v8a-release.apk 等
+
+# Android AAB（上架 Google Play 用）
+flutter build appbundle --release
 ```
+
+### Android 签名
+
+Release 包需要签名，否则无法安装到设备。
+
+**1. 生成 keystore（一次性）**
+
+```bash
+keytool -genkey -v -keystore ~/remotectl.jks \
+  -keyalg RSA -keysize 2048 -validity 10000 -alias remotectl
+```
+
+**2. 创建 `android/key.properties`**（不提交到 git）
+
+```
+storeFile=/Users/<you>/remotectl.jks
+storePassword=your_password
+keyAlias=remotectl
+keyPassword=your_password
+```
+
+**3. 在 `android/app/build.gradle` 中引用**
+
+```groovy
+def keystoreProperties = new Properties()
+keystoreProperties.load(new FileInputStream(rootProject.file('key.properties')))
+
+android {
+    signingConfigs {
+        release {
+            storeFile     file(keystoreProperties['storeFile'])
+            storePassword keystoreProperties['storePassword']
+            keyAlias      keystoreProperties['keyAlias']
+            keyPassword   keystoreProperties['keyPassword']
+        }
+    }
+    buildTypes {
+        release { signingConfig signingConfigs.release }
+    }
+}
+```
+
+> keystore 文件务必妥善备份，丢失后无法为已发布的 App 发布更新。
 
 ## iOS 真机调试
 

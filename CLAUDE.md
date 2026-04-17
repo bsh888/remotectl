@@ -62,6 +62,39 @@ powershell -ExecutionPolicy Bypass -File .\scripts\upload-release.ps1 v1.0.0
 ./scripts/upload-release.sh v1.0.0 app     # 上传 Flutter Linux App
 ```
 
+**Android APK**（可在 macOS 上构建，需要 Android Studio / SDK）
+
+```bash
+cd app
+# 调试包
+flutter build apk --debug
+
+# Release 包（按 ABI 拆分，包体更小）
+flutter build apk --split-per-abi --release
+# 产物：build/app/outputs/flutter-apk/app-arm64-v8a-release.apk 等
+
+# AAB（上架 Google Play 用）
+flutter build appbundle --release
+```
+
+Release 包需要签名。生成 keystore（一次性）：
+
+```bash
+keytool -genkey -v -keystore ~/remotectl.jks \
+  -keyalg RSA -keysize 2048 -validity 10000 -alias remotectl
+```
+
+在 `app/android/key.properties` 中配置（不提交到 git）：
+
+```
+storeFile=/Users/<you>/remotectl.jks
+storePassword=your_password
+keyAlias=remotectl
+keyPassword=your_password
+```
+
+然后在 `app/android/app/build.gradle` 中引用 `key.properties` 并在 `buildTypes.release` 中指定 `signingConfig`（Flutter 新项目模板中已有注释示例）。
+
 发布制品清单（macOS 本地存于 `deploy/release/<version>/`，不提交到 git）：
 
 | 文件 | 构建平台 |
@@ -72,6 +105,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\upload-release.ps1 v1.0.0
 | `remotectl-app-macos-vX.Y.Z.zip` | macOS（含控制端+被控端） |
 | `remotectl-app-windows-amd64-vX.Y.Z.zip` | Windows（含控制端+被控端） |
 | `remotectl-app-linux-amd64-vX.Y.Z.tar.gz` | Linux（含控制端+被控端） |
+| `remotectl-app-android-vX.Y.Z.apk` | macOS / Linux（纯控制端） |
 
 ## Linux 服务器部署（systemd）
 
