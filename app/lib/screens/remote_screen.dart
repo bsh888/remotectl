@@ -52,10 +52,6 @@ class _RemoteScreenState extends State<RemoteScreen> {
 
   // Sticky modifier keys (armed until next keystroke)
   final Set<String> _mods = {};
-  // True when meta was armed but no key has been sent yet.
-  bool _metaArmedUnused = false;
-  // Timer: fires 250 ms after ⊞/Cmd tap to send standalone Win/Cmd if no combo key pressed.
-  Timer? _metaTimer;
 
   bool get _isDesktopViewer => !kIsWeb && (
     defaultTargetPlatform == TargetPlatform.windows ||
@@ -92,7 +88,6 @@ class _RemoteScreenState extends State<RemoteScreen> {
     WakelockPlus.disable();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     _longPressTimer?.cancel();
-    _metaTimer?.cancel();
     _kbFocus.dispose();
     _kbController.dispose();
     super.dispose();
@@ -202,8 +197,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
     // Two-finger gesture hides keyboard but toolbar stays
     if (_kbVisible) {
       _kbFocus.unfocus();
-      _metaTimer?.cancel(); _metaTimer = null;
-      setState(() { _kbVisible = false; _kbExpanded = false; _mods.clear(); _metaArmedUnused = false; });
+      setState(() { _kbVisible = false; _kbExpanded = false; _mods.clear(); });
     }
     Offset sum = Offset.zero;
     for (final f in fingers) sum += f;
@@ -237,8 +231,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
   void _toggleKeyboard() {
     if (_kbVisible) {
       if (!_isDesktopViewer) _kbFocus.unfocus();
-      _metaTimer?.cancel(); _metaTimer = null;
-      setState(() { _kbVisible = false; _kbExpanded = false; _mods.clear(); _metaArmedUnused = false; });
+      setState(() { _kbVisible = false; _kbExpanded = false; _mods.clear(); });
     } else {
       // Show quick row + system keyboard
       setState(() { _kbVisible = true; _kbExpanded = false; });
@@ -272,36 +265,18 @@ class _RemoteScreenState extends State<RemoteScreen> {
     widget.session.sendInput({'event': 'keyup',   'key': key, 'code': code, 'mods': ['ctrl']});
   }
 
-  void _toggleModifier(String mod) {
-    _metaTimer?.cancel();
-    _metaTimer = null;
+  // Long-press Win/Cmd: send the key standalone (opens Start Menu / no-op on mac).
+  void _sendMetaStandalone() {
+    widget.session.sendInput({'event': 'keydown', 'key': 'Meta', 'code': 'MetaLeft', 'mods': <String>[]});
+    widget.session.sendInput({'event': 'keyup',   'key': 'Meta', 'code': 'MetaLeft', 'mods': <String>[]});
+    // Disarm if it was armed
+    if (_mods.contains('meta')) setState(() => _mods.remove('meta'));
+  }
 
-    bool sendStandaloneMeta = false;
+  void _toggleModifier(String mod) {
     setState(() {
-      if (_mods.contains(mod)) {
-        _mods.remove(mod);
-        // Second tap (disarm without combo) → send standalone immediately
-        if (mod == 'meta' && _metaArmedUnused) sendStandaloneMeta = true;
-        _metaArmedUnused = false;
-      } else {
-        _mods.add(mod);
-        if (mod == 'meta') {
-          _metaArmedUnused = true;
-          // Single tap: fire standalone Win/Cmd after 250 ms if no combo key pressed
-          _metaTimer = Timer(const Duration(milliseconds: 250), () {
-            _metaTimer = null;
-            if (!mounted || !_metaArmedUnused) return;
-            widget.session.sendInput({'event': 'keydown', 'key': 'Meta', 'code': 'MetaLeft', 'mods': <String>[]});
-            widget.session.sendInput({'event': 'keyup',   'key': 'Meta', 'code': 'MetaLeft', 'mods': <String>[]});
-            setState(() { _mods.remove('meta'); _metaArmedUnused = false; });
-          });
-        }
-      }
+      if (_mods.contains(mod)) _mods.remove(mod); else _mods.add(mod);
     });
-    if (sendStandaloneMeta) {
-      widget.session.sendInput({'event': 'keydown', 'key': 'Meta', 'code': 'MetaLeft', 'mods': <String>[]});
-      widget.session.sendInput({'event': 'keyup',   'key': 'Meta', 'code': 'MetaLeft', 'mods': <String>[]});
-    }
     _prevKbText = _kbController.text;
     // Only call requestFocus when not already focused — calling it when already
     // focused can cause iOS to move the cursor away from the end.
@@ -312,11 +287,6 @@ class _RemoteScreenState extends State<RemoteScreen> {
   }
 
   void _sendSpecialKey(String key, String code) {
-    if (_mods.contains('meta')) {
-      _metaTimer?.cancel();
-      _metaTimer = null;
-      _metaArmedUnused = false;
-    }
     final mods = _mods.toList();
     widget.session.sendInput({'event': 'keydown', 'key': key, 'code': code, 'mods': mods});
     widget.session.sendInput({'event': 'keyup',   'key': key, 'code': code, 'mods': mods});
@@ -350,11 +320,6 @@ class _RemoteScreenState extends State<RemoteScreen> {
       if (added.length > prevClean.length) {
         final newChars = added.substring(prevClean.length);
         final parts = newChars.split('\n');
-        if (_mods.contains('meta')) {
-          _metaTimer?.cancel();
-          _metaTimer = null;
-          _metaArmedUnused = false;
-        }
         final mods = _mods.toList();
         for (int i = 0; i < parts.length; i++) {
           if (parts[i].isNotEmpty) {
@@ -697,7 +662,8 @@ class _RemoteScreenState extends State<RemoteScreen> {
     Widget k(String label, VoidCallback onTap, {bool active = false}) =>
         SizedBox(width: kw, child: _KbKey(label: label, active: active, onTap: onTap));
 
-    final metaLabel = widget.remotePlatform == 'windows' ? 'Win' : 'Cmd';
+    final metaLabel = widget.remotePlatform == 'windows' ? 'Win' : '⌘';
+    final metaLabelSize = widget.remotePlatform == 'windows' ? 12.0 : 16.0;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
@@ -715,7 +681,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
               const SizedBox(width: gap),
               k('Alt',      () => _toggleModifier('alt'),   active: _mods.contains('alt')),
               const SizedBox(width: gap),
-              k(metaLabel,  () => _toggleModifier('meta'),  active: _mods.contains('meta')),
+              SizedBox(width: kw, child: _KbKey(label: metaLabel, labelSize: metaLabelSize, active: _mods.contains('meta'), onTap: () => _toggleModifier('meta'), onLongPress: _sendMetaStandalone)),
               const SizedBox(width: gap),
               k('/',        () => _sendSpecialKey('/', 'Slash')),
               const SizedBox(width: gap),
@@ -761,7 +727,8 @@ class _RemoteScreenState extends State<RemoteScreen> {
       widget.session.sendInput({'event': 'keyup',   'key': 'Tab', 'code': 'Tab', 'mods': ['shift']});
     }
 
-    final metaLabel = widget.remotePlatform == 'windows' ? 'Win' : 'Cmd';
+    final metaLabel = widget.remotePlatform == 'windows' ? 'Win' : '⌘';
+    final metaLabelSize = widget.remotePlatform == 'windows' ? 12.0 : 16.0;
 
     return Column(mainAxisSize: MainAxisSize.min, children: [
       const Divider(height: 1, color: Color(0xFF30363D)),
@@ -773,7 +740,7 @@ class _RemoteScreenState extends State<RemoteScreen> {
         _KbKey(label: 'Tab',     onTap: () => _sendSpecialKey('Tab', 'Tab')),
         _KbKey(label: 'Ctrl',    active: _mods.contains('ctrl'),  onTap: () => _toggleModifier('ctrl')),
         _KbKey(label: 'Alt',     active: _mods.contains('alt'),   onTap: () => _toggleModifier('alt')),
-        _KbKey(label: metaLabel, active: _mods.contains('meta'),  onTap: () => _toggleModifier('meta')),
+        _KbKey(label: metaLabel, labelSize: metaLabelSize, active: _mods.contains('meta'), onTap: () => _toggleModifier('meta'), onLongPress: _sendMetaStandalone),
         _KbKey(label: 'Shift',   active: _mods.contains('shift'), onTap: () => _toggleModifier('shift')),
         _KbKey(label: 'Del',     onTap: () => _sendSpecialKey('Delete', 'Delete')),
         _KbKey(label: 'Spc',     onTap: () => _sendSpecialKey(' ', 'Space')),
@@ -1006,12 +973,16 @@ class _KbKey extends StatelessWidget {
   final IconData? icon;
   final bool active;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+  final double? labelSize;
 
   const _KbKey({
     this.label,
     this.icon,
     this.active = false,
     required this.onTap,
+    this.onLongPress,
+    this.labelSize,
   }) : assert(label != null || icon != null, 'label or icon required');
 
   @override
@@ -1027,7 +998,7 @@ class _KbKey extends StatelessWidget {
             label!,
             style: TextStyle(
               color: fgColor,
-              fontSize: 12,
+              fontSize: labelSize ?? 12,
               fontWeight: active ? FontWeight.bold : FontWeight.w500,
             ),
             overflow: TextOverflow.ellipsis,
@@ -1037,6 +1008,7 @@ class _KbKey extends StatelessWidget {
 
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 100),
         height: 36,
