@@ -228,7 +228,7 @@ turn:
 
 服务以 `ubuntu` 用户运行，通过 `AmbientCapabilities=CAP_NET_BIND_SERVICE` 绑定 443 端口，无需 root。
 
-下载 [Releases](https://github.com/bsh888/remotectl-releases/releases) 页面的 `remotectl-server-linux-*` 包，解压后一键安装：
+下载 [Releases](https://github.com/bsh888/remotectl/releases) 页面的 `remotectl-server-linux-*` 包，解压后一键安装：
 
 ```bash
 tar xzf remotectl-server-linux-amd64-vX.Y.Z.tar.gz

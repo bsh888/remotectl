@@ -28,7 +28,7 @@ upload() {
   local src="$1" name="$2"
   [[ -f "$src" ]] || { echo "Not found: $src  — build it first." >&2; return 1; }
   echo "Uploading $name..."
-  gh release upload "$VERSION" "$src#$name" --repo bsh888/remotectl-releases --clobber
+  gh release upload "$VERSION" "$src#$name" --repo bsh888/remotectl --clobber
 }
 
 case "$OS" in
@@ -62,4 +62,4 @@ case "$OS" in
     echo "Unsupported platform: $OS" >&2; exit 1 ;;
 esac
 
-echo "Done: $(gh release view "$VERSION" --repo bsh888/remotectl-releases --json url -q .url)"
+echo "Done: $(gh release view "$VERSION" --repo bsh888/remotectl --json url -q .url)"

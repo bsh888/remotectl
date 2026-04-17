@@ -59,9 +59,9 @@ if git rev-parse "$VERSION" &>/dev/null; then
   git push origin ":refs/tags/$VERSION" 2>/dev/null || true
   ok "Local + remote tag removed"
 fi
-if gh release view "$VERSION" --repo bsh888/remotectl-releases &>/dev/null 2>&1; then
-  gh release delete "$VERSION" --repo bsh888/remotectl-releases --yes 2>/dev/null || true
-  gh api "repos/bsh888/remotectl-releases/git/refs/tags/$VERSION" --method DELETE 2>/dev/null || true
+if gh release view "$VERSION" --repo bsh888/remotectl &>/dev/null 2>&1; then
+  gh release delete "$VERSION" --repo bsh888/remotectl --yes 2>/dev/null || true
+  gh api "repos/bsh888/remotectl/git/refs/tags/$VERSION" --method DELETE 2>/dev/null || true
   ok "Release repo tag + release removed"
 fi
 
@@ -197,11 +197,11 @@ git push origin "$VERSION"
 ok "Tag pushed"
 
 # ── Sync README to releases repo (create on first run, update thereafter) ─────
-log "Syncing README to bsh888/remotectl-releases"
-README_SHA=$(gh api repos/bsh888/remotectl-releases/contents/README.md --jq '.sha' 2>/dev/null || true)
+log "Syncing README to bsh888/remotectl"
+README_SHA=$(gh api repos/bsh888/remotectl/contents/README.md --jq '.sha' 2>/dev/null || true)
 README_ARGS=()
 [[ -n "$README_SHA" ]] && README_ARGS=(-f "sha=$README_SHA")
-gh api repos/bsh888/remotectl-releases/contents/README.md \
+gh api repos/bsh888/remotectl/contents/README.md \
     --method PUT \
     "${README_ARGS[@]}" \
     -f message="Update README for $VERSION" \
@@ -224,7 +224,7 @@ gh api repos/bsh888/remotectl-releases/contents/README.md \
 
 ## 下载
 
-前往 [Releases](https://github.com/bsh888/remotectl-releases/releases) 页面下载对应平台的安装包。
+前往 [Releases](https://github.com/bsh888/remotectl/releases) 页面下载对应平台的安装包。
 
 | 文件 | 说明 |
 |------|------|
@@ -371,7 +371,7 @@ NOTES_FILE=$(mktemp)
 printf '%s' "$NOTES" > "$NOTES_FILE"
 
 GH_EDITOR=true gh release create "$VERSION" \
-  --repo bsh888/remotectl-releases \
+  --repo bsh888/remotectl \
   $DRAFT_FLAG \
   --title "RemoteCtl $VERSION" \
   --notes-file "$NOTES_FILE" \
@@ -382,7 +382,7 @@ rm -f "$NOTES_FILE"
 
 log "Done"
 echo ""
-echo "  Release: $(gh release view "$VERSION" --repo bsh888/remotectl-releases --json url -q .url)"
+echo "  Release: $(gh release view "$VERSION" --repo bsh888/remotectl --json url -q .url)"
 echo ""
 echo "  Linux agent: on Linux server:"
 echo "               cd agent && CGO_ENABLED=1 go build -ldflags='-s -w' -o remotectl-agent-linux-amd64 ."
