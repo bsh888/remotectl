@@ -6,6 +6,7 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/windows"
+	"golang.org/x/sys/windows/registry"
 )
 
 var (
@@ -117,28 +118,16 @@ func sendSAS() {
 // enableSAS writes the SoftwareSASGeneration=1 registry value so that
 // services/agents can call SendSAS(). Safe to call repeatedly.
 func enableSAS() {
-	key, _, err := windows.RegCreateKeyEx(
-		windows.HKEY_LOCAL_MACHINE,
-		windows.StringToUTF16Ptr(`SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System`),
-		0, nil, 0,
-		windows.KEY_SET_VALUE,
-		nil, nil, nil,
+	key, _, err := registry.CreateKey(
+		registry.LOCAL_MACHINE,
+		`SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System`,
+		registry.SET_VALUE,
 	)
 	if err != nil {
 		return
 	}
-	defer windows.RegCloseKey(key)
-	_ = windows.RegSetValueEx(key,
-		windows.StringToUTF16Ptr("SoftwareSASGeneration"),
-		0, windows.REG_DWORD,
-		(*byte)(unsafe.Pointer(new(uint32))), 4,
-	)
-	val := uint32(1)
-	_ = windows.RegSetValueEx(key,
-		windows.StringToUTF16Ptr("SoftwareSASGeneration"),
-		0, windows.REG_DWORD,
-		(*byte)(unsafe.Pointer(&val)), 4,
-	)
+	defer key.Close()
+	_ = key.SetDWordValue("SoftwareSASGeneration", 1)
 }
 
 func hasMod(mods []string, m string) bool {
