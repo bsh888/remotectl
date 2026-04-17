@@ -45,6 +45,18 @@ const features = [
   { num: '04', titleKey: 'feat_cross_title',   descKey: 'feat_cross_desc' },
   { num: '05', titleKey: 'feat_latency_title', descKey: 'feat_latency_desc' },
   { num: '06', titleKey: 'feat_chat_title',    descKey: 'feat_chat_desc' },
+  { num: '07', titleKey: 'feat_quality_title', descKey: 'feat_quality_desc' },
+  { num: '08', titleKey: 'feat_keyboard_title',descKey: 'feat_keyboard_desc' },
+]
+
+const vsRows: { key: string; remotectl: 'yes'|'no'|'partial'; sunflower: 'yes'|'no'|'partial' }[] = [
+  { key: 'vs_open_source',   remotectl: 'yes', sunflower: 'no'      },
+  { key: 'vs_self_host',     remotectl: 'yes', sunflower: 'no'      },
+  { key: 'vs_browser_ctrl',  remotectl: 'yes', sunflower: 'partial' },
+  { key: 'vs_quality_tune',  remotectl: 'yes', sunflower: 'partial' },
+  { key: 'vs_mobile_kb',     remotectl: 'yes', sunflower: 'partial' },
+  { key: 'vs_session_chat',  remotectl: 'yes', sunflower: 'no'      },
+  { key: 'vs_free',          remotectl: 'yes', sunflower: 'partial' },
 ]
 
 const platforms: { nameKey: string; icon: ReactNode; label: string; ext: string }[] = [
@@ -553,7 +565,7 @@ export default function LandingPage() {
           <div style={{flex:1, height:1, background:V.border}}/>
           {!isMobile && (
             <span style={{fontFamily:V.mono, fontSize:10, color:V.text3, letterSpacing:'0.1em'}}>
-              06 MODULES
+              08 MODULES
             </span>
           )}
         </div>
@@ -589,6 +601,80 @@ export default function LandingPage() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* ── Comparison ─────────────────────────────────────────────────────── */}
+      <section style={{
+        maxWidth:1200, margin:'0 auto', padding:`0 ${px} 80px`,
+      }}>
+        <div style={{display:'flex', alignItems:'baseline', gap:16, marginBottom:48}}>
+          <h2 style={{
+            fontFamily:V.display, fontSize: isMobile ? 26 : 32, fontWeight:800,
+            letterSpacing:'-0.03em', color:V.text1, whiteSpace:'nowrap',
+          }}>{t('vs_title')}</h2>
+          <div style={{flex:1, height:1, background:V.border}}/>
+        </div>
+        <p style={{
+          fontSize:13, color:V.text2, marginBottom:32, lineHeight:1.7,
+          maxWidth:600,
+        }}>{t('vs_subtitle')}</p>
+
+        <div style={{
+          border:`1px solid ${V.border2}`, borderRadius:4, overflow:'hidden',
+        }}>
+          {/* Table header */}
+          <div style={{
+            display:'grid',
+            gridTemplateColumns: isMobile ? '1fr auto auto' : '2fr 1fr 1fr',
+            padding: isMobile ? '10px 16px' : '10px 28px',
+            background:V.surface,
+            borderBottom:`1px solid ${V.border2}`,
+          }}>
+            {[t('vs_feat'), t('vs_remotectl'), t('vs_sunflower')].map((h, i) => (
+              <div key={i} style={{
+                fontFamily:V.mono, fontSize:10, color: i===1 ? V.accent : V.text3,
+                letterSpacing:'0.1em', fontWeight: i===1 ? 700 : 400,
+                textAlign: i===0 ? 'left' as const : 'center' as const,
+              }}>{h}</div>
+            ))}
+          </div>
+          {vsRows.map((row, i) => {
+            const cell = (v: 'yes'|'no'|'partial', isOurs: boolean) => (
+              <div style={{
+                textAlign:'center' as const, fontSize:14, fontWeight:600,
+                color: v==='yes' ? (isOurs ? V.green : V.text3)
+                     : v==='partial' ? V.accent
+                     : V.text3,
+                opacity: v==='no' ? 0.4 : 1,
+              }}>
+                {v==='yes' ? t('vs_yes') : v==='no' ? t('vs_no') : t('vs_partial')}
+              </div>
+            )
+            return (
+              <div key={row.key} style={{
+                display:'grid',
+                gridTemplateColumns: isMobile ? '1fr auto auto' : '2fr 1fr 1fr',
+                padding: isMobile ? '13px 16px' : '14px 28px',
+                alignItems:'center',
+                borderBottom: i < vsRows.length-1 ? `1px solid ${V.border}` : 'none',
+                background: V.bg,
+                transition:'background 0.12s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = V.surface)}
+              onMouseLeave={e => (e.currentTarget.style.background = V.bg)}
+              >
+                <div style={{fontSize:13, color:V.text2}}>{t(row.key)}</div>
+                {cell(row.remotectl, true)}
+                {cell(row.sunflower, false)}
+              </div>
+            )
+          })}
+        </div>
+
+        <div style={{
+          marginTop:14, fontFamily:V.mono, fontSize:10,
+          color:V.text3, letterSpacing:'0.04em', opacity:0.6,
+        }}>{t('vs_note')}</div>
       </section>
 
       {/* ── Downloads ──────────────────────────────────────────────────────── */}
