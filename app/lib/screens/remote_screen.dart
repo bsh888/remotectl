@@ -705,6 +705,12 @@ class _RemoteScreenState extends State<RemoteScreen> {
               k('-',        () => _sendSpecialKey('-', 'Minus')),
               const SizedBox(width: gap),
               k('^C',       () => _sendCtrlKey('c')),
+              const SizedBox(width: gap),
+              // Digit keys — avoids switching to system numeric keyboard which loses modifier state
+              for (final d in ['1','2','3','4','5','6','7','8','9','0']) ...[
+                k(d, () => _sendSpecialKey(d, 'Digit$d')),
+                const SizedBox(width: gap),
+              ],
             ]),
           ),
         ),
@@ -785,31 +791,31 @@ class _RemoteScreenState extends State<RemoteScreen> {
         _KbKey(label: '=',    onTap: () => _sendSpecialKey('=',  'Equal')),
         _KbKey(label: ':',    onTap: () => _sendSpecialKey(':',  'Colon')),
         _KbKey(label: ';',    onTap: () => _sendSpecialKey(';',  'Semicolon')),
-        _KbKey(label: '!',    onTap: () => _sendSpecialKey('!',  'Digit1')),
+        _KbKey(label: 'pste', onTap: _sendPaste),
       ]),
 
-      // Row 4: common symbols
+      // Row 4: common symbols (all 10 digit shift-chars covered: 1!2@3#4$5%6^7&8*9(0))
       row([
-        _KbKey(label: '*',  onTap: () => _sendSpecialKey('*', 'Digit8')),
+        _KbKey(label: '!',  onTap: () => _sendSpecialKey('!', 'Digit1')),
+        _KbKey(label: '@',  onTap: () => _sendSpecialKey('@', 'Digit2')),
+        _KbKey(label: '#',  onTap: () => _sendSpecialKey('#', 'Digit3')),
         _KbKey(label: r'$', onTap: () => _sendSpecialKey(r'$', 'Digit4')),
         _KbKey(label: '%',  onTap: () => _sendSpecialKey('%', 'Digit5')),
         _KbKey(label: '^',  onTap: () => _sendSpecialKey('^', 'Digit6')),
-        _KbKey(label: '<',  onTap: () => _sendSpecialKey('<', 'Comma')),
-        _KbKey(label: '>',  onTap: () => _sendSpecialKey('>', 'Period')),
-        _KbKey(label: '(',  onTap: () => _sendSpecialKey('(', 'Digit9')),
-        _KbKey(label: ')',  onTap: () => _sendSpecialKey(')', 'Digit0')),
+        _KbKey(label: '&',  onTap: () => _sendSpecialKey('&', 'Digit7')),
+        _KbKey(label: '*',  onTap: () => _sendSpecialKey('*', 'Digit8')),
       ]),
 
-      // Row 5: brackets + paste/del/ins/@
+      // Row 5: brackets + parens/angle + paste/del/ins
       row([
         _KbKey(label: '{',    onTap: () => _sendSpecialKey('{', 'BracketLeft')),
         _KbKey(label: '}',    onTap: () => _sendSpecialKey('}', 'BracketRight')),
         _KbKey(label: '[',    onTap: () => _sendSpecialKey('[', 'BracketLeft')),
         _KbKey(label: ']',    onTap: () => _sendSpecialKey(']', 'BracketRight')),
-        _KbKey(label: 'pste', onTap: _sendPaste),
-        _KbKey(label: 'del',  onTap: () => _sendSpecialKey('Delete', 'Delete')),
-        _KbKey(label: 'ins',  onTap: () => _sendSpecialKey('Insert', 'Insert')),
-        _KbKey(label: '@',    onTap: () => _sendSpecialKey('@', 'Digit2')),
+        _KbKey(label: '(',    onTap: () => _sendSpecialKey('(', 'Digit9')),
+        _KbKey(label: ')',    onTap: () => _sendSpecialKey(')', 'Digit0')),
+        _KbKey(label: '<',    onTap: () => _sendSpecialKey('<', 'Comma')),
+        _KbKey(label: '>',    onTap: () => _sendSpecialKey('>', 'Period')),
       ]),
 
       // Row 6: F1–F8
