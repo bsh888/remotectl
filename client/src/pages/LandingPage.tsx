@@ -235,7 +235,8 @@ export default function LandingPage() {
           width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between',
         }}>
           {/* Logo */}
-          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <a href="#" onClick={e => { e.preventDefault(); window.scrollTo({top:0, behavior:'smooth'}) }}
+            style={{ display:'flex', alignItems:'center', gap:10, textDecoration:'none', cursor:'pointer' }}>
             <div style={{
               width:28, height:28, borderRadius:3,
               background: V.accent,
@@ -250,7 +251,7 @@ export default function LandingPage() {
             <span style={{fontFamily:V.display, fontSize:15, fontWeight:700, letterSpacing:'-0.02em', color:V.text1}}>
               RemoteCtl
             </span>
-          </div>
+          </a>
 
           {/* Desktop links */}
           {!isMobile && (
