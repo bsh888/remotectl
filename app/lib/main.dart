@@ -96,7 +96,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // instead of closing immediately. We show the dialog here (where we have
     // full context + localization), then call back "confirmClose" to let Swift
     // actually close the window.
-    if (!kIsWeb && Platform.isMacOS) {
+    // macOS: MainFlutterWindow.performClose sends "windowCloseRequested" via Swift.
+    // Windows: flutter_window.cpp WM_CLOSE handler sends the same message.
+    if (!kIsWeb && (Platform.isMacOS || Platform.isWindows)) {
       _windowChannel.setMethodCallHandler(_onWindowMethodCall);
     }
   }
@@ -112,7 +114,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (confirmed == true) {
         _quitConfirmed = true;
         await _agentService.stop();
-        _windowChannel.invokeMethod('confirmClose');
+        if (Platform.isMacOS) {
+          // Let Swift close the window (MainFlutterWindow.performClose flow).
+          _windowChannel.invokeMethod('confirmClose');
+        } else {
+          // Windows: destroy the window by posting WM_CLOSE back after we
+          // have stopped the agent — but now the Dart flag is set so the
+          // handler won't re-show the dialog.  Simplest cross-platform exit.
+          exit(0);
+        }
       }
       // else: user cancelled — window stays open
     }

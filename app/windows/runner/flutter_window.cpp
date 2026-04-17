@@ -2,6 +2,9 @@
 
 #include <optional>
 
+#include <flutter/method_channel.h>
+#include <flutter/standard_method_codec.h>
+
 #include "flutter/generated_plugin_registrant.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
@@ -67,12 +70,20 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
       break;
 
     case WM_CLOSE:
-      // Route close-button clicks through Flutter's exit-request mechanism so
-      // that AppLifecycleListener.onExitRequested fires and our confirmation
-      // dialog is shown.  DestroyWindow / WM_DESTROY (and the app exit) happen
-      // only after Dart calls ServicesBinding.exitApplication.
-      flutter_controller_->engine()->RequestAppExit();
-      return 0;
+      // Mirror the macOS "windowCloseRequested" pattern: send a method-channel
+      // message to Dart so AppState._onWindowMethodCall shows the confirmation
+      // dialog before the window is actually destroyed.
+      // Using MethodChannel works on all Flutter versions and requires no
+      // engine-private handles.
+      if (flutter_controller_ && flutter_controller_->engine()) {
+        flutter::MethodChannel<> channel(
+            flutter_controller_->engine()->messenger(),
+            "remotectl/window",
+            &flutter::StandardMethodCodec::GetInstance());
+        channel.InvokeMethod("windowCloseRequested", nullptr);
+        return 0;  // suppress default close; Dart decides when to exit
+      }
+      break;
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
