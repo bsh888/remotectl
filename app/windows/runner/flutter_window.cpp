@@ -65,6 +65,14 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
       break;
+
+    case WM_CLOSE:
+      // Route close-button clicks through Flutter's exit-request mechanism so
+      // that AppLifecycleListener.onExitRequested fires and our confirmation
+      // dialog is shown.  DestroyWindow / WM_DESTROY (and the app exit) happen
+      // only after Dart calls ServicesBinding.exitApplication.
+      flutter_controller_->engine()->RequestAppExit();
+      return 0;
   }
 
   return Win32Window::MessageHandler(hwnd, message, wparam, lparam);
