@@ -52,6 +52,28 @@ class _RemoteScreenState extends State<RemoteScreen> {
 
   // Sticky modifier keys (armed until next keystroke)
   final Set<String> _mods = {};
+
+  // Maps a printable ASCII char to its KeyboardEvent.code.
+  // Returns null for CJK / emoji / other unmappable chars → fallback to paste_text.
+  static String? _charToCode(String s) {
+    if (s.length != 1) return null;
+    if (RegExp(r'^[a-zA-Z]$').hasMatch(s)) return 'Key${s.toUpperCase()}';
+    if (RegExp(r'^[0-9]$').hasMatch(s)) return 'Digit$s';
+    const m = {
+      ' ': 'Space',   '-': 'Minus',       '=': 'Equal',
+      '[': 'BracketLeft', ']': 'BracketRight',
+      '\\': 'Backslash', ';': 'Semicolon', "'": 'Quote',
+      ',': 'Comma',   '.': 'Period',       '/': 'Slash', '`': 'Backquote',
+      // Shift variants share the physical key code
+      '_': 'Minus',   '+': 'Equal',
+      '{': 'BracketLeft', '}': 'BracketRight',
+      '|': 'Backslash', ':': 'Semicolon',  '"': 'Quote',
+      '<': 'Comma',   '>': 'Period',        '?': 'Slash', '~': 'Backquote',
+      '!': 'Digit1',  '@': 'Digit2',  '#': 'Digit3',  r'$': 'Digit4', '%': 'Digit5',
+      '^': 'Digit6',  '&': 'Digit7',  '*': 'Digit8',  '(': 'Digit9',  ')': 'Digit0',
+    };
+    return m[s];
+  }
   // Tracks mods armed but not yet used in a combo; double-tap disarms + sends standalone.
   final Set<String> _modsUnused = {};
 
@@ -339,17 +361,32 @@ class _RemoteScreenState extends State<RemoteScreen> {
             if (mods.isNotEmpty) {
               for (final ch in parts[i].runes) {
                 final s = String.fromCharCode(ch);
-                final upper = s.toUpperCase();
-                final code = RegExp(r'^[a-zA-Z]$').hasMatch(s)
-                    ? 'Key$upper'
-                    : RegExp(r'^[0-9]$').hasMatch(s)
-                        ? 'Digit$s'
-                        : s == ' ' ? 'Space' : s;
+                final code = _charToCode(s) ?? s;
                 widget.session.sendInput({'event': 'keydown', 'key': s, 'code': code, 'mods': mods});
                 widget.session.sendInput({'event': 'keyup',   'key': s, 'code': code, 'mods': mods});
               }
             } else {
-              widget.session.sendInput({'event': 'paste_text', 'text': parts[i]});
+              // Use keydown/keyup for ASCII (XTest on Linux — terminals accept it).
+              // Fall back to paste_text only for CJK/emoji that have no key code.
+              final pasteBuffer = StringBuffer();
+              void flushPaste() {
+                if (pasteBuffer.isNotEmpty) {
+                  widget.session.sendInput({'event': 'paste_text', 'text': pasteBuffer.toString()});
+                  pasteBuffer.clear();
+                }
+              }
+              for (final ch in parts[i].runes) {
+                final s = String.fromCharCode(ch);
+                final code = _charToCode(s);
+                if (code != null) {
+                  flushPaste();
+                  widget.session.sendInput({'event': 'keydown', 'key': s, 'code': code, 'mods': const []});
+                  widget.session.sendInput({'event': 'keyup',   'key': s, 'code': code, 'mods': const []});
+                } else {
+                  pasteBuffer.writeCharCode(ch);
+                }
+              }
+              flushPaste();
             }
           }
           if (i < parts.length - 1) {
