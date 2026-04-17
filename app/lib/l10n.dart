@@ -146,6 +146,8 @@ class AppLocalizations {
       _s('会话密码已复制', 'Session password copied', '工作階段密碼已複製');
   String get hostedUnsupported =>
       _s('共享本机仅支持桌面平台', 'Hosting is only supported on desktop', '共享本機僅支援桌面平台');
+  String currentPlatform(String os) =>
+      _s('当前平台: $os', 'Current platform: $os', '目前平台：$os');
   String get selectCaCert => _s('选择 CA 证书文件', 'Select CA Certificate', '選擇 CA 憑證檔案');
   String get statusStopped  => _s('未共享',  'Not Sharing', '未共享');
   String get statusStarting => _s('启动中…', 'Starting…',   '啟動中…');

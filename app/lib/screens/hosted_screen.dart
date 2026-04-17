@@ -170,6 +170,7 @@ class _HostedScreenState extends State<HostedScreen> {
   // ── unsupported ──────────────────────────────────────────────────────────────
 
   Widget _buildUnsupported(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Stack(
       children: [
         Container(
@@ -218,7 +219,7 @@ class _HostedScreenState extends State<HostedScreen> {
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    '当前平台: ${Platform.operatingSystem}',
+                    l.currentPlatform(Platform.operatingSystem),
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.24),
                       fontSize: 12,
