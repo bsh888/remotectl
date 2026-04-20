@@ -1,25 +1,27 @@
-# RemoteCtl — Flutter 客户端
+# RemoteCtl — Flutter Client
 
-Android / iOS / macOS / Windows / Linux 原生控制端 App，使用 Flutter + flutter_webrtc 构建。
+[中文文档](README.zh.md)
 
-## 初始化项目
+Android / iOS / macOS / Windows / Linux native controller App, built with Flutter + flutter_webrtc.
+
+## Project Setup
 
 ```bash
 cd app
 
-# 初始化 Flutter 项目（首次）
+# Initialize Flutter project (first time only)
 flutter create . --org com.example --project-name remotectl
 
-# 启用桌面支持（首次，按需）
+# Enable desktop support (first time, as needed)
 flutter config --enable-macos-desktop
 flutter config --enable-windows-desktop
 flutter config --enable-linux-desktop
 
-# 安装依赖
+# Install dependencies
 flutter pub get
 ```
 
-**Linux 额外系统依赖：**
+**Linux extra system dependencies:**
 ```bash
 # Debian/Ubuntu
 sudo apt install libpulse-dev libgtk-3-dev liblzma-dev
@@ -31,55 +33,55 @@ sudo dnf install pulseaudio-libs-devel gtk3-devel
 sudo pacman -S libpulse gtk3
 ```
 
-初始化完成后，用本目录下的文件替换 Flutter 生成的同名文件：
+After initialization, replace Flutter-generated files with the ones in this directory:
 
-| 文件 | 说明 |
-|------|------|
-| `android/app/src/main/AndroidManifest.xml` | 网络/摄像头/唤醒锁权限 |
-| `ios/Runner/Info.plist` | 摄像头/麦克风使用说明 |
-| `macos/Runner/DebugProfile.entitlements` | macOS 沙箱：网络+摄像头+麦克风 |
-| `macos/Runner/Release.entitlements` | macOS 发布权限 |
-| `windows/runner/package.appxmanifest` | Windows：internetClient/microphone/webcam |
+| File | Purpose |
+|------|---------|
+| `android/app/src/main/AndroidManifest.xml` | Network / camera / wake-lock permissions |
+| `ios/Runner/Info.plist` | Camera / microphone usage descriptions |
+| `macos/Runner/DebugProfile.entitlements` | macOS sandbox: network + camera + microphone |
+| `macos/Runner/Release.entitlements` | macOS release permissions |
+| `windows/runner/package.appxmanifest` | Windows: internetClient / microphone / webcam |
 
-> Linux 无需额外权限配置，`flutter create` 生成的默认文件即可。
+> Linux requires no extra permission configuration — the default files from `flutter create` work as-is.
 
-## 构建运行
+## Build & Run
 
 ```bash
-# 桌面
+# Desktop
 flutter run -d macos          # macOS
 flutter run -d windows        # Windows
 flutter run -d linux          # Linux
 
-# 手机（连接后自动检测）
+# Mobile (auto-detected when device is connected)
 flutter run
 
-# 发布构建
+# Release builds
 flutter build macos --release
 flutter build windows --release
 flutter build linux --release
-flutter build ios --release           # 需要 macOS + Xcode
+flutter build ios --release           # requires macOS + Xcode
 
-# Android APK（按 ABI 拆分，包体更小）
+# Android APK (split by ABI for smaller size)
 flutter build apk --split-per-abi --release
-# 产物：build/app/outputs/flutter-apk/app-arm64-v8a-release.apk 等
+# Output: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk, etc.
 
-# Android AAB（上架 Google Play 用）
+# Android AAB (for Google Play)
 flutter build appbundle --release
 ```
 
-### Android 签名
+### Android Signing
 
-Release 包需要签名，否则无法安装到设备。
+Release builds must be signed to install on devices.
 
-**1. 生成 keystore（一次性）**
+**1. Generate a keystore (one-time)**
 
 ```bash
 keytool -genkey -v -keystore ~/remotectl.jks \
   -keyalg RSA -keysize 2048 -validity 10000 -alias remotectl
 ```
 
-**2. 创建 `android/key.properties`**（不提交到 git）
+**2. Create `android/key.properties`** (do not commit to git)
 
 ```
 storeFile=/Users/<you>/remotectl.jks
@@ -88,7 +90,7 @@ keyAlias=remotectl
 keyPassword=your_password
 ```
 
-**3. 在 `android/app/build.gradle` 中引用**
+**3. Reference it in `android/app/build.gradle`**
 
 ```groovy
 def keystoreProperties = new Properties()
@@ -109,126 +111,126 @@ android {
 }
 ```
 
-> keystore 文件务必妥善备份，丢失后无法为已发布的 App 发布更新。
+> Back up the keystore file carefully — if lost, you cannot publish updates to an already-released App.
 
-## iOS 真机调试
+## iOS Device Testing
 
-1. 用数据线连接 iPhone，iPhone 上点"信任此电脑"
-2. 打开 Xcode 项目：`open ios/Runner.xcworkspace`
-3. 在 Runner target → Signing & Capabilities 选择开发者 Team（免费 Apple ID 即可）
-4. 将 Bundle Identifier 改为唯一值，例如 `com.yourname.remotectl`
-5. 回到终端：`flutter run`
-6. 首次安装需在 iPhone 上信任证书：**设置 → 通用 → VPN与设备管理 → 信任**
+1. Connect your iPhone with a cable; tap "Trust This Computer" on the device
+2. Open the Xcode project: `open ios/Runner.xcworkspace`
+3. Under Runner target → Signing & Capabilities, select your developer Team (free Apple ID works)
+4. Change the Bundle Identifier to something unique, e.g. `com.yourname.remotectl`
+5. Back in terminal: `flutter run`
+6. First install: trust the certificate on iPhone under **Settings → General → VPN & Device Management → Trust**
 
-> iPhone 需安装与 Xcode 匹配的 iOS 版本 SDK。如果 Xcode 报"iOS X.X is not installed"，到 **Xcode → Settings → Platforms** 下载对应版本。
+> The iPhone must have an iOS version supported by your installed Xcode SDK. If Xcode reports "iOS X.X is not installed", download it from **Xcode → Settings → Platforms**.
 
-## 多语言
+## Localization
 
-App 内置简体中文 / English / 繁體中文，点击右上角地球图标切换，偏好通过 SharedPreferences 持久化。
+The App ships with Simplified Chinese / English / Traditional Chinese. Tap the globe icon in the top-right corner to switch; the preference is persisted via SharedPreferences.
 
-## 会话内聊天
+## In-Session Chat
 
-连接建立后，控制端和被控端可互发文字消息和文件：
+After a session is established, the controller and host can exchange text messages and files:
 
-- **控制端**（`remote_screen.dart` / `remote_screen_desktop.dart`）：工具栏/底栏聊天按钮打开 `ChatPanel`
-  - 移动端：`DraggableScrollableSheet` 底部弹出
-  - 桌面端：右侧固定宽 300px 覆盖层
-- **被控端**（`hosted_screen.dart`）：agent 运行中聊天图标出现，通过 stdio IPC 与 agent 子进程通信
-- 文件保存到 `~/Downloads`；iOS/Android 保存到 App Documents 目录
+- **Controller** (`remote_screen.dart` / `remote_screen_desktop.dart`): chat button in toolbar opens `ChatPanel`
+  - Mobile: slides up as a `DraggableScrollableSheet`
+  - Desktop: fixed 300 px overlay on the right side
+- **Host** (`hosted_screen.dart`): chat icon appears while agent is running; communicates with the agent subprocess via stdio IPC
+- Files are saved to `~/Downloads`; iOS/Android saves to the App's Documents directory
 
-## 平台对比
+## Platform Comparison
 
-| 平台 | 控制端界面 | 键盘捕获 | 鼠标右键 |
-|------|-----------|---------|---------|
-| 浏览器 | Web | 受限（F5/Ctrl+T 等被拦截） | 支持 |
-| macOS App | 桌面 | **完整捕获** | 支持 |
-| Windows App | 桌面 | **完整捕获** | 支持 |
-| Linux App | 桌面 | **完整捕获** | 支持 |
-| Android / iOS | 移动触屏 | 通过软键盘 | 长按 600ms |
+| Platform | Controller UI | Keyboard capture | Right-click |
+|----------|--------------|-----------------|-------------|
+| Browser | Web | Limited (F5/Ctrl+T etc. intercepted) | Supported |
+| macOS App | Desktop | **Full capture** | Supported |
+| Windows App | Desktop | **Full capture** | Supported |
+| Linux App | Desktop | **Full capture** | Supported |
+| Android / iOS | Mobile touch | Via soft keyboard | Long-press 600 ms |
 
-## 桌面端操作说明
+## Desktop Usage
 
-### 鼠标
+### Mouse
 
-| 操作 | 效果 |
-|------|------|
-| 移动 | 移动远程鼠标（本地光标自动隐藏） |
-| 左键单/双击 | 远程左键单/双击 |
-| 右键单击 | 远程右键菜单 |
-| 滚轮 | 远程滚轮 |
+| Action | Effect |
+|--------|--------|
+| Move | Moves remote cursor (local cursor auto-hidden) |
+| Left single/double click | Remote left single/double click |
+| Right click | Remote right-click menu |
+| Scroll wheel | Remote scroll |
 
-### 键盘
+### Keyboard
 
-全部键盘事件直接转发，包括：
-- F1–F12、PrintScreen、Pause 等功能键
-- Ctrl+C / Ctrl+W / F5 等被浏览器拦截的快捷键
-- 输入法（IME）组合输入
+All key events are forwarded directly, including:
+- F1–F12, PrintScreen, Pause, and other function keys
+- Shortcuts intercepted by browsers (Ctrl+C / Ctrl+W / F5, etc.)
+- IME composition input
 
-### Ctrl ⇄ Cmd 开关（工具栏）
+### Ctrl ⇄ Cmd Toggle (toolbar)
 
-| 场景 | 默认行为 |
-|------|---------|
-| Mac 客户端 → Mac 远程 | 关闭（Cmd 发 Cmd） |
-| Mac 客户端 → Windows / Linux 远程 | **开启**（Cmd 自动转 Ctrl） |
-| Windows / Linux 客户端 → Mac 远程 | **开启**（Ctrl 自动转 Cmd） |
-| Windows / Linux 客户端 → Windows / Linux 远程 | 关闭 |
+| Scenario | Default |
+|----------|---------|
+| Mac controller → Mac remote | Off (Cmd sends Cmd) |
+| Mac controller → Windows / Linux remote | **On** (Cmd auto-converted to Ctrl) |
+| Windows / Linux controller → Mac remote | **On** (Ctrl auto-converted to Cmd) |
+| Windows / Linux controller → Windows / Linux remote | Off |
 
-### 手机端手势
+### Mobile Gestures
 
-| 手势 | 操作 |
-|------|------|
-| 单指点击 | 鼠标左键单击 |
-| 单指长按（600ms） | 鼠标右键单击（震动反馈） |
-| 单指拖动 | 鼠标移动 |
-| 双指捏合/张开 | 缩放视图 |
-| 双指拖动 | 滚轮滚动 |
-| 工具栏键盘按钮 | 弹出系统键盘（支持 IME 中文输入） |
-| 工具栏粘贴按钮 | 将手机剪贴板内容粘贴到远程 |
+| Gesture | Action |
+|---------|--------|
+| Single tap | Left mouse click |
+| Long press (600 ms) | Right mouse click (haptic feedback) |
+| Single finger drag | Mouse move |
+| Two-finger pinch/spread | Zoom view |
+| Two-finger drag | Scroll wheel |
+| Keyboard button in toolbar | Open system keyboard (supports IME / CJK input) |
+| Paste button in toolbar | Paste phone clipboard content to remote |
 
-### 修饰键工具栏
+### Modifier Key Toolbar
 
-键盘弹出后顶部显示修饰键行，支持组合快捷键：
+When the keyboard is open, a modifier row appears at the top for keyboard shortcuts:
 
-| 按键 | 说明 |
-|------|------|
-| `Ctrl` `Shift` `Alt` `Win` `Cmd` | 点击激活（高亮），再次点击取消 |
-| `1`–`9` `0` | 直接发送数字键（无需切换键盘布局） |
-| `Tab` `Esc` `←` `→` `↑` `↓` | 常用编辑/导航键 |
-| `F1`–`F12` | 功能键 |
+| Key | Notes |
+|-----|-------|
+| `Ctrl` `Shift` `Alt` `Win` `Cmd` | Tap to activate (highlighted); tap again to deactivate |
+| `1`–`9` `0` | Send digit keys directly (no keyboard layout switch needed) |
+| `Tab` `Esc` `←` `→` `↑` `↓` | Common editing / navigation keys |
+| `F1`–`F12` | Function keys |
 
-> 组合示例：点击 `Ctrl` → 点击 `B` → 点击 `1`，发送 Ctrl+B+1 快捷键
+> Example: tap `Ctrl` → tap `B` → tap `1` to send the Ctrl+B+1 shortcut (tmux window switching)
 
-## iOS 注意事项
+## iOS Notes
 
-### 使用 Release 构建
+### Use Release Build
 
-通过 Xcode 安装的默认是 Debug 构建，关闭 App 后再从桌面点击图标会崩溃。
-必须改用 Release 模式：
+The default install via Xcode is a Debug build; launching the App from the home screen after closing it will crash.
+Switch to Release mode:
 
-**Xcode：** Product → Scheme → Edit Scheme → Run → Build Configuration → **Release**
+**Xcode:** Product → Scheme → Edit Scheme → Run → Build Configuration → **Release**
 
-或命令行：
+Or via command line:
 ```bash
 flutter build ios --release
-# 然后在 Xcode 中 Cmd+R 安装到真机
+# Then install to device with Cmd+R in Xcode
 ```
 
-### 首次启动权限
+### First-Launch Permissions
 
-- **本地网络访问**：WebRTC ICE 打洞需要，首次弹窗时选"允许"
-- **摄像头 / 麦克风**：flutter_webrtc 初始化时请求，实际不会使用本机摄像头和麦克风
+- **Local Network Access**: required for WebRTC ICE; tap "Allow" when prompted
+- **Camera / Microphone**: requested by flutter_webrtc on init; the App does not actually use the local camera or microphone
 
-## App 图标
+## App Icon
 
-图标源文件：`scripts/icon-source.svg`（SIGNAL DARK 风格，深色背景 + 橙色 accent）
+Icon source: `scripts/icon-source.svg` (SIGNAL DARK style — dark background + orange accent)
 
-修改图标后运行以下命令重新生成所有平台图标（需要 `rsvg-convert` + `magick`）：
+After editing the SVG, regenerate all platform icons (requires `rsvg-convert` + `magick`):
 
 ```bash
-# macOS 安装依赖（一次性）
+# macOS: install dependencies (one-time)
 brew install librsvg imagemagick
 
 bash scripts/gen-icons.sh
 ```
 
-覆盖 macOS / iOS / Android / Windows 全平台尺寸。
+Covers macOS / iOS / Android / Windows at all required sizes.
