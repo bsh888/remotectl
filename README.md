@@ -1,85 +1,110 @@
 # RemoteCtl
 
-跨平台远程桌面工具，支持 macOS / Windows / Linux 被控端，浏览器或原生 App 作为控制端。
+[![Stars](https://img.shields.io/github/stars/bsh888/remotectl?style=flat-square)](https://github.com/bsh888/remotectl)
+&nbsp;[中文文档](README.zh.md)
 
-## 功能特性
+Cross-platform remote desktop tool. macOS / Windows / Linux as host, browser or native App as controller.
 
-- **H.264 硬件编码**：macOS 使用 VideoToolbox，Windows/Linux 使用 x264
-- **WebRTC 传输**：视频流点对点直连，服务器不经手视频数据
-- **TURN 中继**：自动为移动网络（4G/5G）/ 对称型 NAT 提供中继
-- **E2EE 输入加密**：ECDH P-256 + AES-256-GCM 端对端加密输入事件
-- **低延迟鼠标**：本地光标叠加层即时反馈，输入走 P2P DataChannel
-- **跨平台剪贴板**：控制端粘贴文本到远程，支持中文 / Emoji
-- **会话内聊天**：控制端与被控端实时文字消息 + 文件互传
-- **会话密码认证**：每次启动随机生成 8 位数字密码，简单安全
-- **一体化桌面 App**：macOS/Windows/Linux 原生 App 同时内置"远程控制"和"共享本机"两种模式
-- **systemd 部署**：发布包内置 install.sh，一键部署为系统服务，无需 root 绑定 443 端口
+## Features
 
-## 下载
+- **H.264 hardware encoding** — VideoToolbox on macOS, x264 on Windows/Linux
+- **WebRTC transport** — peer-to-peer video stream; the server never touches video data
+- **TURN relay** — automatic relay for mobile (4G/5G) / symmetric NAT environments
+- **E2EE input encryption** — ECDH P-256 + AES-256-GCM end-to-end encrypted input events
+- **Low-latency mouse** — local cursor overlay for instant feedback; input over P2P DataChannel
+- **Cross-platform clipboard** — paste text (including CJK / Emoji) from controller to remote
+- **In-session chat** — real-time text messages and file transfer between controller and host
+- **Session password auth** — random 8-digit password generated on each start, simple and secure
+- **All-in-one desktop App** — single App for macOS/Windows/Linux with both "Remote Control" and "Share This PC" modes
+- **systemd deployment** — release package includes `install.sh` for one-command service setup, no root required for port 443
 
-前往 [Releases](https://github.com/bsh888/remotectl/releases) 页面下载对应平台的安装包。
+## vs. Commercial Tools
 
-| 文件 | 说明 |
-|------|------|
-| `remotectl-app-macos-vX.Y.Z.zip` | macOS App（控制端 + 被控端二合一） |
-| `remotectl-app-windows-amd64-vX.Y.Z.zip` | Windows App（控制端 + 被控端二合一） |
-| `remotectl-app-linux-amd64-vX.Y.Z.tar.gz` | Linux App（控制端 + 被控端二合一） |
-| `remotectl-agent-linux-amd64-vX.Y.Z.tar.gz` | Linux 被控端（无 GUI / headless 服务器） |
-| `remotectl-server-linux-amd64-vX.Y.Z.tar.gz` | 信令服务器 Linux x86_64（含 systemd 部署脚本） |
-| `remotectl-server-linux-arm64-vX.Y.Z.tar.gz` | 信令服务器 Linux ARM64（含 systemd 部署脚本） |
+RemoteCtl shares the same WebRTC technology stack as Sunflower, TeamViewer, etc. The key differences are **control depth** and **data sovereignty**:
 
-## 快速开始
+| Feature | RemoteCtl | Sunflower |
+|---------|:---------:|:---------:|
+| Open source | ✓ | — |
+| Self-hosted (no third-party server) | ✓ | — |
+| Browser control (no client install) | ✓ | Partial |
+| Fully custom bitrate / resolution / FPS | ✓ | Partial |
+| Full mobile keyboard (modifiers + number row + F1–F12) | ✓ | Partial |
+| In-session chat + P2P file transfer | ✓ | — |
+| Completely free | ✓ | Partial |
 
-### 桌面 App（控制端 + 被控端）
+- **Self-hosted**: deploy one public Linux server; video travels over WebRTC P2P and the server only forwards signaling — no audio/video ever passes through it.
+- **Quality tuning**: `bitrate`, `scale` (resolution), and `fps` are all independently adjustable. Max out `scale:1.0 bitrate:8M` on LAN; drop to `scale:0.5 bitrate:1M` on mobile 4G.
+- **Mobile keyboard**: modifier keys (Ctrl / Shift / Alt / Win / ⌘) can be pressed standalone; number row, arrow keys, and F1–F12 are always visible in the toolbar — enabling combos like Ctrl+B+1 for tmux.
+- **In-session chat**: controller and host communicate via WebRTC DataChannel directly (no server), with system notifications on the host side — great for sharing links, screenshots, and config files.
 
-下载对应平台的 `remotectl-app-*` 包，解压直接运行。App 内置两种模式：
-- **远程控制**：输入设备 ID + 会话密码，连接并控制远程机器
-- **共享本机**：将本机屏幕共享给控制端
+> Sunflower data sourced from public materials; refer to its latest official release for accuracy.
 
-### Linux 无 GUI 被控端
+## Download
 
-适用于无桌面环境的 Linux 服务器，下载 `remotectl-agent-linux-amd64-*` 包：
+Go to the [Releases](https://github.com/bsh888/remotectl/releases) page to download the package for your platform.
+
+| File | Description |
+|------|-------------|
+| `remotectl-app-macos-vX.Y.Z.zip` | macOS App (controller + host in one) |
+| `remotectl-app-windows-amd64-vX.Y.Z.zip` | Windows App (controller + host in one) |
+| `remotectl-app-linux-amd64-vX.Y.Z.tar.gz` | Linux App (controller + host in one) |
+| `remotectl-agent-linux-amd64-vX.Y.Z.tar.gz` | Linux headless agent (no GUI, for servers) |
+| `remotectl-server-linux-amd64-vX.Y.Z.tar.gz` | Signaling server — Linux x86_64 (includes systemd scripts) |
+| `remotectl-server-linux-arm64-vX.Y.Z.tar.gz` | Signaling server — Linux ARM64 (includes systemd scripts) |
+
+## Quick Start
+
+### Desktop App (controller + host)
+
+Download the `remotectl-app-*` package for your platform, unzip, and run. The App has two modes:
+
+- **Remote Control** — enter a Device ID and session password to connect and control a remote machine
+- **Share This PC** — share your screen with a controller
+
+### Linux Headless Agent
+
+For Linux servers without a desktop environment, download `remotectl-agent-linux-amd64-*`:
 
 ```bash
 tar xzf remotectl-agent-linux-amd64-vX.Y.Z.tar.gz
 cd remotectl-agent-linux-amd64-vX.Y.Z
 cp agent.yaml.example agent.yaml
-vim agent.yaml   # 填入 server 地址和 token
+vim agent.yaml   # fill in server address and token
 ./remotectl-agent --config agent.yaml
 ```
 
-### 信令服务器（自建）
+### Signaling Server (self-hosted)
 
-下载 `remotectl-server-linux-*` 包，解压后一键部署为 systemd 服务：
+Download the `remotectl-server-linux-*` package and deploy as a systemd service:
 
 ```bash
 tar xzf remotectl-server-linux-amd64-vX.Y.Z.tar.gz
 cd remotectl-server-linux-amd64-vX.Y.Z
 
-# （可选）生成自签名 TLS 证书，如已有域名证书可跳过此步
-bash gen-cert.sh ./certs 1.2.3.4          # 替换为服务器公网 IP
-# bash gen-cert.sh ./certs 1.2.3.4 my.domain.com   # 同时绑定域名
+# (optional) generate a self-signed TLS cert; skip if you already have one
+bash gen-cert.sh ./certs 1.2.3.4          # replace with your server's public IP
+# bash gen-cert.sh ./certs 1.2.3.4 my.domain.com   # also bind a domain name
 
-sudo bash install.sh    # 安装到 /opt/remotectl，自动添加 iptables 443 规则
-sudo vim /opt/remotectl/server.yaml   # 填入 tokens、TLS 证书路径、TURN 配置
+sudo bash install.sh    # installs to /opt/remotectl, adds iptables rule for port 443
+sudo vim /opt/remotectl/server.yaml   # fill in tokens, TLS paths, TURN config
 sudo systemctl restart remotectl-server
 ```
 
-### TURN 中继（移动网络必配）
+### TURN Relay (required for mobile networks)
 
-手机 4G/5G、运营商 NAT 环境下需要 TURN 中继，在同一台服务器上安装 coturn：
+Needed for 4G/5G and carrier-grade NAT. Install coturn on the same server:
 
 ```bash
 sudo apt install -y coturn
 sudo sed -i 's/#TURNSERVER_ENABLED/TURNSERVER_ENABLED/' /etc/default/coturn
 ```
 
-`/etc/turnserver.conf` 关键配置：
+Key settings in `/etc/turnserver.conf`:
 
 ```
 listening-port=3478
-external-ip=<服务器公网IP>
-realm=<域名或IP>
+external-ip=<server public IP>
+realm=<domain or IP>
 lt-cred-mech
 user=remotectl:changeme
 no-multicast-peers
@@ -89,7 +114,7 @@ no-multicast-peers
 sudo systemctl enable --now coturn
 ```
 
-在 `server.yaml` 填入 TURN 配置：
+Add TURN config to `server.yaml`:
 
 ```yaml
 turn:
@@ -98,7 +123,7 @@ turn:
   password: "changeme"
 ```
 
-**OS 防火墙（iptables）：**
+**OS firewall (iptables):**
 
 ```bash
 sudo iptables -I INPUT -p udp --dport 3478 -j ACCEPT
@@ -107,23 +132,23 @@ sudo iptables -I INPUT -p udp --dport 49152:65535 -j ACCEPT
 sudo netfilter-persistent save
 ```
 
-**OCI 安全列表（控制台）：** 网络 → 虚拟云网络 → 你的 VCN → 安全列表 → 默认安全列表 → 添加入站规则：
+**OCI Security List (console):** Networking → Virtual Cloud Networks → your VCN → Security Lists → Default Security List → Add Ingress Rules:
 
-| 源 CIDR | 协议 | 目标端口范围 |
-|---------|------|------------|
+| Source CIDR | Protocol | Destination Port |
+|-------------|----------|-----------------|
 | `0.0.0.0/0` | UDP | `3478` |
 | `0.0.0.0/0` | TCP | `3478` |
 | `0.0.0.0/0` | UDP | `49152-65535` |
 
-> OCI 有两层防火墙（安全列表 + 实例 iptables），两层都必须放行，缺一不可。
+> OCI has two firewall layers (Security List + instance iptables) — both must allow the ports.
 
-## 平台支持
+## Platform Support
 
-| 平台 | 控制端 | 被控端 |
-|------|--------|--------|
-| macOS | ✅ App | ✅ App 内置 |
-| Windows | ✅ App | ✅ App 内置 |
-| Linux | ✅ App | ✅ App 内置 / 独立 agent |
+| Platform | Controller | Host |
+|----------|-----------|------|
+| macOS | ✅ App | ✅ built into App |
+| Windows | ✅ App | ✅ built into App |
+| Linux | ✅ App | ✅ App / standalone agent |
 | iOS | ✅ App | ❌ |
 | Android | ✅ App | ❌ |
-| 浏览器 | ✅ Web | ❌ |
+| Browser | ✅ Web | ❌ |
