@@ -35,7 +35,7 @@ make all            # 全量构建
 
 ## 发布 Release
 
-源码不开源，只发布各平台二进制包到 GitHub Releases。分三步在不同平台执行：
+分三步在不同平台执行：
 
 **第一步：macOS（主构建）**— server 全平台、agent mac+windows、Flutter macOS App
 
