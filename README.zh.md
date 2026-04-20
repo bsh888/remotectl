@@ -38,6 +38,37 @@
 
 > 向日葵数据来自公开资料，如有出入以官方最新版本为准。
 
+## 截图预览
+
+**网站首页**
+
+![首页 Hero](docs/images/20260417155614_214_272.png)
+![功能与下载页](docs/images/20260417155650_215_272.png)
+
+**桌面 App — 被控端 + 聊天**
+
+![macOS 被控端与聊天面板](docs/images/20260417160025_216_272.png)
+
+**浏览器控制端**
+
+<table>
+<tr>
+<td><img src="docs/images/20260417160323_217_272.png" alt="管理后台控制 Windows 桌面"></td>
+<td><img src="docs/images/20260417160509_218_272.png" alt="浏览器控制面板"></td>
+</tr>
+</table>
+
+**移动端 — 连接、键盘与聊天**
+
+<table>
+<tr>
+<td><img src="docs/images/20260417160558_222_272.png" alt="iOS 连接界面" width="200"></td>
+<td><img src="docs/images/20260417160555_220_272.png" alt="完整键盘工具栏" width="200"></td>
+<td><img src="docs/images/20260417160556_221_272.png" alt="系统键盘 + 修饰键行" width="200"></td>
+<td><img src="docs/images/20260417160554_219_272.png" alt="会话内聊天与文件传输" width="200"></td>
+</tr>
+</table>
+
 ## 下载
 
 前往 [Releases](https://github.com/bsh888/remotectl/releases) 页面下载对应平台的安装包。
